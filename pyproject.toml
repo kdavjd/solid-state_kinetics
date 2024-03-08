@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "solid-state-kinetics"
+version = "0.1.0"
+description = "calculating kinetic models of chemical solid-state reactions"
+authors = ["kdavjd <105581554+kdavjd@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.12"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
