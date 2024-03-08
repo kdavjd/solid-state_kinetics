@@ -1,6 +1,8 @@
 # solid-state_kinetics
 
+[![.github/workflows/pre-commit.yml](https://github.com/kdavjd/solid-state_kinetics/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/kdavjd/solid-state_kinetics/actions/workflows/pre-commit.yml)
 
+---
 
 ## Setup dev environment
 
