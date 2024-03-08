@@ -1,7 +1,7 @@
 import logging
 
 
-def configure_logger():
+def configure_logger() -> logging.Logger:
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
