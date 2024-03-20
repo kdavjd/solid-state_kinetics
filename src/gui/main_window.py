@@ -2,7 +2,8 @@ from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout,  # pylint: disable=E0611
                              QWidget)
 
 from .plot_canvas import PlotCanvas
-from .side_bar import SideBar
+
+# from .side_bar import SideBar
 
 
 class MainWindow(QMainWindow):
@@ -22,7 +23,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.plot_canvas)
 
         # Sidebar
-        self.sidebar = SideBar(self)
+        # self.sidebar = SideBar(self)
         self.layout.addWidget(self.sidebar)
 
     def public_method_1(self):

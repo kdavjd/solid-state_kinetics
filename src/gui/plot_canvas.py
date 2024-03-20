@@ -1,13 +1,14 @@
 from typing import Optional
 
 import matplotlib.pyplot as plt
+import scienceplots  # noqa
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import \
     NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from PyQt6.QtWidgets import QWidget  # pylint: disable=no-name-in-module
 
-from src.logger_config import logger
+from core.logger_config import logger
 
 # Применяем стили scienceplots
 plt.style.use(['science', 'no-latex', 'nature', 'grid'])

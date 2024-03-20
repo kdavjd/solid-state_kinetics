@@ -13,6 +13,9 @@ packages = [{ include = "*", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
+PyQt6 = "^6.6.1"
+matplotlib = "^3.8.3"
+SciencePlots = "^2.1.1"
 
 [tool.poetry.dev-dependencies]
 pre-commit = "^3.6.2"
