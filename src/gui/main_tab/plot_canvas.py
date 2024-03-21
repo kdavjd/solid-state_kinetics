@@ -1,8 +1,9 @@
 from typing import Optional
 
-# Применяем стили scienceplots
 import matplotlib.pyplot as plt
 import pandas as pd
+# see: https://pypi.org/project/SciencePlots/
+import scienceplots  # noqa pylint: disable=unused-import
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import \
     NavigationToolbar2QT as NavigationToolbar
@@ -10,10 +11,11 @@ from matplotlib.figure import Figure
 from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
-from src.logger_config import logger
-from src.logger_console import LoggerConsole as console
+from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
 
 plt.style.use(['science', 'no-latex', 'nature', 'grid'])
+
 
 class PlotCanvas(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
@@ -25,10 +27,10 @@ class PlotCanvas(QWidget):
 
         self.toolbar = NavigationToolbar(self.canvas, self)
 
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
-        self.layout.addWidget(self.toolbar)
-        self.layout.addWidget(self.canvas)
+        layout = QVBoxLayout()
+        layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
+        self.setLayout(layout)
 
         self.mock_plot()
 
@@ -41,7 +43,7 @@ class PlotCanvas(QWidget):
         self.canvas.draw()
 
     def add_plot(self, x, y, label: str):
-        logger.debug(f"Добавление кривой: {label}")
+        logger.debug('Добавление кривой: %s', label)
         console.log(f"Добавление кривой: {label}")
         self.axes.plot(x, y, label=label)
         self.figure.tight_layout()
@@ -57,6 +59,7 @@ class PlotCanvas(QWidget):
                 if column != 'temperature':
                     self.add_plot(x, data[column], label=column)
         else:
-            logger.error("В DataFrame отсутствует столбец 'temperature' для оси X")
+            logger.error(
+                "В DataFrame отсутствует столбец 'temperature' для оси X")
             console.log("В файле отсутствует столбец 'temperature' для оси X")
         self.canvas.draw()

@@ -11,4 +11,3 @@ class SideBar(QWidget):
         self.load_button = LoadButton("Загрузить", self)
         self.layout.addWidget(self.load_button)
         self.setLayout(self.layout)
-

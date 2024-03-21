@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QVBoxLayout)
 
-from src.logger_config import logger
+from core.logger_config import logger
 
 
 class LoadButton(QPushButton):
@@ -26,11 +26,13 @@ class LoadButton(QPushButton):
                 self.pre_load_dialog(file_path)
         except Exception as e:
             logger.error("Ошибка при загрузке файла: %s", e)
-    
+
     def pre_load_dialog(self, file_path):
         dialog = PreLoadDialog(file_path, self)
         if dialog.exec():
-            self.file_selected.emit((dialog.file_path(), dialog.delimiter(), dialog.skip_rows(), dialog.columns_names()))
+            self.file_selected.emit((dialog.file_path(), dialog.delimiter(
+            ), dialog.skip_rows(), dialog.columns_names()))
+
 
 class PreLoadDialog(QDialog):
     def __init__(self, file_path, parent=None):
@@ -59,13 +61,14 @@ class PreLoadDialog(QDialog):
         row_layout.addWidget(self.skip_rows_edit)
         layout.addLayout(row_layout)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
         self.setLayout(layout)
-    
+
     def file_path(self):
         return self.file_path_edit.text()
 

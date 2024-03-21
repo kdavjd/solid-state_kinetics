@@ -1,7 +1,7 @@
 import pandas as pd
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
-from logger_config import logger
+from core.logger_config import logger
 
 
 class PandasModel(QAbstractTableModel):
@@ -11,7 +11,7 @@ class PandasModel(QAbstractTableModel):
     Attributes:
         data_changed_signal (pyqtSignal): Сигнал изменения данных.
     """
-    
+
     data_changed_signal = pyqtSignal(pd.DataFrame)
 
     def __init__(self, data, parent=None):
@@ -64,7 +64,7 @@ class PandasModel(QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 return str(self._data.iloc[index.row(), index.column()])
         return None
-    
+
     def removeRow(self, row, parent=None):
         """
         Удаляет строку из DataFrame.
@@ -105,8 +105,8 @@ class PandasModel(QAbstractTableModel):
         if orientation == Qt.Orientation.Horizontal:
             return self._data.columns[section]
         if orientation == Qt.Orientation.Vertical:
-            return self._data.index[section]    
-    
+            return self._data.index[section]
+
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
         """
         Изменяет данные в DataFrame.
@@ -125,12 +125,13 @@ class PandasModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
 
-        try:            
+        try:
             converted_value = float(str(value).replace(',', '.'))
             self._data.iat[row, col] = converted_value
             self.dataChanged.emit(index, index, [role])
-            self.data_changed_signal.emit(self._data)            
-            logger.debug(f"Данные изменены в строке {row}, столбце {col}: {converted_value}")
+            self.data_changed_signal.emit(self._data)
+            logger.debug(f"Данные изменены в строке {
+                         row}, столбце {col}: {converted_value}")
             return True
         except Exception as e:
             print(f"Error setting data: {e}")

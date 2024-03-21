@@ -26,6 +26,6 @@ class TableWidget(QTableWidget):
         self.setColumnCount(len(df.columns))
         self.setHorizontalHeaderLabels(df.columns.tolist())
 
-        for i, (index, row) in enumerate(df.iterrows()):
+        for i, (_, row) in enumerate(df.iterrows()):
             for j, value in enumerate(row):
                 self.setItem(i, j, QTableWidgetItem(str(value)))
