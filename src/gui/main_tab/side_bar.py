@@ -1,13 +1,50 @@
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from os import path
+
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QStandardItem, QStandardItemModel
+from PyQt6.QtWidgets import QTreeView, QVBoxLayout, QWidget
 
 from .load_file_button import LoadButton
 
 
 class SideBar(QWidget):
+    file_selected = pyqtSignal(tuple)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout()
 
-        self.load_button = LoadButton("Загрузить", self)
-        self.layout.addWidget(self.load_button)
+        self.tree_view = QTreeView()
+        self.tree_view.clicked.connect(self.on_item_clicked)
+        self.model = QStandardItemModel()
+        self.model.setHorizontalHeaderLabels(["Управление проектом"])
+        self.tree_view.setModel(self.model)
+
+        self.experiments_data_root = QStandardItem("Данные экспериментов")
+        self.model.appendRow(self.experiments_data_root)
+
+        self.add_data_item = QStandardItem("Добавить новые данные")
+        self.experiments_data_root.appendRow(self.add_data_item)
+
+        self.calculation_root = QStandardItem("Безмодельный расчет")
+        self.model.appendRow(self.calculation_root)
+
+        self.calculation_root.appendRow(QStandardItem("Деконволюция"))
+        self.calculation_root.appendRow(QStandardItem("Энергия активации"))
+        self.calculation_root.appendRow(QStandardItem("Свободный коэффициент"))
+
+        self.layout.addWidget(self.tree_view)
         self.setLayout(self.layout)
+
+        self.load_button = LoadButton(self)
+        self.load_button.file_selected.connect(self.add_experiment_file)
+
+    def on_item_clicked(self, index):
+        item = self.model.itemFromIndex(index)
+        if item == self.add_data_item:
+            self.load_button.open_file_dialog()
+
+    def add_experiment_file(self, file_info):
+        new_file_item = QStandardItem(path.basename(file_info[0]))
+        self.experiments_data_root.insertRow(self.experiments_data_root.rowCount() - 1, new_file_item)
+        self.tree_view.expandAll()

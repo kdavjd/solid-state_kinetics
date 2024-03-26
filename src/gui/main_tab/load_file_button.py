@@ -2,20 +2,16 @@ import os
 
 from PyQt6.QtCore import QSize, pyqtSignal
 from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                             QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QVBoxLayout)
+                             QHBoxLayout, QLabel, QLineEdit, QVBoxLayout,
+                             QWidget)
 
-from core.logger_config import logger
+from src.core.logger_config import logger
 
 
-class LoadButton(QPushButton):
+class LoadButton(QWidget):
     file_selected = pyqtSignal(tuple)
 
     file_extensions = 'CSV files (*.csv);;Text files (*.txt)'
-
-    def __init__(self, title, parent=None):
-        super().__init__(title, parent)
-        self.clicked.connect(self.open_file_dialog)
 
     def open_file_dialog(self):
         try:
@@ -30,8 +26,8 @@ class LoadButton(QPushButton):
     def pre_load_dialog(self, file_path):
         dialog = PreLoadDialog(file_path, self)
         if dialog.exec():
-            self.file_selected.emit((dialog.file_path(), dialog.delimiter(
-            ), dialog.skip_rows(), dialog.columns_names()))
+            self.file_selected.emit(
+                (dialog.file_path(), dialog.delimiter(), dialog.skip_rows(), dialog.columns_names()))
 
 
 class PreLoadDialog(QDialog):
@@ -61,8 +57,7 @@ class PreLoadDialog(QDialog):
         row_layout.addWidget(self.skip_rows_edit)
         layout.addLayout(row_layout)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
