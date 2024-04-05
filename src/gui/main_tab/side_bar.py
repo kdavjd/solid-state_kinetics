@@ -80,4 +80,12 @@ class SideBar(QWidget):
         self.experiments_data_root.insertRow(self.experiments_data_root.rowCount() - 1, new_file_item)
         self.tree_view.expandAll()
         self.mark_as_active(new_file_item)
-        logger.debug(f"New file added and marked as active: {new_file_item.text()}")
+        logger.debug(f"Новый файл добавлен и выбран активным: {new_file_item.text()}")
+
+    def get_experiment_files_list(self) -> list[str]:
+        files_list = []
+        for row in range(self.experiments_data_root.rowCount() - 1):
+            item = self.experiments_data_root.child(row)
+            if item is not None:
+                files_list.append(item.text())
+        return files_list

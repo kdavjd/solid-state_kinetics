@@ -85,7 +85,7 @@ class FileData(QObject):
             self.data.columns = [name.strip() for name in self.columns_names]
             self.original_data[file_basename] = self.data.copy()
             self.dataframe_copies[file_basename] = self.data.copy()
-            logger.debug("Добавлен новый файл: %s", self.dataframe_copies[file_basename].info())
+            logger.debug("Добавлен новый файл, размером: %s", self.dataframe_copies[file_basename].shape)
             logger.debug(f"Ключи dataframe_copies: {self.dataframe_copies.keys()}")
         else:
             logger.warning(

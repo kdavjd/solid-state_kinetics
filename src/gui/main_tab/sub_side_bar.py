@@ -1,5 +1,7 @@
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
+from src.core.logger_config import logger
+
 
 class SubSideBar(QWidget):
     def __init__(self, parent=None):
@@ -8,6 +10,7 @@ class SubSideBar(QWidget):
         self.current_widget = None
 
     def update_content(self, content_type):
+        logger.info("SubSideBar контент: %s", content_type)
         if self.current_widget is not None:
             self.layout.removeWidget(self.current_widget)
             self.current_widget.deleteLater()
@@ -16,6 +19,8 @@ class SubSideBar(QWidget):
             self.current_widget = DeconvolutionSubBar(self)
         elif content_type == "Энергия активации":
             self.current_widget = EaSubBar(self)
+        elif content_type == "Эксперимент":
+            self.current_widget = QLabel("Эксперимент", self)
         else:
             self.current_widget = QLabel("Неизвестный контент", self)
 

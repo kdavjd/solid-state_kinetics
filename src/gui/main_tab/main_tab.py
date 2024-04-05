@@ -1,8 +1,6 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
-from src.core.logger_config import logger
-
 from ..console_widget import ConsoleWidget
 from .plot_canvas import PlotCanvas
 from .side_bar import SideBar
@@ -34,35 +32,28 @@ class MainTab(QWidget):
 
     def initialize_sizes(self):
         total_width = self.width()
-        logger.debug(f"Общая ширина: {total_width}")
-
         sidebar_width = int(total_width / 5)
         console_width = int(total_width / 5)
 
         if self.sub_sidebar.isVisible():
-            logger.debug("SubSideBar видим")
             sub_sidebar_width = int(total_width / 6)
             canvas_width = int(total_width - sidebar_width - sub_sidebar_width - console_width)
             self.splitter.setSizes([sidebar_width, sub_sidebar_width, canvas_width, console_width])
-            logger.debug(
-                f"Размеры установлены: Sidebar={sidebar_width}, SubSidebar={sub_sidebar_width}, \
-                    Canvas={canvas_width}, Console={console_width}")
         else:
-            logger.debug("SubSideBar скрыт")
             canvas_width = int(total_width - sidebar_width - console_width)
             self.splitter.setSizes([sidebar_width, 0, canvas_width, console_width])
-            logger.debug(
-                f"Размеры установлены: Sidebar={sidebar_width}, Canvas={canvas_width}, Console={console_width}")
 
     def showEvent(self, event):
         super().showEvent(event)
-        logger.debug("Событие показа MainTab")
         self.initialize_sizes()
 
     def toggle_sub_sidebar(self, content_type):
         if content_type:
-            self.sub_sidebar.update_content(content_type)
-            self.sub_sidebar.setVisible(True)
+            if content_type in self.sidebar.get_experiment_files_list():
+                self.sub_sidebar.update_content("Эксперимент")
+            else:
+                self.sub_sidebar.update_content(content_type)
+                self.sub_sidebar.setVisible(True)
         else:
             self.sub_sidebar.setVisible(False)
         self.initialize_sizes()
