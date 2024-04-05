@@ -12,6 +12,10 @@ def main():
     file_data = FileData()
     window.main_tab.sidebar.load_button.file_selected.connect(
         file_data.load_file)
+    window.main_tab.sidebar.chosen_experiment_signal.connect(
+        file_data.get_dataframe_copy)
+    file_data.dataframe_signal.connect(
+        window.main_tab.plot_canvas.plot_from_dataframe)
     file_data.data_loaded_signal.connect(
         window.main_tab.plot_canvas.plot_from_dataframe)
     file_data.data_loaded_signal.connect(

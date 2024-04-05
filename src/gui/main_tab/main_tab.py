@@ -59,7 +59,10 @@ class MainTab(QWidget):
         logger.debug("Событие показа MainTab")
         self.initialize_sizes()
 
-    def toggle_sub_sidebar(self, show):
-        logger.debug(f"Переключение видимости SubSideBar: {'показать' if show else 'скрыть'}")
-        self.sub_sidebar.setVisible(show)
+    def toggle_sub_sidebar(self, content_type):
+        if content_type:
+            self.sub_sidebar.update_content(content_type)
+            self.sub_sidebar.setVisible(True)
+        else:
+            self.sub_sidebar.setVisible(False)
         self.initialize_sizes()

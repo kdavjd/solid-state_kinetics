@@ -12,6 +12,7 @@ from .load_file_button import LoadButton
 class SideBar(QWidget):
     file_selected = pyqtSignal(tuple)
     sub_side_bar_needed = pyqtSignal(str)
+    chosen_experiment_signal = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -67,6 +68,7 @@ class SideBar(QWidget):
             self.load_button.open_file_dialog()
         elif item.parent() == self.experiments_data_root:
             self.sub_side_bar_needed.emit(item.text())
+            self.chosen_experiment_signal.emit(item.text())
             self.mark_as_active(item)
         elif item.parent() == self.calculation_root:
             self.sub_side_bar_needed.emit(item.text())

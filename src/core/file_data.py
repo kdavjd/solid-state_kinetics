@@ -35,10 +35,13 @@ def detect_decimal(func):
 
 class FileData(QObject):
     data_loaded_signal = pyqtSignal(pd.DataFrame)
+    dataframe_signal = pyqtSignal(pd.DataFrame)
 
     def __init__(self):
         super().__init__()
         self.data = None
+        self.original_data = {}
+        self.dataframe_copies = {}
         self.file_path = None
         self.delimiter = ','
         self.skip_rows = 0
@@ -77,11 +80,25 @@ class FileData(QObject):
             logger.error("Ошибка при загрузке TXT файла: %s", e)
 
     def fetch_data(self):
+        file_basename = os.path.basename(self.file_path)
         if self.columns_names and len(self.columns_names) == len(self.data.columns):
             self.data.columns = [name.strip() for name in self.columns_names]
-            logger.debug("Имена столбцов успешно обновлены.")
+            self.original_data[file_basename] = self.data.copy()
+            self.dataframe_copies[file_basename] = self.data.copy()
+            logger.debug("Добавлен новый файл: %s", self.dataframe_copies[file_basename].info())
+            logger.debug(f"Ключи dataframe_copies: {self.dataframe_copies.keys()}")
         else:
             logger.warning(
                 "Количество имен столбцов не соответствует количеству столбцов в данных.")
-
         self.data_loaded_signal.emit(self.data)
+
+    @pyqtSlot(str)
+    def get_dataframe_copy(self, key):
+        if key in self.dataframe_copies:
+            self.dataframe_signal.emit(self.dataframe_copies[key])
+        else:
+            logger.error(f"Ключ {key} не найден в dataframe_copies.")
+
+    def reset_dataframe_copy(self, key):
+        if key in self.original_data:
+            self.dataframe_copies[key] = self.original_data[key].copy()
