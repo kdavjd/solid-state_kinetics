@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
 from ..console_widget import ConsoleWidget
 from .plot_canvas import PlotCanvas
-from .side_bar import SideBar
-from .sub_side_bar import SubSideBar
+from .sidebar import SideBar
+from .sub_sidebar.sub_side_hub import SubSideHub
 
 
 class MainTab(QWidget):
@@ -18,7 +18,7 @@ class MainTab(QWidget):
         self.sidebar = SideBar(self)
         self.splitter.addWidget(self.sidebar)
 
-        self.sub_sidebar = SubSideBar(self)
+        self.sub_sidebar = SubSideHub(self)
         self.sub_sidebar.hide()
         self.splitter.addWidget(self.sub_sidebar)
 
@@ -49,7 +49,7 @@ class MainTab(QWidget):
 
     def toggle_sub_sidebar(self, content_type):
         if content_type:
-            if content_type in self.sidebar.get_experiment_files_list():
+            if content_type in self.sidebar.get_experiment_files_names():
                 self.sub_sidebar.update_content("Эксперимент")
             else:
                 self.sub_sidebar.update_content(content_type)
