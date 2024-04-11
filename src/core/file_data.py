@@ -50,8 +50,16 @@ class FileData(QObject):
     @pyqtSlot(tuple)
     def load_file(self, file_info):
         self.file_path, self.delimiter, self.skip_rows, columns_names_str = file_info
-        self.columns_names = columns_names_str.split(
-            ',') if columns_names_str else None
+        if columns_names_str:
+            column_delimiter = ',' if ',' in columns_names_str else ' '
+            self.columns_names = [name.strip() for name in columns_names_str.split(column_delimiter)]
+            logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=%s",
+                         self.file_path, self.delimiter, self.skip_rows, columns_names_str)
+        else:
+            self.columns_names = None
+            logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=нет (пустая строка)",
+                         self.file_path, self.delimiter, self.skip_rows)
+
         _, file_extension = os.path.splitext(self.file_path)
         if file_extension == '.csv':
             self.load_csv()
@@ -64,7 +72,7 @@ class FileData(QObject):
         try:
             self.data = pd.read_csv(
                 self.file_path, sep=self.delimiter, engine='python',
-                on_bad_lines='skip', skiprows=self.skip_rows, **kwargs)
+                on_bad_lines='skip', skiprows=self.skip_rows, header=0, **kwargs)
             self.fetch_data()
         except Exception as e:
             logger.error("Ошибка при загрузке CSV файла: %s", e)
@@ -74,22 +82,27 @@ class FileData(QObject):
     def load_txt(self, **kwargs):
         try:
             self.data = pd.read_table(
-                self.file_path, sep=self.delimiter, skiprows=self.skip_rows, **kwargs)
+                self.file_path, sep=self.delimiter, skiprows=self.skip_rows, header=0, **kwargs)
             self.fetch_data()
         except Exception as e:
             logger.error("Ошибка при загрузке TXT файла: %s", e)
 
     def fetch_data(self):
         file_basename = os.path.basename(self.file_path)
-        if self.columns_names and len(self.columns_names) == len(self.data.columns):
+
+        if self.columns_names is not None:
+            if len(self.columns_names) != len(self.data.columns):
+                logger.warning(
+                    "Количество имен столбцов не соответствует количеству столбцов в данных.")
+            self.data = self.data.apply(pd.to_numeric, errors='coerce')
             self.data.columns = [name.strip() for name in self.columns_names]
-            self.original_data[file_basename] = self.data.copy()
-            self.dataframe_copies[file_basename] = self.data.copy()
-            logger.debug("Добавлен новый файл, размером: %s", self.dataframe_copies[file_basename].shape)
-            logger.debug(f"Ключи dataframe_copies: {self.dataframe_copies.keys()}")
         else:
-            logger.warning(
-                "Количество имен столбцов не соответствует количеству столбцов в данных.")
+            logger.debug("Первая строка оставлена как имена столбцов: %s", self.data.columns)
+
+        self.original_data[file_basename] = self.data.copy()
+        self.dataframe_copies[file_basename] = self.data.copy()
+        logger.debug("Добавлен новый файл, размером: %s", self.dataframe_copies[file_basename].shape)
+        logger.debug(f"Ключи dataframe_copies: {self.dataframe_copies.keys()}")
         self.data_loaded_signal.emit(self.data)
 
     @pyqtSlot(str)
