@@ -16,16 +16,20 @@ class MainTab(QWidget):
         self.layout.addWidget(self.splitter)
 
         self.sidebar = SideBar(self)
+        self.sidebar.setMinimumWidth(220)
         self.splitter.addWidget(self.sidebar)
 
         self.sub_sidebar = SubSideHub(self)
+        self.sub_sidebar.setMinimumWidth(200)
         self.sub_sidebar.hide()
         self.splitter.addWidget(self.sub_sidebar)
 
         self.plot_canvas = PlotCanvas(self)
+        self.plot_canvas.setMinimumHeight(500)
         self.splitter.addWidget(self.plot_canvas)
 
         self.console_widget = ConsoleWidget(self)
+        self.console_widget.setMinimumHeight(150)
         self.splitter.addWidget(self.console_widget)
 
         self.sidebar.sub_side_bar_needed.connect(self.toggle_sub_sidebar)
