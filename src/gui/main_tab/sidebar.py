@@ -13,6 +13,7 @@ class SideBar(QWidget):
     file_selected = pyqtSignal(tuple)
     sub_side_bar_needed = pyqtSignal(str)
     chosen_experiment_signal = pyqtSignal(str)
+    console_show_signal = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -87,9 +88,11 @@ class SideBar(QWidget):
             self.mark_as_active(item)
         elif item == self.console_show_state:
             if item.checkState() == Qt.CheckState.Checked:
+                self.console_show_signal.emit(True)
                 self.console_hide_state.setCheckState(Qt.CheckState.Unchecked)
         elif item == self.console_hide_state:
             if item.checkState() == Qt.CheckState.Checked:
+                self.console_show_signal.emit(False)
                 self.console_show_state.setCheckState(Qt.CheckState.Unchecked)
         elif item.parent() == self.model_free_root:
             self.sub_side_bar_needed.emit(item.text())

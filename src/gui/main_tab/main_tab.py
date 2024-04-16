@@ -44,6 +44,7 @@ class MainTab(QWidget):
         self.splitter.addWidget(self.console_widget)
 
         self.sidebar.sub_side_bar_needed.connect(self.toggle_sub_sidebar)
+        self.sidebar.console_show_signal.connect(self.toggle_console_visibility)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -53,15 +54,10 @@ class MainTab(QWidget):
         console_ratio = MIN_WIDTH_CONSOLE / COMPONENTS_MIN_WIDTH
 
         sidebar_width = int(total_width * sidebar_ratio)
-        console_width = int(total_width * console_ratio)
-
-        if self.sub_sidebar.isVisible():
-            sub_sidebar_width = int(total_width * subsidebar_ratio)
-            canvas_width = total_width - (sidebar_width + sub_sidebar_width + console_width)
-            self.splitter.setSizes([sidebar_width, sub_sidebar_width, canvas_width, console_width])
-        else:
-            canvas_width = total_width - (sidebar_width + console_width)
-            self.splitter.setSizes([sidebar_width, 0, canvas_width, console_width])
+        console_width = int(total_width * console_ratio) if self.console_widget.isVisible() else 0
+        sub_sidebar_width = int(total_width * subsidebar_ratio) if self.sub_sidebar.isVisible() else 0
+        canvas_width = total_width - (sidebar_width + sub_sidebar_width + console_width)
+        self.splitter.setSizes([sidebar_width, sub_sidebar_width, canvas_width, console_width])
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -76,4 +72,8 @@ class MainTab(QWidget):
                 self.sub_sidebar.setVisible(True)
         else:
             self.sub_sidebar.setVisible(False)
+        self.initialize_sizes()
+
+    def toggle_console_visibility(self, visible):
+        self.console_widget.setVisible(visible)
         self.initialize_sizes()
