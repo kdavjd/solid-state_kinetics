@@ -1,6 +1,6 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QSizePolicy, QVBoxLayout, QWidget)
+                             QPushButton, QVBoxLayout, QWidget)
 
 
 class SmoothingBlock(QWidget):
@@ -98,19 +98,6 @@ class ExperimentSubBar(QWidget):
         self.smoothing_block = SmoothingBlock(self)
         self.background_subtraction_block = BackgroundSubtractionBlock(self)
         self.action_buttons_block = ActionButtonsBlock(self)
-
-        self.setSizePolicy(
-            QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum
-        )
-        self.smoothing_block.setSizePolicy(
-            QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum
-        )
-        self.background_subtraction_block.setSizePolicy(
-            QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum
-        )
-        self.action_buttons_block.setSizePolicy(
-            QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum
-        )
 
         layout.addWidget(self.smoothing_block)
         layout.addWidget(self.background_subtraction_block)
