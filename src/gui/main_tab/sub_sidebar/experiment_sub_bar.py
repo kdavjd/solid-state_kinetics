@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QVBoxLayout, QWidget)
 
@@ -78,12 +78,21 @@ class BackgroundSubtractionBlock(QWidget):
 
 
 class ActionButtonsBlock(QWidget):
+    cancel_changes_clicked = pyqtSignal()
+    derive_clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setLayout(QVBoxLayout())
 
-        self.cancel_button = QPushButton("Отменить изменения")
-        self.layout().addWidget(self.cancel_button)
+        self.cancel_changes_button = QPushButton("Отменить изменения")
+        self.derive_button = QPushButton("Взять производную")
+
+        self.cancel_changes_button.clicked.connect(self.cancel_changes_clicked.emit)
+        self.derive_button.clicked.connect(self.derive_clicked.emit)
+
+        self.layout().addWidget(self.derive_button)
+        self.layout().addWidget(self.cancel_changes_button)
 
 
 class ExperimentSubBar(QWidget):
