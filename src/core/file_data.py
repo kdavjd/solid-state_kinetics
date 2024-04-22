@@ -26,8 +26,7 @@ def detect_decimal(func):
         sample_text = ''.join(sample_lines)
         # Простая эвристика: если запятых больше, чем точек, предполагаем,
         # что запятая используется как десятичный разделитель
-        decimal_sep = ',' if sample_text.count(
-            ',') > sample_text.count('.') else '.'
+        decimal_sep = ',' if sample_text.count(',') > sample_text.count('.') else '.'
         kwargs['decimal'] = decimal_sep
         return func(self, **kwargs)
     return wrapper
@@ -115,3 +114,24 @@ class FileData(QObject):
     def reset_dataframe_copy(self, key):
         if key in self.original_data:
             self.dataframe_copies[key] = self.original_data[key].copy()
+
+    @pyqtSlot(object, str)
+    def modify_data(self, func, key):
+        if not callable(func):
+            logger.error("Предоставленный аргумент не является функцией")
+            return
+
+        if key not in self.dataframe_copies:
+            logger.error(f"Ключ {key} не найден в dataframe_copies.")
+            return
+
+        try:
+            dataframe = self.dataframe_copies[key]
+            for column in dataframe.columns:
+                if column != 'temperature':
+                    dataframe[column] = func(dataframe[column])
+
+            logger.info("Данные были успешно модифицированы.")
+
+        except Exception as e:
+            logger.error(f"Ошибка при модификации данных {key}: {e}")

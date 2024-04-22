@@ -20,6 +20,8 @@ def main():
         window.main_tab.plot_canvas.plot_from_dataframe)
     file_data.data_loaded_signal.connect(
         window.table_tab.table_widget.display_dataframe)
+    # window.main_tab.sub_sidebar.experiment_sub_bar.action_buttons_block.cancel_changes_clicked.connect()
+    # window.main_tab.sub_sidebar.experiment_sub_bar.action_buttons_block.derive_clicked.connect()
     window.show()
     sys.exit(app.exec())
 
