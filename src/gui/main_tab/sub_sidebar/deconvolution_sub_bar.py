@@ -1,3 +1,4 @@
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMessageBox,
                              QPushButton, QVBoxLayout, QWidget)
 
@@ -27,7 +28,9 @@ class CalcButtons(QWidget):
         self.start_button.show()
 
 
-class CurvesTable(QWidget):
+class ReactionTable(QWidget):
+    reaction_added_signal = pyqtSignal(list)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -53,6 +56,7 @@ class CurvesTable(QWidget):
     def add_reaction(self):
         reaction_name = f"реакция_{self.reaction_counter}"
         self.reactions_list.addItem(reaction_name)
+        self.reaction_added_signal.emit([reaction_name])
         self.reaction_counter += 1
 
     def open_settings(self):
@@ -68,9 +72,9 @@ class DeconvolutionSubBar(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
 
-        calc_buttons = CalcButtons(self)
-        curves_table = CurvesTable(self)
+        self.calc_buttons = CalcButtons(self)
+        self.reactions_table = ReactionTable(self)
 
         layout.addWidget(QLabel("Деконволюция"))
-        layout.addWidget(calc_buttons)
-        layout.addWidget(curves_table)
+        layout.addWidget(self.calc_buttons)
+        layout.addWidget(self.reactions_table)

@@ -1,3 +1,5 @@
+import numpy as np
+from numpy import ndarray
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
@@ -20,6 +22,7 @@ COMPONENTS_MIN_WIDTH = (
 
 class MainTab(QWidget):
     active_file_modify_signal = pyqtSignal(str, str)
+    calculations_data_modify_signal = pyqtSignal(list, ndarray)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -53,6 +56,8 @@ class MainTab(QWidget):
             self.modify_active_file)
         self.sub_sidebar.experiment_sub_bar.action_buttons_block.derivative_clicked.connect(
             self.modify_active_file)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added_signal.connect(
+            self.modify_calculations_data)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -86,6 +91,13 @@ class MainTab(QWidget):
         self.console_widget.setVisible(visible)
         self.initialize_sizes()
 
-    def modify_active_file(self, text):
-        logger.debug(f"Активный файл: {self.sidebar.active_file_item.text()} запрашивает действие: {text}")
-        self.active_file_modify_signal.emit(text, self.sidebar.active_file_item.text())
+    def modify_active_file(self, command: str):
+        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
+        self.active_file_modify_signal.emit(command, active_file_name)
+        logger.debug(f"Активный файл: {active_file_name} запрашивает действие: {command}")
+
+    def modify_calculations_data(self, path_keys: list, data=np.array([])):
+        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
+        path_keys.insert(0, active_file_name)
+        self.calculations_data_modify_signal.emit(path_keys, data)
+        logger.debug(f"Данные: {data} передаются по пути: {path_keys}")

@@ -1,5 +1,8 @@
 import pandas as pd
+from numpy import ndarray
 from PyQt6.QtCore import QObject, pyqtSlot
+
+from core.logger_config import logger
 
 
 class Calcultaions(QObject):
@@ -12,8 +15,12 @@ class Calcultaions(QObject):
         return data.diff() * -1
 
     @pyqtSlot(str, str)
-    def handle_modify_signal(self, command, key):
+    def modify_active_file_slot(self, command, file_name):
         if command == "Привести к da/dT":
-            self.file_data.modify_data(self.diff_function, key)
+            self.file_data.modify_data(self.diff_function, file_name)
         elif command == "Отменить изменения":
-            self.file_data.reset_dataframe_copy(key)
+            self.file_data.reset_dataframe_copy(file_name)
+
+    @pyqtSlot(list, ndarray)
+    def modify_calculations_data_slot(self, *args):
+        logger.debug(f'В modify_calculations_data_slot пришли данные {args}')

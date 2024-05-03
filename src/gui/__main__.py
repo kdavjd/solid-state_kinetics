@@ -24,7 +24,8 @@ def main():
         window.main_tab.plot_canvas.plot_from_dataframe)
     file_data.data_loaded_signal.connect(
         window.table_tab.table_widget.display_dataframe)
-    window.main_tab.active_file_modify_signal.connect(calcultaions.handle_modify_signal)
+    window.main_tab.active_file_modify_signal.connect(calcultaions.modify_active_file_slot)
+    window.main_tab.calculations_data_modify_signal.connect(calcultaions.modify_calculations_data_slot)
     window.show()
     sys.exit(app.exec())
 
