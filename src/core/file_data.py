@@ -34,7 +34,7 @@ def detect_decimal(func):
 
 class FileData(QObject):
     data_loaded_signal = pyqtSignal(pd.DataFrame)
-    dataframe_signal = pyqtSignal(pd.DataFrame)
+    plot_dataframe_signal = pyqtSignal(pd.DataFrame)
 
     def __init__(self):
         super().__init__()
@@ -105,15 +105,16 @@ class FileData(QObject):
         self.data_loaded_signal.emit(self.data)
 
     @pyqtSlot(str)
-    def get_dataframe_copy(self, key):
+    def plot_dataframe_copy(self, key):
         if key in self.dataframe_copies:
-            self.dataframe_signal.emit(self.dataframe_copies[key])
+            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
         else:
             logger.error(f"Ключ {key} не найден в dataframe_copies.")
 
     def reset_dataframe_copy(self, key):
         if key in self.original_data:
             self.dataframe_copies[key] = self.original_data[key].copy()
+            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
 
     @pyqtSlot(object, str)
     def modify_data(self, func, key):
@@ -131,6 +132,7 @@ class FileData(QObject):
                 if column != 'temperature':
                     dataframe[column] = func(dataframe[column])
 
+            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
             logger.info("Данные были успешно модифицированы.")
 
         except Exception as e:

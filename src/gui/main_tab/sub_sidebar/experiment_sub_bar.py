@@ -78,20 +78,22 @@ class BackgroundSubtractionBlock(QWidget):
 
 
 class ActionButtonsBlock(QWidget):
-    cancel_changes_clicked = pyqtSignal()
-    derive_clicked = pyqtSignal()
+    cancel_changes_clicked = pyqtSignal(str)
+    derivative_clicked = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setLayout(QVBoxLayout())
 
         self.cancel_changes_button = QPushButton("Отменить изменения")
-        self.derive_button = QPushButton("Взять производную")
+        self.derivative_button = QPushButton("Привести к da/dT")
 
-        self.cancel_changes_button.clicked.connect(self.cancel_changes_clicked.emit)
-        self.derive_button.clicked.connect(self.derive_clicked.emit)
+        self.cancel_changes_button.clicked.connect(
+            lambda: self.cancel_changes_clicked.emit(self.cancel_changes_button.text()))
+        self.derivative_button.clicked.connect(
+            lambda: self.derivative_clicked.emit(self.derivative_button.text()))
 
-        self.layout().addWidget(self.derive_button)
+        self.layout().addWidget(self.derivative_button)
         self.layout().addWidget(self.cancel_changes_button)
 
 
