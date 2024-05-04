@@ -82,7 +82,7 @@ class MainTab(QWidget):
                 self.sub_sidebar.update_content("Эксперимент")
             else:
                 self.sub_sidebar.update_content(content_type)
-                self.sub_sidebar.setVisible(True)
+            self.sub_sidebar.setVisible(True)
         else:
             self.sub_sidebar.setVisible(False)
         self.initialize_sizes()
