@@ -22,7 +22,7 @@ COMPONENTS_MIN_WIDTH = (
 
 class MainTab(QWidget):
     active_file_modify_signal = pyqtSignal(str, str)
-    calculations_data_modify_signal = pyqtSignal(list, ndarray)
+    calculations_data_modify_signal = pyqtSignal(list, str, ndarray)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -93,11 +93,11 @@ class MainTab(QWidget):
 
     def modify_active_file(self, command: str):
         active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
-        self.active_file_modify_signal.emit(command, active_file_name)
         logger.debug(f"Активный файл: {active_file_name} запрашивает действие: {command}")
+        self.active_file_modify_signal.emit(command, active_file_name)
 
-    def modify_calculations_data(self, path_keys: list, data=np.array([])):
+    def modify_calculations_data(self, path_keys: list, command='', data=np.array([])):
         active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
         path_keys.insert(0, active_file_name)
-        self.calculations_data_modify_signal.emit(path_keys, data)
-        logger.debug(f"Данные: {data} передаются по пути: {path_keys}")
+        logger.debug(f"Данные: {data} с командой: {command}, передаются по пути: {path_keys}")
+        self.calculations_data_modify_signal.emit(path_keys, command, data)

@@ -29,34 +29,34 @@ class CalcButtons(QWidget):
 
 
 class ReactionTable(QWidget):
-    reaction_added_signal = pyqtSignal(list)
+    reaction_added_signal = pyqtSignal(list, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
+        self.layout = QVBoxLayout(self)
 
-        add_reaction_button = QPushButton("Добавить")
-        load_reaction_button = QPushButton("Загрузить")
-        top_buttons_layout = QHBoxLayout()
-        top_buttons_layout.addWidget(add_reaction_button)
-        top_buttons_layout.addWidget(load_reaction_button)
-        layout.addLayout(top_buttons_layout)
+        self.add_reaction_button = QPushButton("Добавить")
+        self.load_reaction_button = QPushButton("Загрузить")
+        self.top_buttons_layout = QHBoxLayout()
+        self.top_buttons_layout.addWidget(self.add_reaction_button)
+        self.top_buttons_layout.addWidget(self.load_reaction_button)
+        self.layout.addLayout(self.top_buttons_layout)
 
         self.reactions_list = QListWidget()
-        layout.addWidget(self.reactions_list)
+        self.layout.addWidget(self.reactions_list)
 
-        settings_button = QPushButton("Настройки")
-        layout.addWidget(settings_button)
+        self.settings_button = QPushButton("Настройки")
+        self.layout.addWidget(self.settings_button)
 
-        add_reaction_button.clicked.connect(self.add_reaction)
-        settings_button.clicked.connect(self.open_settings)
+        self.add_reaction_button.clicked.connect(self.add_reaction)
+        self.settings_button.clicked.connect(self.open_settings)
 
         self.reaction_counter = 0
 
     def add_reaction(self):
         reaction_name = f"реакция_{self.reaction_counter}"
         self.reactions_list.addItem(reaction_name)
-        self.reaction_added_signal.emit([reaction_name])
+        self.reaction_added_signal.emit([reaction_name], self.add_reaction_button.text())
         self.reaction_counter += 1
 
     def open_settings(self):

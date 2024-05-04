@@ -1,6 +1,7 @@
 import json
 from functools import reduce
 
+from numpy import ndarray
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
@@ -28,11 +29,10 @@ class CalculationsData(QObject):
         except IOError as e:
             print(f"Ошибка сохранения данных: {e}")
 
-    def check_all_stages_have_data(self):
-        for experiment, details in self.data.items():
-            if any(stage_data is None for stage_data in details.get('stages', {}).values()):
-                return False
-        return True
+    def get_value(self, keys: list[str]):
+        return reduce(lambda data, key: (data or {}).get(key), keys, self.data)
 
-    def get_stage_data(self, keys):
-        return reduce(lambda acc, key: (acc or {}).get(key), keys, self.data)
+    def set_value(self, keys: list[str], value: ndarray):
+        last_key = keys.pop()
+        nested_dict = reduce(lambda data, key: data.setdefault(key, {}), keys, self.data)
+        nested_dict[last_key] = value

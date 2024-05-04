@@ -21,6 +21,6 @@ class Calcultaions(QObject):
         elif command == "Отменить изменения":
             self.file_data.reset_dataframe_copy(file_name)
 
-    @pyqtSlot(list, ndarray)
+    @pyqtSlot(list, str, ndarray)
     def modify_calculations_data_slot(self, *args):
         logger.debug(f'В modify_calculations_data_slot пришли данные {args}')
