@@ -45,6 +45,16 @@ class FileData(QObject):
         self.delimiter = ','
         self.skip_rows = 0
         self.columns_names = None
+        self.operations_history = {}
+
+    def log_operation(self, params: dict):
+        file_name = params.pop('файл')
+        if file_name not in self.operations_history:
+            self.operations_history[file_name] = []
+        self.operations_history[file_name].append({
+            'параметры': params,
+        })
+        logger.debug(f'История операций: {self.operations_history}')
 
     @pyqtSlot(tuple)
     def load_file(self, file_info):
@@ -115,25 +125,29 @@ class FileData(QObject):
         if key in self.original_data:
             self.dataframe_copies[key] = self.original_data[key].copy()
             self.plot_dataframe_signal.emit(self.dataframe_copies[key])
+            if key in self.operations_history:
+                del self.operations_history[key]
+                logger.debug(f'История операций: {self.operations_history}')
 
-    @pyqtSlot(object, str)
-    def modify_data(self, func, key):
+    def modify_data(self, func, params):
+        file_name = params.get('файл')
         if not callable(func):
             logger.error("Предоставленный аргумент не является функцией")
             return
 
-        if key not in self.dataframe_copies:
-            logger.error(f"Ключ {key} не найден в dataframe_copies.")
+        if file_name not in self.dataframe_copies:
+            logger.error(f"Ключ {file_name} не найден в dataframe_copies.")
             return
 
         try:
-            dataframe = self.dataframe_copies[key]
+            dataframe = self.dataframe_copies[file_name]
             for column in dataframe.columns:
                 if column != 'temperature':
                     dataframe[column] = func(dataframe[column])
 
-            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
+            self.log_operation(params)
+            self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
             logger.info("Данные были успешно модифицированы.")
 
         except Exception as e:
-            logger.error(f"Ошибка при модификации данных {key}: {e}")
+            logger.error(f"Ошибка при модификации данных файла:{file_name}: {e}")

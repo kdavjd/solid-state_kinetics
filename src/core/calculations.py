@@ -14,11 +14,13 @@ class Calculations(QObject):
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
 
-    @pyqtSlot(str, str)
-    def modify_active_file_slot(self, command, file_name):
-        if command == "Привести к da/dT":
-            self.file_data.modify_data(self.diff_function, file_name)
-        elif command == "Отменить изменения":
+    @pyqtSlot(dict)
+    def modify_active_file_slot(self, params: dict):
+        operation = params.get('операция')
+        file_name = params.get('файл')
+        if operation == "Привести к da/dT":
+            self.file_data.modify_data(self.diff_function, params)
+        elif operation == "Отменить изменения":
             self.file_data.reset_dataframe_copy(file_name)
 
     @pyqtSlot(list, str, ndarray)
