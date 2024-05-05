@@ -51,10 +51,15 @@ class FileData(QObject):
         file_name = params.pop('файл')
         if file_name not in self.operations_history:
             self.operations_history[file_name] = []
-        self.operations_history[file_name].append({
-            'параметры': params,
-        })
+        self.operations_history[file_name].append({'параметры': params, })
         logger.debug(f'История операций: {self.operations_history}')
+
+    def check_operation_executed(self, file_name: str, operation: str):
+        if file_name in self.operations_history:
+            for operation_record in self.operations_history[file_name]:
+                if operation_record['параметры']['операция'] == operation:
+                    return True
+        return False
 
     @pyqtSlot(tuple)
     def load_file(self, file_info):
@@ -65,7 +70,6 @@ class FileData(QObject):
             logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=%s",
                          self.file_path, self.delimiter, self.skip_rows, columns_names)
         else:
-            self.columns_names = None
             logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=нет (пустая строка)",
                          self.file_path, self.delimiter, self.skip_rows)
 

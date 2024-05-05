@@ -3,6 +3,7 @@ from numpy import ndarray
 from PyQt6.QtCore import QObject, pyqtSlot
 
 from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
 
 
 class Calculations(QObject):
@@ -19,7 +20,10 @@ class Calculations(QObject):
         operation = params.get('операция')
         file_name = params.get('файл')
         if operation == "Привести к da/dT":
-            self.file_data.modify_data(self.diff_function, params)
+            if not self.file_data.check_operation_executed(file_name, operation):
+                self.file_data.modify_data(self.diff_function, params)
+            else:
+                console.log('Данные уже приведены к da/dT')
         elif operation == "Отменить изменения":
             self.file_data.reset_dataframe_copy(file_name)
 

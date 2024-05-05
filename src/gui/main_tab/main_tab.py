@@ -91,15 +91,15 @@ class MainTab(QWidget):
         self.console_widget.setVisible(visible)
         self.initialize_sizes()
 
+    def modify_calculations_data(self, path_keys: list, command='', data=np.array([])):
+        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
+        path_keys.insert(0, active_file_name)
+        logger.debug(f"Данные: {data} с командой: {command}, передаются по пути: {path_keys}")
+        self.calculations_data_modify_signal.emit(path_keys, command, data)
+
     pyqtSlot(dict)
 
     def modify_active_file(self, params: dict):
         params['файл'] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
         logger.debug(f"Активный файл: {params['файл']} запрашивает операцию: {params['операция']}")
         self.active_file_modify_signal.emit(params)
-
-    def modify_calculations_data(self, path_keys: list, command='', data=np.array([])):
-        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
-        path_keys.insert(0, active_file_name)
-        logger.debug(f"Данные: {data} с командой: {command}, передаются по пути: {path_keys}")
-        self.calculations_data_modify_signal.emit(path_keys, command, data)
