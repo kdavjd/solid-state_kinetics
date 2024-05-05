@@ -5,7 +5,7 @@ from PyQt6.QtCore import QObject, pyqtSlot
 from core.logger_config import logger
 
 
-class Calcultaions(QObject):
+class Calculations(QObject):
     def __init__(self, file_data=None, calculations_data=None):
         super().__init__()
         self.file_data = file_data

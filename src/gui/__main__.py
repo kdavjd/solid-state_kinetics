@@ -2,7 +2,7 @@ import sys
 
 from PyQt6.QtWidgets import QApplication
 
-from core.calculations import Calcultaions
+from core.calculations import Calculations
 from core.calculations_data import CalculationsData
 from core.file_data import FileData
 from gui.main_window import MainWindow
@@ -13,7 +13,7 @@ def main():
     window = MainWindow()
     file_data = FileData()
     calculations_data = CalculationsData()
-    calcultaions = Calcultaions(file_data, calculations_data)
+    calcultaions = Calculations(file_data, calculations_data)
     window.main_tab.sidebar.load_button.file_selected.connect(
         file_data.load_file)
     window.main_tab.sidebar.chosen_experiment_signal.connect(

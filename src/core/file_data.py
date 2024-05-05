@@ -48,12 +48,12 @@ class FileData(QObject):
 
     @pyqtSlot(tuple)
     def load_file(self, file_info):
-        self.file_path, self.delimiter, self.skip_rows, columns_names_str = file_info
-        if columns_names_str:
-            column_delimiter = ',' if ',' in columns_names_str else ' '
-            self.columns_names = [name.strip() for name in columns_names_str.split(column_delimiter)]
+        self.file_path, self.delimiter, self.skip_rows, columns_names = file_info
+        if columns_names:
+            column_delimiter = ',' if ',' in columns_names else ' '
+            self.columns_names = [name.strip() for name in columns_names.split(column_delimiter)]
             logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=%s",
-                         self.file_path, self.delimiter, self.skip_rows, columns_names_str)
+                         self.file_path, self.delimiter, self.skip_rows, columns_names)
         else:
             self.columns_names = None
             logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=нет (пустая строка)",
