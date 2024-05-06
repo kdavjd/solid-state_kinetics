@@ -33,6 +33,37 @@ class Calculations(QObject):
         term2 = 1 - inner_term
         return h * term1 * term2
 
+    def add_default_gaussian(self, file_name):
+        df = self.file_data.dataframe_copies[file_name]
+        x = df['temperature']
+        y_columns = [col for col in df.columns if col != 'temperature']
+        if y_columns:
+            y = df[y_columns[0]]
+            h = 0.8 * y.max()
+            z = x.mean()
+            w = 0.1 * (x.max() - x.min())
+
+            result_dict = {
+                "function": "gauss",
+                "w": {
+                    "value": w,
+                    "lower_bound": w * 0.9,
+                    "upper_bound": w * 1.1
+                },
+                "h": {
+                    "value": h,
+                    "lower_bound": h * 0.9,
+                    "upper_bound": h * 1.1
+                },
+                "z": {
+                    "value": z,
+                    "lower_bound": z - 0.1 * abs(z),
+                    "upper_bound": z + 0.1 * abs(z)
+                },
+            }
+            return result_dict
+        return {}
+
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
 
@@ -52,3 +83,11 @@ class Calculations(QObject):
     @pyqtSlot(dict)
     def modify_calculations_data_slot(self, params: dict):
         logger.debug(f'В modify_calculations_data_slot пришли данные {params}')
+        operation = params.get('operation')
+        path_keys = params.get('path_keys')
+        if path_keys and isinstance(path_keys, list):
+            file_name = path_keys[0]
+            if operation == 'add_reaction':
+                self.calculations_data.set_value(path_keys, self.add_default_gaussian(file_name))
+        else:
+            logger.error("Некорректный или пустой список path_keys")

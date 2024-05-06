@@ -1,8 +1,9 @@
 import json
 from functools import reduce
 
-from numpy import ndarray
 from PyQt6.QtCore import QObject, pyqtSignal
+
+from core.logger_config import logger
 
 
 class CalculationsData(QObject):
@@ -30,9 +31,10 @@ class CalculationsData(QObject):
             print(f"Ошибка сохранения данных: {e}")
 
     def get_value(self, keys: list[str]):
-        return reduce(lambda data, key: (data or {}).get(key), keys, self.data)
+        return reduce(lambda data, key: (data or {}).get(key), keys, self._data)
 
-    def set_value(self, keys: list[str], value: ndarray):
+    def set_value(self, keys: list[str], value):
         last_key = keys.pop()
-        nested_dict = reduce(lambda data, key: data.setdefault(key, {}), keys, self.data)
+        nested_dict = reduce(lambda data, key: data.setdefault(key, {}), keys, self._data)
         nested_dict[last_key] = value
+        logger.debug(f'Данные вычислений: {self._data}')
