@@ -1,6 +1,4 @@
-import numpy as np
-from numpy import ndarray
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
 from core.logger_config import logger
@@ -22,7 +20,7 @@ COMPONENTS_MIN_WIDTH = (
 
 class MainTab(QWidget):
     active_file_modify_signal = pyqtSignal(dict)
-    calculations_data_modify_signal = pyqtSignal(list, str, ndarray)
+    calculations_data_modify_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -91,15 +89,13 @@ class MainTab(QWidget):
         self.console_widget.setVisible(visible)
         self.initialize_sizes()
 
-    def modify_calculations_data(self, path_keys: list, command='', data=np.array([])):
-        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
-        path_keys.insert(0, active_file_name)
-        logger.debug(f"Данные: {data} с командой: {command}, передаются по пути: {path_keys}")
-        self.calculations_data_modify_signal.emit(path_keys, command, data)
-
-    pyqtSlot(dict)
+    def modify_calculations_data(self, params: dict):
+        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
+        params["path_keys"].insert(0, active_file_name)
+        logger.debug(f"Данные: {params} запрашивают операцию изменения данных расчета")
+        self.calculations_data_modify_signal.emit(params)
 
     def modify_active_file(self, params: dict):
-        params['файл'] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "Файл не выбран"
-        logger.debug(f"Активный файл: {params['файл']} запрашивает операцию: {params['операция']}")
+        params['file_name'] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
+        logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
         self.active_file_modify_signal.emit(params)

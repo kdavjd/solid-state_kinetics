@@ -48,16 +48,16 @@ class FileData(QObject):
         self.operations_history = {}
 
     def log_operation(self, params: dict):
-        file_name = params.pop('файл')
+        file_name = params.pop('file_name')
         if file_name not in self.operations_history:
             self.operations_history[file_name] = []
-        self.operations_history[file_name].append({'параметры': params, })
+        self.operations_history[file_name].append({'params': params, })
         logger.debug(f'История операций: {self.operations_history}')
 
     def check_operation_executed(self, file_name: str, operation: str):
         if file_name in self.operations_history:
             for operation_record in self.operations_history[file_name]:
-                if operation_record['параметры']['операция'] == operation:
+                if operation_record['params']['operation'] == operation:
                     return True
         return False
 
@@ -134,7 +134,7 @@ class FileData(QObject):
                 logger.debug(f'История операций: {self.operations_history}')
 
     def modify_data(self, func, params):
-        file_name = params.get('файл')
+        file_name = params.get('file_name')
         if not callable(func):
             logger.error("Предоставленный аргумент не является функцией")
             return
