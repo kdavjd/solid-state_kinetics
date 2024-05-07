@@ -42,15 +42,15 @@ class PlotCanvas(QWidget):
         self.figure.tight_layout()
         self.canvas.draw()
 
-    def add_plot(self, x, y, label: str):
+    def add_plot(self, x, y, label: str, **kwargs):
         logger.debug('Добавление кривой: %s', label)
         console.log(f"Добавление кривой: {label}")
-        self.axes.plot(x, y, label=label)
+        self.axes.plot(x, y, label=label, **kwargs)
         self.figure.tight_layout()
         self.canvas.draw()
 
     @pyqtSlot(pd.DataFrame)
-    def plot_from_dataframe(self, data: pd.DataFrame):
+    def plot_file_data_from_dataframe(self, data: pd.DataFrame):
         self.axes.clear()
         logger.debug("Оси очищены от кривых")
         if 'temperature' in data.columns:
@@ -62,4 +62,12 @@ class PlotCanvas(QWidget):
             logger.error(
                 "В DataFrame отсутствует столбец 'temperature' для оси X")
             console.log("В файле отсутствует столбец 'temperature' для оси X")
+        self.canvas.draw()
+
+    @pyqtSlot(pd.DataFrame)
+    def plot_calculations_data_from_dataframe(self, df: pd.DataFrame):
+        self.add_plot(df.index, df['value'], label='Value', color='red', linewidth=1.25)
+        self.add_plot(df.index, df['lower_bound'], label='Lower Bound', color='red', linewidth=0.25)
+        self.add_plot(df.index, df['upper_bound'], label='Upper Bound', color='red', linewidth=0.25)
+        self.axes.fill_between(df.index, df['lower_bound'], df['upper_bound'], color='gray', alpha=0.15)
         self.canvas.draw()

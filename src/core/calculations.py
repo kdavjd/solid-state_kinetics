@@ -1,12 +1,14 @@
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import QObject, pyqtSlot
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
 
 
 class Calculations(QObject):
+    plot_df_signal = pyqtSignal(pd.DataFrame)
+
     def __init__(self, file_data=None, calculations_data=None):
         super().__init__()
         self.file_data = file_data
@@ -33,7 +35,7 @@ class Calculations(QObject):
         term2 = 1 - inner_term
         return h * term1 * term2
 
-    def add_default_gaussian(self, file_name):
+    def generate_default_gaussian_data(self, file_name):
         df = self.file_data.dataframe_copies[file_name]
         x = df['temperature']
         y_columns = [col for col in df.columns if col != 'temperature']
@@ -43,17 +45,32 @@ class Calculations(QObject):
             z = x.mean()
             w = 0.1 * (x.max() - x.min())
 
+            h_lower = h * 0.9
+            h_upper = h * 1.1
+            w_lower = w * 0.9
+            w_upper = w * 1.1
+
+            gauss_values = self.gaussian(x, h, z, w)
+            gauss_lower_values = self.gaussian(x, h_lower, z, w_lower)
+            gauss_upper_values = self.gaussian(x, h_upper, z, w_upper)
+
             result_dict = {
                 "function": "gauss",
+                "x": x.to_numpy(),
+                "y": {
+                    "value": gauss_values,
+                    "lower_bound": gauss_lower_values,
+                    "upper_bound": gauss_upper_values
+                },
                 "w": {
                     "value": w,
-                    "lower_bound": w * 0.9,
-                    "upper_bound": w * 1.1
+                    "lower_bound": w_lower,
+                    "upper_bound": w_upper
                 },
                 "h": {
                     "value": h,
-                    "lower_bound": h * 0.9,
-                    "upper_bound": h * 1.1
+                    "lower_bound": h_lower,
+                    "upper_bound": h_upper
                 },
                 "z": {
                     "value": z,
@@ -63,6 +80,16 @@ class Calculations(QObject):
             }
             return result_dict
         return {}
+
+    @staticmethod
+    def create_data_frame(data):
+        data_frame = pd.DataFrame({
+            "temperature": data["x"],
+            "value": data["y"]["value"],
+            "lower_bound": data["y"]["lower_bound"],
+            "upper_bound": data["y"]["upper_bound"]
+        })
+        return data_frame
 
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
@@ -88,6 +115,9 @@ class Calculations(QObject):
         if path_keys and isinstance(path_keys, list):
             file_name = path_keys[0]
             if operation == 'add_reaction':
-                self.calculations_data.set_value(path_keys, self.add_default_gaussian(file_name))
+                data = self.generate_default_gaussian_data(file_name)
+                self.calculations_data.set_value(path_keys, data)
+                df = self.create_data_frame(data)
+                self.plot_df_signal.emit(df)
         else:
             logger.error("Некорректный или пустой список path_keys")
