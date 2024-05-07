@@ -3,8 +3,6 @@ from functools import reduce
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from core.logger_config import logger
-
 
 class CalculationsData(QObject):
     dataChanged = pyqtSignal(dict)
@@ -37,4 +35,3 @@ class CalculationsData(QObject):
         last_key = keys.pop()
         nested_dict = reduce(lambda data, key: data.setdefault(key, {}), keys, self._data)
         nested_dict[last_key] = value
-        logger.debug(f'Данные вычислений: {self._data}')

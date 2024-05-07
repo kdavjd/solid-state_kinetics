@@ -2,6 +2,8 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMessageBox,
                              QPushButton, QVBoxLayout, QWidget)
 
+from core.logger_config import logger
+
 
 class CalcButtons(QWidget):
     def __init__(self, parent=None):
@@ -43,6 +45,7 @@ class ReactionTable(QWidget):
         self.layout.addLayout(self.top_buttons_layout)
 
         self.reactions_list = QListWidget()
+        self.reactions_list.itemClicked.connect(self.selected_reaction)
         self.layout.addWidget(self.reactions_list)
 
         self.settings_button = QPushButton("Настройки")
@@ -63,6 +66,11 @@ class ReactionTable(QWidget):
         }
         self.reaction_added_signal.emit(reaction_data)
         self.reaction_counter += 1
+        logger.debug(
+            f'Список реакций: {[self.reactions_list.item(i).text() for i in range(self.reactions_list.count())]}')
+
+    def selected_reaction(self, item):
+        logger.debug(f'Активная реакция: {item.text()}')
 
     def open_settings(self):
         if self.reactions_list.currentItem():
