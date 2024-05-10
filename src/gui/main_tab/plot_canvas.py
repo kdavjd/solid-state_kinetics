@@ -64,10 +64,6 @@ class PlotCanvas(QWidget):
             console.log("В файле отсутствует столбец 'temperature' для оси X")
         self.canvas.draw()
 
-    @pyqtSlot(pd.DataFrame)
-    def plot_calculations_data_from_dataframe(self, df: pd.DataFrame):
-        self.add_plot(df.index, df['value'], label='Value', color='red', linewidth=1.25)
-        self.add_plot(df.index, df['lower_bound'], label='Lower Bound', color='red', linewidth=0.25)
-        self.add_plot(df.index, df['upper_bound'], label='Upper Bound', color='red', linewidth=0.25)
-        self.axes.fill_between(df.index, df['lower_bound'], df['upper_bound'], color='gray', alpha=0.15)
-        self.canvas.draw()
+    @pyqtSlot(str, list)
+    def plot_reaction(self, label, values):
+        pass

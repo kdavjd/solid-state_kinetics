@@ -74,8 +74,8 @@ class ReactionTable(QWidget):
 
     def open_settings(self):
         if self.reactions_list.currentItem():
-            reaction_details = self.reactions_list.currentItem().text()
-            QMessageBox.information(self, "Настройки Реакции", f"Настройки для {reaction_details}")
+            reaction_name = self.reactions_list.currentItem().text()
+            QMessageBox.information(self, "Настройки Реакции", f"Настройки для {reaction_name}")
         else:
             QMessageBox.warning(self, "Настройки Реакции", "Пожалуйста, выберите реакцию из списка.")
 

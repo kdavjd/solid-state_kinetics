@@ -21,7 +21,7 @@ def main():
     file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
     window.main_tab.active_file_modify_signal.connect(calcultaions.modify_active_file_slot)
     window.main_tab.calculations_data_modify_signal.connect(calcultaions.modify_calculations_data_slot)
-    calcultaions.plot_df_signal.connect(window.main_tab.plot_canvas.plot_calculations_data_from_dataframe)
+    calcultaions.plot_reaction_signal.connect(window.main_tab.plot_canvas.plot_reaction)
     window.show()
     sys.exit(app.exec())
 

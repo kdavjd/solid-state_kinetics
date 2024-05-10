@@ -1,3 +1,5 @@
+from typing import Callable, Dict
+
 import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
@@ -7,7 +9,7 @@ from core.logger_console import LoggerConsole as console
 
 
 class Calculations(QObject):
-    plot_df_signal = pyqtSignal(pd.DataFrame)
+    plot_reaction_signal = pyqtSignal(str, list)
 
     def __init__(self, file_data=None, calculations_data=None):
         super().__init__()
@@ -37,7 +39,7 @@ class Calculations(QObject):
 
     def generate_default_gaussian_data(self, file_name):
         df = self.file_data.dataframe_copies[file_name]
-        x = df['temperature']
+        x = df['temperature'].copy()
         y_columns = [col for col in df.columns if col != 'temperature']
         if y_columns:
             y = df[y_columns[0]]
@@ -50,46 +52,58 @@ class Calculations(QObject):
             w_lower = w * 0.9
             w_upper = w * 1.1
 
-            gauss_values = self.gaussian(x, h, z, w)
-            gauss_lower_values = self.gaussian(x, h_lower, z, w_lower)
-            gauss_upper_values = self.gaussian(x, h_upper, z, w_upper)
-
             result_dict = {
                 "function": "gauss",
                 "x": x.to_numpy(),
-                "y": {
-                    "value": gauss_values,
-                    "lower_bound": gauss_lower_values,
-                    "upper_bound": gauss_upper_values
+                "coeffs": {
+                    "w": w,
+                    "h": h,
+                    "z": z
                 },
-                "w": {
-                    "value": w,
-                    "lower_bound": w_lower,
-                    "upper_bound": w_upper
+                "upper_bound_coeffs": {
+                    "w": w_upper,
+                    "h": h_upper,
+                    "z": z + 0.1 * abs(z)
                 },
-                "h": {
-                    "value": h,
-                    "lower_bound": h_lower,
-                    "upper_bound": h_upper
-                },
-                "z": {
-                    "value": z,
-                    "lower_bound": z - 0.1 * abs(z),
-                    "upper_bound": z + 0.1 * abs(z)
-                },
+                "lower_bound_coeffs": {
+                    "w": w_lower,
+                    "h": h_lower,
+                    "z": z - 0.1 * abs(z)
+                }
             }
+            logger.debug(f"Данные отправлены на запись: {result_dict}")
             return result_dict
         return {}
 
-    @staticmethod
-    def create_data_frame(data):
-        data_frame = pd.DataFrame({
-            "temperature": data["x"],
-            "value": data["y"]["value"],
-            "lower_bound": data["y"]["lower_bound"],
-            "upper_bound": data["y"]["upper_bound"]
-        })
-        return data_frame
+    def calculate_reaction(self, path_keys: list):
+        reaction_params = self.calculations_data.get_value(path_keys)
+        logger.debug(f"Данные принятые из get_value: {reaction_params} по ключам {path_keys}")
+        x = reaction_params.get('x')
+        function_type = reaction_params.get('function')
+        coeffs = reaction_params.get('coeffs', {})
+        upper_bound_coeffs = reaction_params.get('upper_bound_coeffs', {})
+        lower_bound_coeffs = reaction_params.get('lower_bound_coeffs', {})
+
+        function_map: Dict[str, Callable[..., np.ndarray]] = {
+            'gauss': self.gaussian,
+            'frazer': self.fraser_suzuki,
+            'ads': self.asymmetric_double_sigmoid
+        }
+
+        default_callable: Callable[..., np.ndarray] = lambda *args, **kwargs: np.array([])
+        calculate: Callable[..., np.ndarray] = function_map.get(function_type, default_callable)
+
+        y_value = calculate(x, **coeffs)
+        y_upper = calculate(x, **upper_bound_coeffs)
+        y_lower = calculate(x, **lower_bound_coeffs)
+
+        result = {
+            'lower_bound': [x, y_lower],
+            'value': [x, y_value],
+            'upper_bound': [x, y_upper]
+        }
+
+        return result
 
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
@@ -116,8 +130,11 @@ class Calculations(QObject):
             file_name = path_keys[0]
             if operation == 'add_reaction':
                 data = self.generate_default_gaussian_data(file_name)
-                self.calculations_data.set_value(path_keys, data)
-                df = self.create_data_frame(data)
-                self.plot_df_signal.emit(df)
+                self.calculations_data.set_value(path_keys.copy(), data)
+                reaction_results = self.calculate_reaction(path_keys)
+                for key, value in reaction_results.items():
+                    self.plot_reaction_signal.emit(key, value)
+            else:
+                logger.warning("Неизвестная или отсуствующая операция над данными.")
         else:
             logger.error("Некорректный или пустой список path_keys")
