@@ -130,9 +130,24 @@ class Calculations(QObject):
                 reaction_results = self.calculate_reaction(path_keys)
                 for key, value in reaction_results.items():
                     self.plot_reaction_signal.emit(key, value)
+
             elif operation == 'highlight_reaction':
+                self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
                 data = self.calculations_data.get_value([file_name])
-                logger.info(f'Реакции активного файла: {data.keys()}, имя файла: {file_name}')
+                reactions = data.keys()
+                for reaction in reactions:
+                    reaction_results = self.calculate_reaction([file_name, reaction])
+                    if reaction in path_keys:
+                        for key, value in reaction_results.items():
+                            self.plot_reaction_signal.emit(key, value)
+                    else:
+                        value = reaction_results.get('value')
+                        if value is not None:
+                            self.plot_reaction_signal.emit('value', value)
+                logger.info(
+                    f'Реакции активного файла: {data.keys()}, имя файла: {file_name},\
+                        ключи запроса:{path_keys}')
+
             else:
                 logger.warning("Неизвестная или отсуствующая операция над данными.")
         else:

@@ -68,4 +68,4 @@ class PlotCanvas(QWidget):
     @pyqtSlot(str, list)
     def plot_reaction(self, label, values):
         x, y = values
-        self.add_plot(x, y)
+        self.add_plot(x, y, label=label)
