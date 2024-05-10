@@ -51,11 +51,13 @@ class MainTab(QWidget):
         self.sidebar.sub_side_bar_needed.connect(self.toggle_sub_sidebar)
         self.sidebar.console_show_signal.connect(self.toggle_console_visibility)
         self.sub_sidebar.experiment_sub_bar.action_buttons_block.cancel_changes_clicked.connect(
-            self.modify_active_file)
+            self.refer_to_active_file)
         self.sub_sidebar.experiment_sub_bar.action_buttons_block.derivative_clicked.connect(
-            self.modify_active_file)
-        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added_signal.connect(
-            self.modify_calculations_data)
+            self.refer_to_active_file)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(
+            self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(
+            self.refer_to_calculations_data)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -89,13 +91,13 @@ class MainTab(QWidget):
         self.console_widget.setVisible(visible)
         self.initialize_sizes()
 
-    def modify_calculations_data(self, params: dict):
+    def refer_to_calculations_data(self, params: dict):
         active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
         params["path_keys"].insert(0, active_file_name)
         logger.debug(f"Данные: {params} запрашивают операцию изменения данных расчета")
         self.calculations_data_modify_signal.emit(params)
 
-    def modify_active_file(self, params: dict):
+    def refer_to_active_file(self, params: dict):
         params['file_name'] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
         logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
         self.active_file_modify_signal.emit(params)

@@ -31,7 +31,8 @@ class CalcButtons(QWidget):
 
 
 class ReactionTable(QWidget):
-    reaction_added_signal = pyqtSignal(dict)
+    reaction_added = pyqtSignal(dict)
+    reaction_chosed = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -61,16 +62,19 @@ class ReactionTable(QWidget):
         self.reactions_list.addItem(reaction_name)
         reaction_data = {
             "path_keys": [reaction_name],
-            "operation": "add_reaction",
-            "index": self.reaction_counter
+            "operation": "add_reaction"
         }
-        self.reaction_added_signal.emit(reaction_data)
+        self.reaction_added.emit(reaction_data)
         self.reaction_counter += 1
         logger.debug(
             f'Список реакций: {[self.reactions_list.item(i).text() for i in range(self.reactions_list.count())]}')
 
     def selected_reaction(self, item):
         logger.debug(f'Активная реакция: {item.text()}')
+        self.reaction_chosed.emit({
+            "path_keys": [item.text()],
+            "operation": "highlight_reaction"
+        })
 
     def open_settings(self):
         if self.reactions_list.currentItem():
