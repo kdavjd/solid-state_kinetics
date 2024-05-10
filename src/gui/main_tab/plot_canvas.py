@@ -42,7 +42,8 @@ class PlotCanvas(QWidget):
         self.figure.tight_layout()
         self.canvas.draw()
 
-    def add_plot(self, x, y, label: str, **kwargs):
+    def add_plot(self, x, y, **kwargs):
+        label = kwargs.pop('label', '')
         logger.debug('Добавление кривой: %s', label)
         console.log(f"Добавление кривой: {label}")
         self.axes.plot(x, y, label=label, **kwargs)
@@ -66,4 +67,5 @@ class PlotCanvas(QWidget):
 
     @pyqtSlot(str, list)
     def plot_reaction(self, label, values):
-        pass
+        x, y = values
+        self.add_plot(x, y)

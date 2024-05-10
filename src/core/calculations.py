@@ -63,21 +63,19 @@ class Calculations(QObject):
                 "upper_bound_coeffs": {
                     "w": w_upper,
                     "h": h_upper,
-                    "z": z + 0.1 * abs(z)
+                    "z": z
                 },
                 "lower_bound_coeffs": {
                     "w": w_lower,
                     "h": h_lower,
-                    "z": z - 0.1 * abs(z)
+                    "z": z
                 }
             }
-            logger.debug(f"Данные отправлены на запись: {result_dict}")
             return result_dict
         return {}
 
     def calculate_reaction(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
-        logger.debug(f"Данные принятые из get_value: {reaction_params} по ключам {path_keys}")
         x = reaction_params.get('x')
         function_type = reaction_params.get('function')
         coeffs = reaction_params.get('coeffs', {})
@@ -97,13 +95,11 @@ class Calculations(QObject):
         y_upper = calculate(x, **upper_bound_coeffs)
         y_lower = calculate(x, **lower_bound_coeffs)
 
-        result = {
+        return {
             'lower_bound': [x, y_lower],
             'value': [x, y_value],
             'upper_bound': [x, y_upper]
         }
-
-        return result
 
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
