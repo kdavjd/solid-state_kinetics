@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
+from core.calculations_data import CalculationsData
 from core.curve_fitting import CurveFitting as cft
+from core.file_data import FileData
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
 
@@ -12,7 +14,7 @@ from core.logger_console import LoggerConsole as console
 class Calculations(QObject):
     plot_reaction_signal = pyqtSignal(str, list)
 
-    def __init__(self, file_data=None, calculations_data=None):
+    def __init__(self, file_data: FileData, calculations_data: CalculationsData):
         super().__init__()
         self.file_data = file_data
         self.calculations_data = calculations_data
@@ -122,7 +124,7 @@ class Calculations(QObject):
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
-    def process_add_reaction(self, path_keys, _params):
+    def process_add_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
         data = self.generate_default_gaussian_data(file_name)
         self.calculations_data.set_value(path_keys.copy(), data)
@@ -133,7 +135,7 @@ class Calculations(QObject):
             x = np.linspace(x_range[0], x_range[1], 100)
             self.plot_reaction_signal.emit(label, [x, y])
 
-    def process_highlight_reaction(self, path_keys, _params):
+    def process_highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
         self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
         data = self.calculations_data.get_value([file_name])

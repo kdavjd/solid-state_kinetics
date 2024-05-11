@@ -47,7 +47,6 @@ class PlotCanvas(QWidget):
         logger.debug('Добавление кривой: %s', label)
         console.log(f"Добавление кривой: {label}")
         self.axes.plot(x, y, label=label, **kwargs)
-        self.figure.tight_layout()
         self.canvas.draw()
 
     @pyqtSlot(pd.DataFrame)
