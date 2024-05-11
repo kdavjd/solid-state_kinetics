@@ -1,5 +1,3 @@
-from typing import Callable, Dict
-
 import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
@@ -81,29 +79,23 @@ class Calculations(QObject):
         coeffs = reaction_params.get('coeffs', {})
         upper_bound_coeffs = reaction_params.get('upper_bound_coeffs', {})
         lower_bound_coeffs = reaction_params.get('lower_bound_coeffs', {})
-        return x, function_type, coeffs, upper_bound_coeffs, lower_bound_coeffs
-
-    def calculate_reaction(self, reaction_params: tuple):
-        x, function_type, coeffs, upper_bound_coeffs, lower_bound_coeffs = reaction_params
-
-        function_map: Dict[str, Callable[..., np.ndarray]] = {
-            'gauss': self.gaussian,
-            'frazer': self.fraser_suzuki,
-            'ads': self.asymmetric_double_sigmoid
-        }
-
-        default_callable: Callable[..., np.ndarray] = lambda *args, **kwargs: np.array([])
-        calculate: Callable[..., np.ndarray] = function_map.get(function_type, default_callable)
-
-        y_value = calculate(x, **coeffs)
-        y_upper = calculate(x, **upper_bound_coeffs)
-        y_lower = calculate(x, **lower_bound_coeffs)
 
         return {
-            'lower_bound': [x, y_lower],
-            'value': [x, y_value],
-            'upper_bound': [x, y_upper]
+            'value': (x, function_type, coeffs),
+            'upper_bound': (x, function_type, upper_bound_coeffs),
+            'lower_bound': (x, function_type, lower_bound_coeffs)
         }
+
+    def calculate_reaction(self, reaction_params: tuple):
+        x, function_type, coeffs = reaction_params
+        result = None
+        if function_type == 'gauss':
+            result = self.gaussian(x, **coeffs)
+        elif function_type == 'fraser':
+            result = self.fraser_suzuki(x, **coeffs)
+        elif function_type == 'ads':
+            result = self.asymmetric_double_sigmoid(x, **coeffs)
+        return result
 
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
@@ -131,9 +123,11 @@ class Calculations(QObject):
             if operation == 'add_reaction':
                 data = self.generate_default_gaussian_data(file_name)
                 self.calculations_data.set_value(path_keys.copy(), data)
-                reaction_results = self.calculate_reaction(self.extract_reaction_params(path_keys))
+                reaction_params = self.extract_reaction_params(path_keys)
+                reaction_results = {key: self.calculate_reaction(params)
+                                    for key, params in reaction_params.items()}
                 for key, value in reaction_results.items():
-                    self.plot_reaction_signal.emit(key, value)
+                    self.plot_reaction_signal.emit(key, [reaction_params[key][0], value])
 
             elif operation == 'highlight_reaction':
                 self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
@@ -141,18 +135,17 @@ class Calculations(QObject):
                 reactions = data.keys()
                 for reaction in reactions:
                     reaction_params = self.extract_reaction_params([file_name, reaction])
-                    reaction_results = self.calculate_reaction(reaction_params)
                     if reaction in path_keys:
+                        reaction_results = {key: self.calculate_reaction(params)
+                                            for key, params in reaction_params.items()}
                         for key, value in reaction_results.items():
-                            self.plot_reaction_signal.emit(key, value)
+                            self.plot_reaction_signal.emit(key, [reaction_params[key][0], value])
                     else:
-                        value = reaction_results.get('value')
-                        if value is not None:
-                            self.plot_reaction_signal.emit('value', value)
+                        value = self.calculate_reaction(reaction_params['value'])
+                        self.plot_reaction_signal.emit('value', [reaction_params['value'][0], value])
                 logger.info(
                     f'Реакции активного файла: {data.keys()}, имя файла: {file_name},\
                         ключи запроса:{path_keys}')
-
             else:
                 logger.warning("Неизвестная или отсуствующая операция над данными.")
         else:
