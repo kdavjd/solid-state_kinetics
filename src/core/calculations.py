@@ -1,7 +1,7 @@
-import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
+from core.curve_fitting import CurveFitting as cft
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
 
@@ -13,27 +13,6 @@ class Calculations(QObject):
         super().__init__()
         self.file_data = file_data
         self.calculations_data = calculations_data
-
-    @staticmethod
-    def gaussian(x, h, z, w) -> np.ndarray:
-        return h * np.exp(-((x - z) ** 2) / (2 * w ** 2))
-
-    @staticmethod
-    def fraser_suzuki(x, h, z, w, a3) -> np.ndarray:
-        with np.errstate(divide='ignore', invalid='ignore'):
-            result = h * np.exp(-np.log(2)*((np.log(1+2*a3*((x-z)/w))/a3)**2))
-        result = np.nan_to_num(result, nan=0)
-        return result
-
-    @staticmethod
-    def asymmetric_double_sigmoid(x, h, z, w, s1, s2) -> np.ndarray:
-        safe_x = np.clip(x, -709, 709)
-        exp_arg = -((safe_x - z + w/2) / s1)
-        clipped_exp_arg = np.clip(exp_arg, -709, 709)
-        term1 = 1 / (1 + np.exp(clipped_exp_arg))
-        inner_term = 1 / (1 + np.exp(-((safe_x - z - w/2) / s2)))
-        term2 = 1 - inner_term
-        return h * term1 * term2
 
     def generate_default_gaussian_data(self, file_name):
         df = self.file_data.dataframe_copies[file_name]
@@ -90,11 +69,11 @@ class Calculations(QObject):
         x, function_type, coeffs = reaction_params
         result = None
         if function_type == 'gauss':
-            result = self.gaussian(x, **coeffs)
+            result = cft.gaussian(x, **coeffs)
         elif function_type == 'fraser':
-            result = self.fraser_suzuki(x, **coeffs)
+            result = cft.fraser_suzuki(x, **coeffs)
         elif function_type == 'ads':
-            result = self.asymmetric_double_sigmoid(x, **coeffs)
+            result = cft.asymmetric_double_sigmoid(x, **coeffs)
         return result
 
     def diff_function(self, data: pd.DataFrame):
