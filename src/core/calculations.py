@@ -74,13 +74,17 @@ class Calculations(QObject):
             return result_dict
         return {}
 
-    def calculate_reaction(self, path_keys: list):
+    def extract_reaction_params(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
         x = reaction_params.get('x')
         function_type = reaction_params.get('function')
         coeffs = reaction_params.get('coeffs', {})
         upper_bound_coeffs = reaction_params.get('upper_bound_coeffs', {})
         lower_bound_coeffs = reaction_params.get('lower_bound_coeffs', {})
+        return x, function_type, coeffs, upper_bound_coeffs, lower_bound_coeffs
+
+    def calculate_reaction(self, reaction_params: tuple):
+        x, function_type, coeffs, upper_bound_coeffs, lower_bound_coeffs = reaction_params
 
         function_map: Dict[str, Callable[..., np.ndarray]] = {
             'gauss': self.gaussian,
@@ -127,7 +131,7 @@ class Calculations(QObject):
             if operation == 'add_reaction':
                 data = self.generate_default_gaussian_data(file_name)
                 self.calculations_data.set_value(path_keys.copy(), data)
-                reaction_results = self.calculate_reaction(path_keys)
+                reaction_results = self.calculate_reaction(self.extract_reaction_params(path_keys))
                 for key, value in reaction_results.items():
                     self.plot_reaction_signal.emit(key, value)
 
@@ -136,7 +140,8 @@ class Calculations(QObject):
                 data = self.calculations_data.get_value([file_name])
                 reactions = data.keys()
                 for reaction in reactions:
-                    reaction_results = self.calculate_reaction([file_name, reaction])
+                    reaction_params = self.extract_reaction_params([file_name, reaction])
+                    reaction_results = self.calculate_reaction(reaction_params)
                     if reaction in path_keys:
                         for key, value in reaction_results.items():
                             self.plot_reaction_signal.emit(key, value)
