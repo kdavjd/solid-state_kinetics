@@ -126,6 +126,9 @@ class Calculations(QObject):
 
     def process_add_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
+        if not self.file_data.check_operation_executed(file_name, 'differential'):
+            console.log('Данные нужно привести к da/dT')
+            return  # Добавить delete_last_reaction
         data = self.generate_default_gaussian_data(file_name)
         self.calculations_data.set_value(path_keys.copy(), data)
         reaction_params = self.extract_reaction_params(path_keys)
@@ -153,4 +156,3 @@ class Calculations(QObject):
                 value_x = np.linspace(value_x_range[0], value_x_range[1], 100)
                 value_y = self.calculate_reaction(reaction_params['value'])
                 self.plot_reaction_signal.emit('value', [value_x, value_y])
-        logger.debug(f'Реакции активного файла: {data.keys()}, имя файла: {file_name}, ключи запроса:{path_keys}')
