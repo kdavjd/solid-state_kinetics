@@ -116,37 +116,44 @@ class Calculations(QObject):
     @pyqtSlot(dict)
     def modify_calculations_data_slot(self, params: dict):
         logger.debug(f'В modify_calculations_data_slot пришли данные {params}')
-        operation = params.get('operation')
         path_keys = params.get('path_keys')
-        if path_keys and isinstance(path_keys, list):
-            file_name = path_keys[0]
-            if operation == 'add_reaction':
-                data = self.generate_default_gaussian_data(file_name)
-                self.calculations_data.set_value(path_keys.copy(), data)
-                reaction_params = self.extract_reaction_params(path_keys)
-                reaction_results = {key: self.calculate_reaction(params)
-                                    for key, params in reaction_params.items()}
+        operation = params.get('operation')
+
+        if not path_keys or not isinstance(path_keys, list):
+            logger.error("Некорректный или пустой список path_keys")
+            return
+
+        operations = {
+            'add_reaction': self.process_add_reaction,
+            'highlight_reaction': self.process_highlight_reaction
+        }
+
+        if operation in operations:
+            operations[operation](path_keys, params)
+        else:
+            logger.warning("Неизвестная или отсутствующая операция над данными.")
+
+    def process_add_reaction(self, path_keys, params):
+        file_name = path_keys[0]
+        data = self.generate_default_gaussian_data(file_name)
+        self.calculations_data.set_value(path_keys.copy(), data)
+        reaction_params = self.extract_reaction_params(path_keys)
+        reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
+        for key, value in reaction_results.items():
+            self.plot_reaction_signal.emit(key, [reaction_params[key][0], value])
+
+    def process_highlight_reaction(self, path_keys, params):
+        file_name = path_keys[0]
+        self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
+        data = self.calculations_data.get_value([file_name])
+        reactions = data.keys()
+        for reaction in reactions:
+            reaction_params = self.extract_reaction_params([file_name, reaction])
+            if reaction in path_keys:
+                reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
                 for key, value in reaction_results.items():
                     self.plot_reaction_signal.emit(key, [reaction_params[key][0], value])
-
-            elif operation == 'highlight_reaction':
-                self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
-                data = self.calculations_data.get_value([file_name])
-                reactions = data.keys()
-                for reaction in reactions:
-                    reaction_params = self.extract_reaction_params([file_name, reaction])
-                    if reaction in path_keys:
-                        reaction_results = {key: self.calculate_reaction(params)
-                                            for key, params in reaction_params.items()}
-                        for key, value in reaction_results.items():
-                            self.plot_reaction_signal.emit(key, [reaction_params[key][0], value])
-                    else:
-                        value = self.calculate_reaction(reaction_params['value'])
-                        self.plot_reaction_signal.emit('value', [reaction_params['value'][0], value])
-                logger.info(
-                    f'Реакции активного файла: {data.keys()}, имя файла: {file_name},\
-                        ключи запроса:{path_keys}')
             else:
-                logger.warning("Неизвестная или отсуствующая операция над данными.")
-        else:
-            logger.error("Некорректный или пустой список path_keys")
+                value = self.calculate_reaction(reaction_params['value'])
+                self.plot_reaction_signal.emit('value', [reaction_params['value'][0], value])
+        logger.info(f'Реакции активного файла: {data.keys()}, имя файла: {file_name}, ключи запроса:{path_keys}')
