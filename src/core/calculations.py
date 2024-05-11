@@ -33,19 +33,19 @@ class Calculations(QObject):
                 "function": "gauss",
                 "x": x.to_numpy(),
                 "coeffs": {
-                    "w": w,
                     "h": h,
-                    "z": z
+                    "z": z,
+                    "w": w
                 },
                 "upper_bound_coeffs": {
-                    "w": w_upper,
                     "h": h_upper,
-                    "z": z
+                    "z": z,
+                    "w": w_upper
                 },
                 "lower_bound_coeffs": {
-                    "w": w_lower,
                     "h": h_lower,
-                    "z": z
+                    "z": z,
+                    "w": w_lower
                 }
             }
             return result_dict
@@ -112,16 +112,17 @@ class Calculations(QObject):
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
-    def process_add_reaction(self, path_keys, params):
+    def process_add_reaction(self, path_keys, _params):
         file_name = path_keys[0]
         data = self.generate_default_gaussian_data(file_name)
         self.calculations_data.set_value(path_keys.copy(), data)
         reaction_params = self.extract_reaction_params(path_keys)
         reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
-        for key, value in reaction_results.items():
-            self.plot_reaction_signal.emit(key, [reaction_params[key][0], value])
+        for label, y in reaction_results.items():
+            x = reaction_params[label][0]
+            self.plot_reaction_signal.emit(label, [x, y])
 
-    def process_highlight_reaction(self, path_keys, params):
+    def process_highlight_reaction(self, path_keys, _params):
         file_name = path_keys[0]
         self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
         data = self.calculations_data.get_value([file_name])
@@ -130,9 +131,11 @@ class Calculations(QObject):
             reaction_params = self.extract_reaction_params([file_name, reaction])
             if reaction in path_keys:
                 reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
-                for key, value in reaction_results.items():
-                    self.plot_reaction_signal.emit(key, [reaction_params[key][0], value])
+                for label, y in reaction_results.items():
+                    x = reaction_params[label][0]
+                    self.plot_reaction_signal.emit(label, [x, y])
             else:
-                value = self.calculate_reaction(reaction_params['value'])
-                self.plot_reaction_signal.emit('value', [reaction_params['value'][0], value])
-        logger.info(f'Реакции активного файла: {data.keys()}, имя файла: {file_name}, ключи запроса:{path_keys}')
+                value_x = reaction_params['value'][0]
+                value_y = self.calculate_reaction(reaction_params['value'])
+                self.plot_reaction_signal.emit('value', [value_x, value_y])
+        logger.debug(f'Реакции активного файла: {data.keys()}, имя файла: {file_name}, ключи запроса:{path_keys}')
