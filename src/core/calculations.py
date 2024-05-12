@@ -181,6 +181,7 @@ class Calculations(QObject):
             new_value = params.get('value')
             if self.calculations_data.exists(path_keys):
                 self.calculations_data.set_value(path_keys.copy(), new_value)
+                self.process_highlight_reaction(path_keys[:2], params)
                 logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
             else:
                 logger.error(f"Все данные: {self.calculations_data._data}")
