@@ -1,5 +1,7 @@
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
+
+from core.logger_config import logger
 
 from ..console_widget import ConsoleWidget
 from .plot_canvas import PlotCanvas
@@ -7,7 +9,7 @@ from .sidebar import SideBar
 from .sub_sidebar.sub_side_hub import SubSideHub
 
 MIN_WIDTH_SIDEBAR = 220
-MIN_WIDTH_SUBSIDEBAR = 200
+MIN_WIDTH_SUBSIDEBAR = 220
 MIN_WIDTH_CONSOLE = 150
 MIN_WIDTH_PLOTCANVAS = 500
 SPLITTER_WIDTH = 100
@@ -17,6 +19,9 @@ COMPONENTS_MIN_WIDTH = (
 
 
 class MainTab(QWidget):
+    active_file_modify_signal = pyqtSignal(dict)
+    calculations_data_modify_signal = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -45,6 +50,14 @@ class MainTab(QWidget):
 
         self.sidebar.sub_side_bar_needed.connect(self.toggle_sub_sidebar)
         self.sidebar.console_show_signal.connect(self.toggle_console_visibility)
+        self.sub_sidebar.experiment_sub_bar.action_buttons_block.cancel_changes_clicked.connect(
+            self.refer_to_active_file)
+        self.sub_sidebar.experiment_sub_bar.action_buttons_block.derivative_clicked.connect(
+            self.refer_to_active_file)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(
+            self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(
+            self.refer_to_calculations_data)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -69,7 +82,7 @@ class MainTab(QWidget):
                 self.sub_sidebar.update_content("Эксперимент")
             else:
                 self.sub_sidebar.update_content(content_type)
-                self.sub_sidebar.setVisible(True)
+            self.sub_sidebar.setVisible(True)
         else:
             self.sub_sidebar.setVisible(False)
         self.initialize_sizes()
@@ -77,3 +90,14 @@ class MainTab(QWidget):
     def toggle_console_visibility(self, visible):
         self.console_widget.setVisible(visible)
         self.initialize_sizes()
+
+    def refer_to_calculations_data(self, params: dict):
+        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
+        params["path_keys"].insert(0, active_file_name)
+        logger.debug(f"Данные: {params} запрашивают операцию изменения данных расчета")
+        self.calculations_data_modify_signal.emit(params)
+
+    def refer_to_active_file(self, params: dict):
+        params['file_name'] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
+        logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
+        self.active_file_modify_signal.emit(params)

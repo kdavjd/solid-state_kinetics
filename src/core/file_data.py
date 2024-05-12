@@ -34,7 +34,7 @@ def detect_decimal(func):
 
 class FileData(QObject):
     data_loaded_signal = pyqtSignal(pd.DataFrame)
-    dataframe_signal = pyqtSignal(pd.DataFrame)
+    plot_dataframe_signal = pyqtSignal(pd.DataFrame)
 
     def __init__(self):
         super().__init__()
@@ -45,17 +45,31 @@ class FileData(QObject):
         self.delimiter = ','
         self.skip_rows = 0
         self.columns_names = None
+        self.operations_history = {}
+
+    def log_operation(self, params: dict):
+        file_name = params.pop('file_name')
+        if file_name not in self.operations_history:
+            self.operations_history[file_name] = []
+        self.operations_history[file_name].append({'params': params, })
+        logger.debug(f'История операций: {self.operations_history}')
+
+    def check_operation_executed(self, file_name: str, operation: str):
+        if file_name in self.operations_history:
+            for operation_record in self.operations_history[file_name]:
+                if operation_record['params']['operation'] == operation:
+                    return True
+        return False
 
     @pyqtSlot(tuple)
     def load_file(self, file_info):
-        self.file_path, self.delimiter, self.skip_rows, columns_names_str = file_info
-        if columns_names_str:
-            column_delimiter = ',' if ',' in columns_names_str else ' '
-            self.columns_names = [name.strip() for name in columns_names_str.split(column_delimiter)]
+        self.file_path, self.delimiter, self.skip_rows, columns_names = file_info
+        if columns_names:
+            column_delimiter = ',' if ',' in columns_names else ' '
+            self.columns_names = [name.strip() for name in columns_names.split(column_delimiter)]
             logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=%s",
-                         self.file_path, self.delimiter, self.skip_rows, columns_names_str)
+                         self.file_path, self.delimiter, self.skip_rows, columns_names)
         else:
-            self.columns_names = None
             logger.debug("Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=нет (пустая строка)",
                          self.file_path, self.delimiter, self.skip_rows)
 
@@ -105,33 +119,39 @@ class FileData(QObject):
         self.data_loaded_signal.emit(self.data)
 
     @pyqtSlot(str)
-    def get_dataframe_copy(self, key):
+    def plot_dataframe_copy(self, key):
         if key in self.dataframe_copies:
-            self.dataframe_signal.emit(self.dataframe_copies[key])
+            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
         else:
             logger.error(f"Ключ {key} не найден в dataframe_copies.")
 
     def reset_dataframe_copy(self, key):
         if key in self.original_data:
             self.dataframe_copies[key] = self.original_data[key].copy()
+            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
+            if key in self.operations_history:
+                del self.operations_history[key]
+                logger.debug(f'История операций: {self.operations_history}')
 
-    @pyqtSlot(object, str)
-    def modify_data(self, func, key):
+    def modify_data(self, func, params):
+        file_name = params.get('file_name')
         if not callable(func):
             logger.error("Предоставленный аргумент не является функцией")
             return
 
-        if key not in self.dataframe_copies:
-            logger.error(f"Ключ {key} не найден в dataframe_copies.")
+        if file_name not in self.dataframe_copies:
+            logger.error(f"Ключ {file_name} не найден в dataframe_copies.")
             return
 
         try:
-            dataframe = self.dataframe_copies[key]
+            dataframe = self.dataframe_copies[file_name]
             for column in dataframe.columns:
                 if column != 'temperature':
                     dataframe[column] = func(dataframe[column])
 
+            self.log_operation(params)
+            self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
             logger.info("Данные были успешно модифицированы.")
 
         except Exception as e:
-            logger.error(f"Ошибка при модификации данных {key}: {e}")
+            logger.error(f"Ошибка при модификации данных файла:{file_name}: {e}")

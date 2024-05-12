@@ -32,7 +32,18 @@ class PlotCanvas(QWidget):
         layout.addWidget(self.canvas)
         self.setLayout(layout)
 
+        self.background = None
+        self.canvas.mpl_connect('draw_event', self.on_draw)
+
         self.mock_plot()
+
+    def on_draw(self, event):
+        """ Захватываем фон после первой отрисовки. """
+        self.background = self.canvas.copy_from_bbox(self.figure.bbox)
+
+    def restore_background(self):
+        """ Восстанавливаем сохраненный фон. """
+        self.canvas.restore_region(self.background)
 
     def mock_plot(self, data=None):
         logger.debug("Перерисовка графика")
@@ -40,18 +51,20 @@ class PlotCanvas(QWidget):
             data = [1, 2, 3, 4, 5]
         self.axes.plot(data)
         self.figure.tight_layout()
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
-    def add_plot(self, x, y, label: str):
+    def add_plot(self, x, y, **kwargs):
+        label = kwargs.pop('label', '')
         logger.debug('Добавление кривой: %s', label)
         console.log(f"Добавление кривой: {label}")
-        self.axes.plot(x, y, label=label)
-        self.figure.tight_layout()
-        self.canvas.draw()
+        self.restore_background()
+        self.axes.plot(x, y, label=label, **kwargs)
+        self.canvas.blit(self.figure.bbox)
+        self.canvas.draw_idle()
 
-    @pyqtSlot(pd.DataFrame)
-    def plot_from_dataframe(self, data: pd.DataFrame):
+    def plot_file_data_from_dataframe(self, data: pd.DataFrame):
         self.axes.clear()
+        self.restore_background()
         logger.debug("Оси очищены от кривых")
         if 'temperature' in data.columns:
             x = data['temperature']
@@ -62,4 +75,9 @@ class PlotCanvas(QWidget):
             logger.error(
                 "В DataFrame отсутствует столбец 'temperature' для оси X")
             console.log("В файле отсутствует столбец 'temperature' для оси X")
-        self.canvas.draw()
+        self.canvas.blit(self.figure.bbox)
+
+    @pyqtSlot(str, list)
+    def plot_reaction(self, label, values):
+        x, y = values
+        self.add_plot(x, y, label=label)

@@ -2,6 +2,8 @@ import sys
 
 from PyQt6.QtWidgets import QApplication
 
+from core.calculations import Calculations
+from core.calculations_data import CalculationsData
 from core.file_data import FileData
 from gui.main_window import MainWindow
 
@@ -10,18 +12,16 @@ def main():
     app = QApplication(sys.argv)
     window = MainWindow()
     file_data = FileData()
-    window.main_tab.sidebar.load_button.file_selected.connect(
-        file_data.load_file)
-    window.main_tab.sidebar.chosen_experiment_signal.connect(
-        file_data.get_dataframe_copy)
-    file_data.dataframe_signal.connect(
-        window.main_tab.plot_canvas.plot_from_dataframe)
-    file_data.data_loaded_signal.connect(
-        window.main_tab.plot_canvas.plot_from_dataframe)
-    file_data.data_loaded_signal.connect(
-        window.table_tab.table_widget.display_dataframe)
-    # window.main_tab.sub_sidebar.experiment_sub_bar.action_buttons_block.cancel_changes_clicked.connect()
-    # window.main_tab.sub_sidebar.experiment_sub_bar.action_buttons_block.derive_clicked.connect()
+    calculations_data = CalculationsData()
+    calcultaions = Calculations(file_data, calculations_data)
+    window.main_tab.sidebar.load_button.file_selected.connect(file_data.load_file)
+    window.main_tab.sidebar.chosen_experiment_signal.connect(file_data.plot_dataframe_copy)
+    file_data.plot_dataframe_signal.connect(window.main_tab.plot_canvas.plot_file_data_from_dataframe)
+    file_data.data_loaded_signal.connect(window.main_tab.plot_canvas.plot_file_data_from_dataframe)
+    file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
+    window.main_tab.active_file_modify_signal.connect(calcultaions.modify_active_file_slot)
+    window.main_tab.calculations_data_modify_signal.connect(calcultaions.modify_calculations_data_slot)
+    calcultaions.plot_reaction_signal.connect(window.main_tab.plot_canvas.plot_reaction)
     window.show()
     sys.exit(app.exec())
 
