@@ -46,6 +46,7 @@ class ReactionTable(QWidget):
         self.del_reaction_button.clicked.connect(self.del_reaction)
         self.settings_button.clicked.connect(self.open_settings)
 
+        self.active_reaction = None
         self.reaction_counter = 0
 
     def add_reaction(self):
@@ -84,6 +85,7 @@ class ReactionTable(QWidget):
 
     def selected_reaction(self, item):
         logger.debug(f'Активная реакция: {item.text()}')
+        self.active_reaction = item.text()
         self.reaction_chosed.emit({
             "path_keys": [item.text()],
             "operation": "highlight_reaction"
@@ -98,20 +100,27 @@ class ReactionTable(QWidget):
 
 
 class CoeffsTable(QTableWidget):
+    update_value = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(5, 3, parent)
-        self.setHorizontalHeaderLabels(['low', 'val', 'up'])
-        self.setVerticalHeaderLabels(['h', 'z', 'w', 'a1', 'a2'])
-        self.mock_table()
+        self.header_labels = ['low', 'val', 'up']
+        self.row_labels = ['h', 'z', 'w', 'a1', 'a2']
 
+        self.setHorizontalHeaderLabels(self.header_labels)
+        self.setVerticalHeaderLabels(self.row_labels)
+        self.mock_table()
+        self.calculate_fixed_height()
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.cellChanged.connect(self.update_reaction_params)
+        self._is_table_filling = False
+
+    def calculate_fixed_height(self):
         row_height = self.rowHeight(0)
         borders_height = 10
         header_height = self.horizontalHeader().height()
         total_height = (row_height * 5) + header_height + borders_height
         self.setFixedHeight(total_height)
-
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def mock_table(self):
         for i in range(5):
@@ -120,18 +129,45 @@ class CoeffsTable(QTableWidget):
 
     def fill_table(self, reaction_params: dict):
         logger.debug(f"Приняты параметры реакции для таблицы {reaction_params}")
-        for j, key in enumerate(['lower_bound', 'value', 'upper_bound']):
+        param_keys = ['lower_bound_coeffs', 'coeffs', 'upper_bound_coeffs']
+        self._is_filling = True
+        for j, key in enumerate(param_keys):
             try:
-                data = reaction_params[key][2]
+                data = reaction_params[key][2]  # струтура ключей: x_range, function_type, params
                 if len(data) > 5:
                     logger.error(f"Ошибка: Параметры реакции для '{key}' содержат больше 5 элементов.")
                     continue
-                for i in range(5):
-                    value = f"{data[i]:.2f}" if i < len(data) else "NaN"
+                for i in range(min(5, len(data))):
+                    value = f"{data[i]:.2f}"
                     self.setItem(i, j, QTableWidgetItem(value))
-            except IndexError:
-                logger.error(f"Ошибка индекса при обработке данных '{key}'.")
-                continue
+            except IndexError as e:
+                logger.error(f"Ошибка индекса при обработке данных '{key}': {e}")
+        self._is_filling = False
+
+    def update_reaction_params(self, row, column):
+        if not self._is_filling:
+            try:
+                item = self.item(row, column)
+                value = float(item.text())
+                row_label = self.verticalHeaderItem(row).text()
+                column_label = self.horizontalHeaderItem(column).text()
+
+                path_keys = [self.column_to_bound(column_label), row_label]
+                data_change = {
+                    'path_keys': path_keys,
+                    'operation': 'update_value',
+                    'value': value
+                }
+                self.update_value.emit(data_change)
+            except ValueError as e:
+                logger.error(f"Неверные данные для преобразования в число: ряд {row}, колонка {column}: {e}")
+
+    def column_to_bound(self, column_label):
+        return {
+            'low': 'lower_bound_coeffs',
+            'val': 'coeffs',
+            'up': 'upper_bound_coeffs'
+        }.get(column_label, '')
 
 
 class CalcButtons(QWidget):
@@ -160,6 +196,8 @@ class CalcButtons(QWidget):
 
 
 class DeconvolutionSubBar(QWidget):
+    update_value = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -173,3 +211,10 @@ class DeconvolutionSubBar(QWidget):
         layout.addWidget(self.coeffs_table)
         layout.addWidget(self.file_transfer_buttons)
         layout.addWidget(self.calc_buttons)
+
+        self.coeffs_table.update_value.connect(self.handle_update_value)
+
+    def handle_update_value(self, data: dict):
+        if self.reactions_table.active_reaction:
+            data['path_keys'].insert(0, self.reactions_table.active_reaction)
+        self.update_value.emit(data)

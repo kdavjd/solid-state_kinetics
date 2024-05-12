@@ -72,9 +72,9 @@ class Calculations(QObject):
         lower_coeffs_tuple = (lower_coeffs.get('h'), lower_coeffs.get('z'), lower_coeffs.get('w'))
 
         return {
-            "value": (x_range, function_type, coeffs_tuple),
-            "upper_bound": (x_range, function_type, upper_coeffs_tuple),
-            "lower_bound": (x_range, function_type, lower_coeffs_tuple)
+            "coeffs": (x_range, function_type, coeffs_tuple),
+            "upper_bound_coeffs": (x_range, function_type, upper_coeffs_tuple),
+            "lower_bound_coeffs": (x_range, function_type, lower_coeffs_tuple)
         }
 
     @lru_cache(maxsize=128)
@@ -119,7 +119,8 @@ class Calculations(QObject):
         operations = {
             "add_reaction": self.process_add_reaction,
             "remove_reaction": self.process_remove_reaction,
-            "highlight_reaction": self.process_highlight_reaction
+            "highlight_reaction": self.process_highlight_reaction,
+            "update_value": self.process_update_value
         }
 
         if operation in operations:
@@ -170,7 +171,19 @@ class Calculations(QObject):
                     x = np.linspace(x_range[0], x_range[1], 100)
                     self.plot_reaction.emit(label, [x, y])
             else:
-                value_x_range = reaction_params['value'][0]
+                value_x_range = reaction_params['coeffs'][0]
                 value_x = np.linspace(value_x_range[0], value_x_range[1], 100)
-                value_y = self.calculate_reaction(reaction_params['value'])
-                self.plot_reaction.emit('value', [value_x, value_y])
+                value_y = self.calculate_reaction(reaction_params['coeffs'])
+                self.plot_reaction.emit('coeffs', [value_x, value_y])
+
+    def process_update_value(self, path_keys: list, params: dict):
+        try:
+            new_value = params.get('value')
+            if self.calculations_data.exists(path_keys):
+                self.calculations_data.set_value(path_keys.copy(), new_value)
+                logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
+            else:
+                logger.error(f"Все данные: {self.calculations_data._data}")
+                logger.error(f"Данных по пути: {path_keys} не найдено.")
+        except Exception as e:
+            logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
