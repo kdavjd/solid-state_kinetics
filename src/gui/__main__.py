@@ -21,9 +21,11 @@ def main():
     file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
     window.main_tab.active_file_modify_signal.connect(calcultaions.modify_active_file_slot)
     window.main_tab.calculations_data_modify_signal.connect(calcultaions.modify_calculations_data_slot)
-    calcultaions.plot_reaction_signal.connect(window.main_tab.plot_canvas.plot_reaction)
+    calcultaions.plot_reaction.connect(window.main_tab.plot_canvas.plot_reaction)
     calcultaions.add_reaction_fail.connect(
         window.main_tab.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction)
+    calcultaions.send_raction_params.connect(
+        window.main_tab.sub_sidebar.deconvolution_sub_bar.coeffs_table.fill_table)
     window.show()
     sys.exit(app.exec())
 

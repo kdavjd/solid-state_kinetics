@@ -12,8 +12,9 @@ from core.logger_console import LoggerConsole as console
 
 
 class Calculations(QObject):
-    plot_reaction_signal = pyqtSignal(str, list)
+    plot_reaction = pyqtSignal(str, list)
     add_reaction_fail = pyqtSignal()
+    send_raction_params = pyqtSignal(dict)
 
     def __init__(self, file_data: FileData, calculations_data: CalculationsData):
         super().__init__()
@@ -139,7 +140,7 @@ class Calculations(QObject):
         for label, y in reaction_results.items():
             x_range = reaction_params[label][0]
             x = np.linspace(x_range[0], x_range[1], 100)
-            self.plot_reaction_signal.emit(label, [x, y])
+            self.plot_reaction.emit(label, [x, y])
 
     def process_remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
@@ -162,13 +163,14 @@ class Calculations(QObject):
         for reaction in reactions:
             reaction_params = self.extract_reaction_params([file_name, reaction])
             if reaction in path_keys:
+                self.send_raction_params.emit(reaction_params)
                 reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
                 for label, y in reaction_results.items():
                     x_range = reaction_params[label][0]
                     x = np.linspace(x_range[0], x_range[1], 100)
-                    self.plot_reaction_signal.emit(label, [x, y])
+                    self.plot_reaction.emit(label, [x, y])
             else:
                 value_x_range = reaction_params['value'][0]
                 value_x = np.linspace(value_x_range[0], value_x_range[1], 100)
                 value_y = self.calculate_reaction(reaction_params['value'])
-                self.plot_reaction_signal.emit('value', [value_x, value_y])
+                self.plot_reaction.emit('value', [value_x, value_y])

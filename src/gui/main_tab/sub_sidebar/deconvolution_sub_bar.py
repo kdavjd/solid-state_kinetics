@@ -103,10 +103,7 @@ class CoeffsTable(QTableWidget):
         super().__init__(5, 3, parent)
         self.setHorizontalHeaderLabels(['low', 'val', 'up'])
         self.setVerticalHeaderLabels(['h', 'z', 'w', 'a1', 'a2'])
-
-        for i in range(5):
-            for j in range(3):
-                self.setItem(i, j, QTableWidgetItem(f"{i+1},{j+1}{i+1}"))
+        self.mock_table()
 
         row_height = self.rowHeight(0)
         borders_height = 10
@@ -115,6 +112,26 @@ class CoeffsTable(QTableWidget):
         self.setFixedHeight(total_height)
 
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+    def mock_table(self):
+        for i in range(5):
+            for j in range(3):
+                self.setItem(i, j, QTableWidgetItem(f"Mock,{i+1},{j+1}"))
+
+    def fill_table(self, reaction_params: dict):
+        logger.debug(f"Приняты параметры реакции для таблицы {reaction_params}")
+        for j, key in enumerate(['lower_bound', 'value', 'upper_bound']):
+            try:
+                data = reaction_params[key][2]
+                if len(data) > 5:
+                    logger.error(f"Ошибка: Параметры реакции для '{key}' содержат больше 5 элементов.")
+                    continue
+                for i in range(5):
+                    value = f"{data[i]:.2f}" if i < len(data) else "NaN"
+                    self.setItem(i, j, QTableWidgetItem(value))
+            except IndexError:
+                logger.error(f"Ошибка индекса при обработке данных '{key}'.")
+                continue
 
 
 class CalcButtons(QWidget):
