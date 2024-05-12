@@ -13,6 +13,7 @@ from core.logger_console import LoggerConsole as console
 
 class Calculations(QObject):
     plot_reaction_signal = pyqtSignal(str, list)
+    add_reaction_fail = pyqtSignal()
 
     def __init__(self, file_data: FileData, calculations_data: CalculationsData):
         super().__init__()
@@ -70,9 +71,9 @@ class Calculations(QObject):
         lower_coeffs_tuple = (lower_coeffs.get('h'), lower_coeffs.get('z'), lower_coeffs.get('w'))
 
         return {
-            'value': (x_range, function_type, coeffs_tuple),
-            'upper_bound': (x_range, function_type, upper_coeffs_tuple),
-            'lower_bound': (x_range, function_type, lower_coeffs_tuple)
+            "value": (x_range, function_type, coeffs_tuple),
+            "upper_bound": (x_range, function_type, upper_coeffs_tuple),
+            "lower_bound": (x_range, function_type, lower_coeffs_tuple)
         }
 
     @lru_cache(maxsize=128)
@@ -80,11 +81,11 @@ class Calculations(QObject):
         x_range, function_type, coeffs = reaction_params
         x = np.linspace(x_range[0], x_range[1], 100)
         result = None
-        if function_type == 'gauss':
+        if function_type == "gauss":
             result = cft.gaussian(x, *coeffs)
-        elif function_type == 'fraser':
+        elif function_type == "fraser":
             result = cft.fraser_suzuki(x, *coeffs)
-        elif function_type == 'ads':
+        elif function_type == "ads":
             result = cft.asymmetric_double_sigmoid(x, *coeffs)
         return result
 
@@ -93,30 +94,31 @@ class Calculations(QObject):
 
     @pyqtSlot(dict)
     def modify_active_file_slot(self, params: dict):
-        logger.debug(f'В modify_active_file_slot пришли данные {params}')
-        operation = params.get('operation')
-        file_name = params.get('file_name')
+        logger.debug(f"В modify_active_file_slot пришли данные {params}")
+        operation = params.get("operation")
+        file_name = params.get("file_name")
         if operation == "differential":
             if not self.file_data.check_operation_executed(file_name, operation):
                 self.file_data.modify_data(self.diff_function, params)
             else:
-                console.log('Данные уже приведены к da/dT')
+                console.log("Данные уже приведены к da/dT")
         elif operation == "cancel_changes":
             self.file_data.reset_dataframe_copy(file_name)
 
     @pyqtSlot(dict)
     def modify_calculations_data_slot(self, params: dict):
-        logger.debug(f'В modify_calculations_data_slot пришли данные {params}')
-        path_keys = params.get('path_keys')
-        operation = params.get('operation')
+        logger.debug(f"В modify_calculations_data_slot пришли данные {params}")
+        path_keys = params.get("path_keys")
+        operation = params.get("operation")
 
         if not path_keys or not isinstance(path_keys, list):
             logger.error("Некорректный или пустой список path_keys")
             return
 
         operations = {
-            'add_reaction': self.process_add_reaction,
-            'highlight_reaction': self.process_highlight_reaction
+            "add_reaction": self.process_add_reaction,
+            "remove_reaction": self.process_remove_reaction,
+            "highlight_reaction": self.process_highlight_reaction
         }
 
         if operation in operations:
@@ -126,9 +128,10 @@ class Calculations(QObject):
 
     def process_add_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
-        if not self.file_data.check_operation_executed(file_name, 'differential'):
-            console.log('Данные нужно привести к da/dT')
-            return  # Добавить delete_last_reaction
+        if not self.file_data.check_operation_executed(file_name, "differential"):
+            console.log("Данные нужно привести к da/dT")
+            self.add_reaction_fail.emit()
+            return
         data = self.generate_default_gaussian_data(file_name)
         self.calculations_data.set_value(path_keys.copy(), data)
         reaction_params = self.extract_reaction_params(path_keys)
@@ -137,6 +140,19 @@ class Calculations(QObject):
             x_range = reaction_params[label][0]
             x = np.linspace(x_range[0], x_range[1], 100)
             self.plot_reaction_signal.emit(label, [x, y])
+
+    def process_remove_reaction(self, path_keys: list, _params: dict):
+        if len(path_keys) < 2:
+            logger.error("Недостаточно информации в path_keys для удаления реакции")
+            return
+        file_name, reaction_name = path_keys
+        if self.calculations_data.exists(path_keys):
+            self.calculations_data.remove_value(path_keys)
+            logger.debug(f"Удалена реакция {reaction_name} для файла {file_name}")
+            console.log(f"Реакция {reaction_name} была успешно удалена")
+        else:
+            logger.warning(f"Реакция {reaction_name} не найдена в данных")
+            console.log(f"Не удалось найти реакцию {reaction_name} для удаления")
 
     def process_highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]

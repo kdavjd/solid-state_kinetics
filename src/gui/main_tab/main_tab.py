@@ -56,6 +56,8 @@ class MainTab(QWidget):
             self.refer_to_active_file)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(
             self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_removed.connect(
+            self.refer_to_calculations_data)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(
             self.refer_to_calculations_data)
 

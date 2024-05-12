@@ -21,6 +21,7 @@ class FileTransferButtons(QWidget):
 
 class ReactionTable(QWidget):
     reaction_added = pyqtSignal(dict)
+    reaction_removed = pyqtSignal(dict)
     reaction_chosed = pyqtSignal(dict)
 
     def __init__(self, parent=None):
@@ -42,6 +43,7 @@ class ReactionTable(QWidget):
         self.layout.addWidget(self.settings_button)
 
         self.add_reaction_button.clicked.connect(self.add_reaction)
+        self.del_reaction_button.clicked.connect(self.del_reaction)
         self.settings_button.clicked.connect(self.open_settings)
 
         self.reaction_counter = 0
@@ -57,6 +59,28 @@ class ReactionTable(QWidget):
         self.reaction_counter += 1
         logger.debug(
             f'Список реакций: {[self.reactions_list.item(i).text() for i in range(self.reactions_list.count())]}')
+
+    def on_fail_add_reaction(self):
+        if self.reactions_list.count() > 0:
+            last_item_index = self.reactions_list.count() - 1
+            last_item = self.reactions_list.item(last_item_index)
+            self.reactions_list.takeItem(last_item_index)
+            self.reaction_counter -= 1
+            logger.debug(f"Неудачное добавление реакции. Удалён элемент: {last_item.text()}")
+
+    def del_reaction(self):
+        current_item = self.reactions_list.currentItem()
+        if current_item is not None:
+            reaction_name = current_item.text()
+            row = self.reactions_list.row(current_item)
+            self.reactions_list.takeItem(row)
+            self.reaction_removed.emit({
+                "path_keys": [reaction_name],
+                "operation": "remove_reaction"
+            })
+            logger.debug(f"Создан запрос на удаление реакции: {reaction_name}")
+        else:
+            QMessageBox.warning(self, "Удаление Реакции", "Пожалуйста, выберите реакцию из списка для удаления.")
 
     def selected_reaction(self, item):
         logger.debug(f'Активная реакция: {item.text()}')
