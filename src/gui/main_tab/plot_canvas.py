@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -8,6 +8,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import \
     NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
@@ -26,6 +27,7 @@ class PlotCanvas(QWidget):
         self.axes = self.figure.add_subplot(111)
 
         self.toolbar = NavigationToolbar(self.canvas, self)
+        self.lines: Dict[str, Line2D] = {}
 
         layout = QVBoxLayout()
         layout.addWidget(self.toolbar)
@@ -49,35 +51,33 @@ class PlotCanvas(QWidget):
         logger.debug("Перерисовка графика")
         if data is None:
             data = [1, 2, 3, 4, 5]
-        self.axes.plot(data)
-        self.figure.tight_layout()
-        self.canvas.draw_idle()
+        self.add_or_update_line('mock', range(len(data)), data)
 
-    def add_plot(self, x, y, **kwargs):
-        label = kwargs.pop('label', '')
-        logger.debug('Добавление кривой: %s', label)
-        console.log(f"Добавление кривой: {label}")
-        self.restore_background()
-        self.axes.plot(x, y, label=label, **kwargs)
-        self.canvas.blit(self.figure.bbox)
+    def add_or_update_line(self, key, x, y, **kwargs):
+        """ Добавляет или обновляет линию по ключу. """
+        if key in self.lines:
+            line = self.lines[key]
+            line.set_data(x, y)
+        else:
+            line, = self.axes.plot(x, y, **kwargs)
+            self.lines[key] = line
         self.canvas.draw_idle()
+        self.figure.tight_layout()
 
     def plot_file_data_from_dataframe(self, data: pd.DataFrame):
         self.axes.clear()
-        self.restore_background()
-        logger.debug("Оси очищены от кривых")
+        self.lines.clear()
         if 'temperature' in data.columns:
             x = data['temperature']
             for column in data.columns:
                 if column != 'temperature':
-                    self.add_plot(x, data[column], label=column)
+                    self.add_or_update_line(column, x, data[column], label=column)
         else:
             logger.error(
                 "В DataFrame отсутствует столбец 'temperature' для оси X")
             console.log("В файле отсутствует столбец 'temperature' для оси X")
-        self.canvas.blit(self.figure.bbox)
 
     @pyqtSlot(str, list)
     def plot_reaction(self, label, values):
         x, y = values
-        self.add_plot(x, y, label=label)
+        self.add_or_update_line(label, x, y, label=label)
