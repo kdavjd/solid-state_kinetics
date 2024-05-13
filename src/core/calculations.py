@@ -129,7 +129,7 @@ class Calculations(QObject):
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
     def process_add_reaction(self, path_keys: list, _params: dict):
-        file_name = path_keys[0]
+        file_name, reaction_name = path_keys
         if not self.file_data.check_operation_executed(file_name, "differential"):
             console.log("Данные нужно привести к da/dT")
             self.add_reaction_fail.emit()
@@ -141,7 +141,7 @@ class Calculations(QObject):
         for label, y in reaction_results.items():
             x_range = reaction_params[label][0]
             x = np.linspace(x_range[0], x_range[1], 100)
-            self.plot_reaction.emit(label, [x, y])
+            self.plot_reaction.emit(reaction_name + '_' + label, [x, y])
 
     def process_remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
@@ -169,12 +169,12 @@ class Calculations(QObject):
                 for label, y in reaction_results.items():
                     x_range = reaction_params[label][0]
                     x = np.linspace(x_range[0], x_range[1], 100)
-                    self.plot_reaction.emit(label, [x, y])
+                    self.plot_reaction.emit(reaction + '_' + label, [x, y])
             else:
                 value_x_range = reaction_params['coeffs'][0]
                 value_x = np.linspace(value_x_range[0], value_x_range[1], 100)
                 value_y = self.calculate_reaction(reaction_params['coeffs'])
-                self.plot_reaction.emit('coeffs', [value_x, value_y])
+                self.plot_reaction.emit(reaction + '_' + 'coeffs', [value_x, value_y])
 
     def process_update_value(self, path_keys: list, params: dict):
         try:
