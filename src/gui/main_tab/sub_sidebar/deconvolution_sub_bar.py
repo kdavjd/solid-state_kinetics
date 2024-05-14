@@ -89,19 +89,22 @@ class ReactionTable(QWidget):
             logger.debug(f"Неудачное добавление реакции. Удалён элемент: {last_item.text()}")
 
     def del_reaction(self):
-        if not self.active_file or not self.reactions_lists[self.active_file].currentItem():
-            QMessageBox.warning(self, "Удаление Реакции", "Пожалуйста, выберите реакцию из списка для удаления.")
+        if not self.active_file:
+            QMessageBox.warning(self, "Удаление Реакции", "Файл не выбран.")
             return
 
-        current_item = self.reactions_lists[self.active_file].currentItem()
-        reaction_name = current_item.text()
-        row = self.reactions_lists[self.active_file].row(current_item)
-        self.reactions_lists[self.active_file].takeItem(row)
-        self.reaction_removed.emit({
-            "path_keys": [reaction_name],
-            "operation": "remove_reaction"
-        })
-        logger.debug(f"Создан запрос на удаление реакции: {reaction_name}")
+        if self.reactions_lists[self.active_file].count() > 0:
+            last_item_index = self.reactions_lists[self.active_file].count() - 1
+            last_item = self.reactions_lists[self.active_file].takeItem(last_item_index)
+            self.reactions_counters[self.active_file] -= 1
+
+            self.reaction_removed.emit({
+                "path_keys": [last_item.text()],
+                "operation": "remove_reaction"
+            })
+            logger.debug(f"Удалена последняя реакция: {last_item.text()}")
+        else:
+            QMessageBox.warning(self, "Удаление Реакции", "В списке нет реакций для удаления.")
 
     def selected_reaction(self, item):
         logger.debug(f'Активная реакция: {item.text()}')
