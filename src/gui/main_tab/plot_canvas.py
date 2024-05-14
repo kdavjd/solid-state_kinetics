@@ -48,7 +48,6 @@ class PlotCanvas(QWidget):
         self.canvas.restore_region(self.background)
 
     def mock_plot(self, data=None):
-        logger.debug("Перерисовка графика")
         if data is None:
             data = [1, 2, 3, 4, 5]
         self.add_or_update_line('mock', range(len(data)), data)
@@ -77,7 +76,8 @@ class PlotCanvas(QWidget):
                 "В DataFrame отсутствует столбец 'temperature' для оси X")
             console.log("В файле отсутствует столбец 'temperature' для оси X")
 
-    @pyqtSlot(str, list)
-    def plot_reaction(self, label, values):
+    @pyqtSlot(tuple, list)
+    def plot_reaction(self, keys, values):
+        file_name, reaction_name = keys
         x, y = values
-        self.add_or_update_line(label, x, y, label=label)
+        self.add_or_update_line(reaction_name, x, y, label=reaction_name)

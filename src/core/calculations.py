@@ -12,7 +12,7 @@ from core.logger_console import LoggerConsole as console
 
 
 class Calculations(QObject):
-    plot_reaction = pyqtSignal(str, list)
+    plot_reaction = pyqtSignal(tuple, list)
     add_reaction_fail = pyqtSignal()
     send_raction_params = pyqtSignal(dict)
 
@@ -134,14 +134,20 @@ class Calculations(QObject):
             console.log("Данные нужно привести к da/dT")
             self.add_reaction_fail.emit()
             return
+
         data = self.generate_default_gaussian_data(file_name)
         self.calculations_data.set_value(path_keys.copy(), data)
         reaction_params = self.extract_reaction_params(path_keys)
-        reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
-        for label, y in reaction_results.items():
-            x_range = reaction_params[label][0]
+
+        def plot_reaction_curve(reaction_name, label, params):
+            x_range = params[0]
             x = np.linspace(x_range[0], x_range[1], 100)
-            self.plot_reaction.emit(reaction_name + '_' + label, [x, y])
+            y = self.calculate_reaction(params)
+            curve_name = f"{reaction_name}_{label}"
+            self.plot_reaction.emit((file_name, curve_name), [x, y])
+
+        for label, params in reaction_params.items():
+            plot_reaction_curve(reaction_name, label, params)
 
     def process_remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
@@ -161,20 +167,22 @@ class Calculations(QObject):
         self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
         data = self.calculations_data.get_value([file_name])
         reactions = data.keys()
+
+        def plot_reaction_curve(reaction, label, params):
+            x_range = params[0]
+            x = np.linspace(x_range[0], x_range[1], 100)
+            y = self.calculate_reaction(params)
+            curve_name = f"{reaction}_{label}"
+            self.plot_reaction.emit((file_name, curve_name), [x, y])
+
         for reaction in reactions:
             reaction_params = self.extract_reaction_params([file_name, reaction])
             if reaction in path_keys:
                 self.send_raction_params.emit(reaction_params)
-                reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
-                for label, y in reaction_results.items():
-                    x_range = reaction_params[label][0]
-                    x = np.linspace(x_range[0], x_range[1], 100)
-                    self.plot_reaction.emit(reaction + '_' + label, [x, y])
+                for label, params in reaction_params.items():
+                    plot_reaction_curve(reaction, label, params)
             else:
-                value_x_range = reaction_params['coeffs'][0]
-                value_x = np.linspace(value_x_range[0], value_x_range[1], 100)
-                value_y = self.calculate_reaction(reaction_params['coeffs'])
-                self.plot_reaction.emit(reaction + '_' + 'coeffs', [value_x, value_y])
+                plot_reaction_curve(reaction, 'coeffs', reaction_params['coeffs'])
 
     def process_update_value(self, path_keys: list, params: dict):
         try:
