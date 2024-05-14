@@ -62,6 +62,8 @@ class MainTab(QWidget):
             self.refer_to_calculations_data)
         self.sub_sidebar.deconvolution_sub_bar.update_value.connect(
             self.refer_to_calculations_data)
+        self.sidebar.active_file_selected.connect(
+            self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file)
 
     def initialize_sizes(self):
         total_width = self.width()

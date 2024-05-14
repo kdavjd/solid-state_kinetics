@@ -14,6 +14,7 @@ class SideBar(QWidget):
     sub_side_bar_needed = pyqtSignal(str)
     chosen_experiment_signal = pyqtSignal(str)
     console_show_signal = pyqtSignal(bool)
+    active_file_selected = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -66,6 +67,7 @@ class SideBar(QWidget):
             self.unmark_active_state(self.active_file_item)
         self.mark_active_state(item)
         self.active_file_item = item
+        self.active_file_selected.emit(item.text())
         logger.debug(f"Активный файл: {item.text()}")
 
     def mark_active_state(self, item):

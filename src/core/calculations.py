@@ -129,8 +129,8 @@ class Calculations(QObject):
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
     def plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
-        x_range = params[0]
-        x = np.linspace(x_range[0], x_range[1], 100)
+        x_min, x_max = params[0]
+        x = np.linspace(x_min, x_max, 100)
         y = self.calculate_reaction(params)
         curve_name = f"{reaction_name}_{bound_label}"
         self.plot_reaction.emit((file_name, curve_name), [x, y])

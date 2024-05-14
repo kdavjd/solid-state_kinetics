@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QHBoxLayout, QHeaderView, QListWidget,
                              QMessageBox, QPushButton, QTableWidget,
@@ -35,9 +37,9 @@ class ReactionTable(QWidget):
         self.top_buttons_layout.addWidget(self.del_reaction_button)
         self.layout.addLayout(self.top_buttons_layout)
 
-        self.reactions_list = QListWidget()
-        self.reactions_list.itemClicked.connect(self.selected_reaction)
-        self.layout.addWidget(self.reactions_list)
+        self.reactions_lists = {}
+        self.reactions_counters = defaultdict(int)
+        self.active_file = None
 
         self.settings_button = QPushButton("Настройки")
         self.layout.addWidget(self.settings_button)
@@ -46,42 +48,60 @@ class ReactionTable(QWidget):
         self.del_reaction_button.clicked.connect(self.del_reaction)
         self.settings_button.clicked.connect(self.open_settings)
 
-        self.active_reaction = None
-        self.reaction_counter = 0
+    def switch_file(self, file_name):
+        if file_name not in self.reactions_lists:
+            self.reactions_lists[file_name] = QListWidget()
+            self.reactions_lists[file_name].itemClicked.connect(self.selected_reaction)
+            self.layout.addWidget(self.reactions_lists[file_name])
+
+        if self.active_file:
+            self.reactions_lists[self.active_file].setVisible(False)
+
+        self.reactions_lists[file_name].setVisible(True)
+        self.active_file = file_name
 
     def add_reaction(self):
-        reaction_name = f"reaction_{self.reaction_counter}"
-        self.reactions_list.addItem(reaction_name)
+        if not self.active_file:
+            QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
+            return
+
+        reaction_name = f"{self.active_file}_reaction_{self.reactions_counters[self.active_file]}"
+        self.reactions_lists[self.active_file].addItem(reaction_name)
         reaction_data = {
             "path_keys": [reaction_name],
             "operation": "add_reaction"
         }
         self.reaction_added.emit(reaction_data)
-        self.reaction_counter += 1
-        logger.debug(
-            f'Список реакций: {[self.reactions_list.item(i).text() for i in range(self.reactions_list.count())]}')
+        self.reactions_counters[self.active_file] += 1
+
+        logger.debug(f'Список реакций: {[self.reactions_lists[self.active_file].item(i).text()
+                     for i in range(self.reactions_lists[self.active_file].count())]}')
 
     def on_fail_add_reaction(self):
-        if self.reactions_list.count() > 0:
-            last_item_index = self.reactions_list.count() - 1
-            last_item = self.reactions_list.item(last_item_index)
-            self.reactions_list.takeItem(last_item_index)
-            self.reaction_counter -= 1
+        if not self.active_file:
+            logger.debug("Файл не выбран. Откат операции добавления невозможен.")
+            return
+
+        if self.reactions_lists[self.active_file].count() > 0:
+            last_item_index = self.reactions_lists[self.active_file].count() - 1
+            last_item = self.reactions_lists[self.active_file].takeItem(last_item_index)
+            self.reactions_counters[self.active_file] -= 1
             logger.debug(f"Неудачное добавление реакции. Удалён элемент: {last_item.text()}")
 
     def del_reaction(self):
-        current_item = self.reactions_list.currentItem()
-        if current_item is not None:
-            reaction_name = current_item.text()
-            row = self.reactions_list.row(current_item)
-            self.reactions_list.takeItem(row)
-            self.reaction_removed.emit({
-                "path_keys": [reaction_name],
-                "operation": "remove_reaction"
-            })
-            logger.debug(f"Создан запрос на удаление реакции: {reaction_name}")
-        else:
+        if not self.active_file or not self.reactions_lists[self.active_file].currentItem():
             QMessageBox.warning(self, "Удаление Реакции", "Пожалуйста, выберите реакцию из списка для удаления.")
+            return
+
+        current_item = self.reactions_lists[self.active_file].currentItem()
+        reaction_name = current_item.text()
+        row = self.reactions_lists[self.active_file].row(current_item)
+        self.reactions_lists[self.active_file].takeItem(row)
+        self.reaction_removed.emit({
+            "path_keys": [reaction_name],
+            "operation": "remove_reaction"
+        })
+        logger.debug(f"Создан запрос на удаление реакции: {reaction_name}")
 
     def selected_reaction(self, item):
         logger.debug(f'Активная реакция: {item.text()}')
@@ -92,8 +112,8 @@ class ReactionTable(QWidget):
         })
 
     def open_settings(self):
-        if self.reactions_list.currentItem():
-            reaction_name = self.reactions_list.currentItem().text()
+        if self.active_file and self.reactions_lists[self.active_file].currentItem():
+            reaction_name = self.reactions_lists[self.active_file].currentItem().text()
             QMessageBox.information(self, "Настройки Реакции", f"Настройки для {reaction_name}")
         else:
             QMessageBox.warning(self, "Настройки Реакции", "Пожалуйста, выберите реакцию из списка.")
