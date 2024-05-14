@@ -128,6 +128,13 @@ class Calculations(QObject):
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
+    def plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
+        x_range = params[0]
+        x = np.linspace(x_range[0], x_range[1], 100)
+        y = self.calculate_reaction(params)
+        curve_name = f"{reaction_name}_{bound_label}"
+        self.plot_reaction.emit((file_name, curve_name), [x, y])
+
     def process_add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
         if not self.file_data.check_operation_executed(file_name, "differential"):
@@ -139,15 +146,8 @@ class Calculations(QObject):
         self.calculations_data.set_value(path_keys.copy(), data)
         reaction_params = self.extract_reaction_params(path_keys)
 
-        def plot_reaction_curve(reaction_name, label, params):
-            x_range = params[0]
-            x = np.linspace(x_range[0], x_range[1], 100)
-            y = self.calculate_reaction(params)
-            curve_name = f"{reaction_name}_{label}"
-            self.plot_reaction.emit((file_name, curve_name), [x, y])
-
-        for label, params in reaction_params.items():
-            plot_reaction_curve(reaction_name, label, params)
+        for bound_label, params in reaction_params.items():
+            self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
 
     def process_remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
@@ -168,21 +168,14 @@ class Calculations(QObject):
         data = self.calculations_data.get_value([file_name])
         reactions = data.keys()
 
-        def plot_reaction_curve(reaction, label, params):
-            x_range = params[0]
-            x = np.linspace(x_range[0], x_range[1], 100)
-            y = self.calculate_reaction(params)
-            curve_name = f"{reaction}_{label}"
-            self.plot_reaction.emit((file_name, curve_name), [x, y])
-
-        for reaction in reactions:
-            reaction_params = self.extract_reaction_params([file_name, reaction])
-            if reaction in path_keys:
+        for reaction_name in reactions:
+            reaction_params = self.extract_reaction_params([file_name, reaction_name])
+            if reaction_name in path_keys:
                 self.send_raction_params.emit(reaction_params)
-                for label, params in reaction_params.items():
-                    plot_reaction_curve(reaction, label, params)
+                for bound_label, params in reaction_params.items():
+                    self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
             else:
-                plot_reaction_curve(reaction, 'coeffs', reaction_params['coeffs'])
+                self.plot_reaction_curve(file_name, reaction_name, 'coeffs', reaction_params['coeffs'])
 
     def process_update_value(self, path_keys: list, params: dict):
         try:
