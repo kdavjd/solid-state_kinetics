@@ -25,7 +25,7 @@ class ReactionTable(QWidget):
     reaction_added = pyqtSignal(dict)
     reaction_removed = pyqtSignal(dict)
     reaction_chosed = pyqtSignal(dict)
-    reaction_function_changed = pyqtSignal(str, str)
+    reaction_function_changed = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -67,7 +67,12 @@ class ReactionTable(QWidget):
 
     def function_changed(self, reaction_name, combo):
         function = combo.currentText()
-        self.reaction_function_changed.emit(reaction_name, function)
+        data_change = {
+                    'path_keys': [reaction_name, "function"],
+                    'operation': 'update_value',
+                    'value': function
+                }
+        self.reaction_function_changed.emit(data_change)
         logger.debug(f"Изменена реакция для {reaction_name}: {function}")
 
     def add_reaction(self):
@@ -81,7 +86,7 @@ class ReactionTable(QWidget):
 
         reaction_name = f"reaction_{self.reactions_counters[self.active_file]}"
         combo = QComboBox()
-        combo.addItems(["gauss", "frazer", "ads"])
+        combo.addItems(["gauss", "fraser", "ads"])
         combo.setCurrentText("gauss")
         combo.currentIndexChanged.connect(lambda: self.function_changed(reaction_name, combo))
 
@@ -161,7 +166,7 @@ class CoeffsTable(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(6, 3, parent)
         self.header_labels = ['low', 'val', 'up']
-        self.row_labels = ['h', 'z', 'w', 'fs', 'ads1', 'ads2']
+        self.row_labels = ['h', 'z', 'w', 'fr', 'ads1', 'ads2']
 
         self.setHorizontalHeaderLabels(self.header_labels)
         self.setVerticalHeaderLabels(self.row_labels)
@@ -191,7 +196,7 @@ class CoeffsTable(QTableWidget):
             try:
                 data = reaction_params[key][2]  # струтура ключей: x_range, function_type, params
                 if len(data) > 6:
-                    logger.error(f"Ошибка: Параметры реакции для '{key}' содержат больше 5 элементов.")
+                    logger.error(f"Ошибка: Параметры реакции для '{key}' содержат больше 6 элементов.")
                     continue
                 for i in range(min(6, len(data))):
                     value = f"{data[i]:.2f}"
@@ -269,8 +274,12 @@ class DeconvolutionSubBar(QWidget):
         layout.addWidget(self.calc_buttons)
 
         self.coeffs_table.update_value.connect(self.handle_update_value)
+        self.reactions_table.reaction_function_changed.connect(self.handle_update_function_value)
 
     def handle_update_value(self, data: dict):
         if self.reactions_table.active_reaction:
             data['path_keys'].insert(0, self.reactions_table.active_reaction)
+        self.update_value.emit(data)
+
+    def handle_update_function_value(self, data: dict):
         self.update_value.emit(data)

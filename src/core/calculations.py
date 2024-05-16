@@ -14,7 +14,7 @@ from core.logger_console import LoggerConsole as console
 class Calculations(QObject):
     plot_reaction = pyqtSignal(tuple, list)
     add_reaction_fail = pyqtSignal()
-    send_raction_params = pyqtSignal(dict)
+    reaction_params_to_gui = pyqtSignal(dict)
 
     def __init__(self, file_data: FileData, calculations_data: CalculationsData):
         super().__init__()
@@ -33,7 +33,7 @@ class Calculations(QObject):
 
         default_keys = ['h', 'z', 'w']
         function_specific_keys = {
-            'frazer': default_keys + ['fr'],
+            'fraser': default_keys + ['fr'],
             'ads': default_keys + ['ads1', 'ads2']
         }
         allowed_keys = function_specific_keys.get(function_type, default_keys)
@@ -143,7 +143,7 @@ class Calculations(QObject):
         for reaction_name in reactions:
             reaction_params = self.extract_reaction_params([file_name, reaction_name])
             if reaction_name in path_keys:
-                self.send_raction_params.emit(reaction_params)
+                self.reaction_params_to_gui.emit(reaction_params)
                 for bound_label, params in reaction_params.items():
                     self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
             else:
