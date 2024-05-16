@@ -25,6 +25,7 @@ class ReactionTable(QWidget):
     reaction_added = pyqtSignal(dict)
     reaction_removed = pyqtSignal(dict)
     reaction_chosed = pyqtSignal(dict)
+    reaction_function_changed = pyqtSignal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -64,6 +65,11 @@ class ReactionTable(QWidget):
         self.reactions_tables[file_name].setVisible(True)
         self.active_file = file_name
 
+    def function_changed(self, reaction_name, combo):
+        function = combo.currentText()
+        self.reaction_function_changed.emit(reaction_name, function)
+        logger.debug(f"Изменена реакция для {reaction_name}: {function}")
+
     def add_reaction(self):
         if not self.active_file:
             QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
@@ -77,6 +83,7 @@ class ReactionTable(QWidget):
         combo = QComboBox()
         combo.addItems(["gauss", "frazer", "ads"])
         combo.setCurrentText("gauss")
+        combo.currentIndexChanged.connect(lambda: self.function_changed(reaction_name, combo))
 
         table.setItem(row_count, 0, QTableWidgetItem(reaction_name))
         table.setCellWidget(row_count, 1, combo)
