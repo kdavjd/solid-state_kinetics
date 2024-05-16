@@ -21,55 +21,26 @@ class Calculations(QObject):
         self.file_data = file_data
         self.calculations_data = calculations_data
 
-    def generate_default_gaussian_data(self, file_name):
-        df = self.file_data.dataframe_copies[file_name]
-        x = df['temperature'].copy()
-        y_columns = [col for col in df.columns if col != 'temperature']
-        if y_columns:
-            y = df[y_columns[0]]
-            h = 0.3 * y.max()
-            z = x.mean()
-            w = 0.1 * (x.max() - x.min())
-
-            h_lower = h * 0.9
-            h_upper = h * 1.1
-            w_lower = w * 0.9
-            w_upper = w * 1.1
-
-            result_dict = {
-                "function": "gauss",
-                "x": x.to_numpy(),
-                "coeffs": {
-                    "h": h,
-                    "z": z,
-                    "w": w
-                },
-                "upper_bound_coeffs": {
-                    "h": h_upper,
-                    "z": z,
-                    "w": w_upper
-                },
-                "lower_bound_coeffs": {
-                    "h": h_lower,
-                    "z": z,
-                    "w": w_lower
-                }
-            }
-            return result_dict
-        return {}
-
     def extract_reaction_params(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
-        x = reaction_params.get('x')
-        function_type = reaction_params.get('function')
-        coeffs = reaction_params.get('coeffs', {})
-        upper_coeffs = reaction_params.get('upper_bound_coeffs', {})
-        lower_coeffs = reaction_params.get('lower_bound_coeffs', {})
+        x: np.ndarray = reaction_params.get('x')
+        function_type: str = reaction_params.get('function')
+        coeffs: dict = reaction_params.get('coeffs', {})
+        upper_coeffs: dict = reaction_params.get('upper_bound_coeffs', {})
+        lower_coeffs: dict = reaction_params.get('lower_bound_coeffs', {})
 
         x_range = (np.min(x), np.max(x))
-        coeffs_tuple = (coeffs.get('h'), coeffs.get('z'), coeffs.get('w'))
-        upper_coeffs_tuple = (upper_coeffs.get('h'), upper_coeffs.get('z'), upper_coeffs.get('w'))
-        lower_coeffs_tuple = (lower_coeffs.get('h'), lower_coeffs.get('z'), lower_coeffs.get('w'))
+
+        default_keys = ['h', 'z', 'w']
+        function_specific_keys = {
+            'frazer': default_keys + ['fr'],
+            'ads': default_keys + ['ads1', 'ads2']
+        }
+        allowed_keys = function_specific_keys.get(function_type, default_keys)
+
+        coeffs_tuple = tuple(coeffs.get(key) for key in allowed_keys if key in coeffs)
+        upper_coeffs_tuple = tuple(upper_coeffs.get(key) for key in allowed_keys if key in upper_coeffs)
+        lower_coeffs_tuple = tuple(lower_coeffs.get(key) for key in allowed_keys if key in lower_coeffs)
 
         return {
             "coeffs": (x_range, function_type, coeffs_tuple),
@@ -142,7 +113,8 @@ class Calculations(QObject):
             self.add_reaction_fail.emit()
             return
 
-        data = self.generate_default_gaussian_data(file_name)
+        df = self.file_data.dataframe_copies[file_name]
+        data = cft.generate_default_function_data(df)
         self.calculations_data.set_value(path_keys.copy(), data)
         reaction_params = self.extract_reaction_params(path_keys)
 

@@ -30,8 +30,8 @@ class CalculationsData(QObject):
         except IOError as e:
             print(f"Ошибка сохранения данных: {e}")
 
-    def get_value(self, keys: list[str]):
-        return reduce(lambda data, key: (data or {}).get(key), keys, self._data)
+    def get_value(self, keys: list[str]) -> dict:
+        return reduce(lambda data, key: data.get(key, {}), keys, self._data)
 
     def set_value(self, keys: list[str], value):
         last_key = keys.pop()
