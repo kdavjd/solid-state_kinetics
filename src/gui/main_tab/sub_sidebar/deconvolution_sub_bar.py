@@ -1,9 +1,9 @@
 from collections import defaultdict
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (QHBoxLayout, QHeaderView, QListWidget,
-                             QMessageBox, QPushButton, QTableWidget,
-                             QTableWidgetItem, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QHeaderView, QMessageBox,
+                             QPushButton, QTableWidget, QTableWidgetItem,
+                             QVBoxLayout, QWidget)
 
 from core.logger_config import logger
 
@@ -37,9 +37,10 @@ class ReactionTable(QWidget):
         self.top_buttons_layout.addWidget(self.del_reaction_button)
         self.layout.addLayout(self.top_buttons_layout)
 
-        self.reactions_lists = {}
+        self.reactions_tables = {}
         self.reactions_counters = defaultdict(int)
         self.active_file = None
+        self.active_reaction = ''
 
         self.settings_button = QPushButton("Настройки")
         self.layout.addWidget(self.settings_button)
@@ -49,15 +50,18 @@ class ReactionTable(QWidget):
         self.settings_button.clicked.connect(self.open_settings)
 
     def switch_file(self, file_name):
-        if file_name not in self.reactions_lists:
-            self.reactions_lists[file_name] = QListWidget()
-            self.reactions_lists[file_name].itemClicked.connect(self.selected_reaction)
-            self.layout.addWidget(self.reactions_lists[file_name])
+        if file_name not in self.reactions_tables:
+            self.reactions_tables[file_name] = QTableWidget()
+            self.reactions_tables[file_name].setColumnCount(2)
+            self.reactions_tables[file_name].setHorizontalHeaderLabels(["Имя", "Функция"])
+            self.reactions_tables[file_name].horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            self.reactions_tables[file_name].itemClicked.connect(self.selected_reaction)
+            self.layout.addWidget(self.reactions_tables[file_name])
 
         if self.active_file:
-            self.reactions_lists[self.active_file].setVisible(False)
+            self.reactions_tables[self.active_file].setVisible(False)
 
-        self.reactions_lists[file_name].setVisible(True)
+        self.reactions_tables[file_name].setVisible(True)
         self.active_file = file_name
 
     def add_reaction(self):
@@ -65,8 +69,18 @@ class ReactionTable(QWidget):
             QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
             return
 
-        reaction_name = f"{self.active_file}_reaction_{self.reactions_counters[self.active_file]}"
-        self.reactions_lists[self.active_file].addItem(reaction_name)
+        table = self.reactions_tables[self.active_file]
+        row_count = table.rowCount()
+        table.insertRow(row_count)
+
+        reaction_name = f"reaction_{self.reactions_counters[self.active_file]}"
+        combo = QComboBox()
+        combo.addItems(["gauss", "frazer", "ads"])
+        combo.setCurrentText("gauss")
+
+        table.setItem(row_count, 0, QTableWidgetItem(reaction_name))
+        table.setCellWidget(row_count, 1, combo)
+
         reaction_data = {
             "path_keys": [reaction_name],
             "operation": "add_reaction"
@@ -74,61 +88,73 @@ class ReactionTable(QWidget):
         self.reaction_added.emit(reaction_data)
         self.reactions_counters[self.active_file] += 1
 
-        logger.debug(f'Список реакций: {[self.reactions_lists[self.active_file].item(i).text()
-                     for i in range(self.reactions_lists[self.active_file].count())]}')
-
     def on_fail_add_reaction(self):
         if not self.active_file:
             logger.debug("Файл не выбран. Откат операции добавления невозможен.")
             return
 
-        if self.reactions_lists[self.active_file].count() > 0:
-            last_item_index = self.reactions_lists[self.active_file].count() - 1
-            last_item = self.reactions_lists[self.active_file].takeItem(last_item_index)
+        table = self.reactions_tables[self.active_file]
+        if table.rowCount() > 0:
+            last_row = table.rowCount() - 1
+            table.removeRow(last_row)
             self.reactions_counters[self.active_file] -= 1
-            logger.debug(f"Неудачное добавление реакции. Удалён элемент: {last_item.text()}")
+            logger.debug("Неудачное добавление реакции. Удалена последняя строка.")
 
     def del_reaction(self):
         if not self.active_file:
             QMessageBox.warning(self, "Удаление Реакции", "Файл не выбран.")
             return
 
-        if self.reactions_lists[self.active_file].count() > 0:
-            last_item_index = self.reactions_lists[self.active_file].count() - 1
-            last_item = self.reactions_lists[self.active_file].takeItem(last_item_index)
-            self.reactions_counters[self.active_file] -= 1
+        table = self.reactions_tables[self.active_file]
+        if table.rowCount() > 0:
+            last_row = table.rowCount() - 1
+            item = table.item(last_row, 0)
+            if item is not None:
+                reaction_name = item.text()
+                table.removeRow(last_row)
+                self.reactions_counters[self.active_file] -= 1
 
-            self.reaction_removed.emit({
-                "path_keys": [last_item.text()],
-                "operation": "remove_reaction"
-            })
-            logger.debug(f"Удалена последняя реакция: {last_item.text()}")
+                reaction_data = {
+                    "path_keys": [reaction_name],
+                    "operation": "remove_reaction"
+                }
+                self.reaction_removed.emit(reaction_data)
+            else:
+                logger.debug("Попытка удалить пустую ячейку.")
         else:
             QMessageBox.warning(self, "Удаление Реакции", "В списке нет реакций для удаления.")
 
     def selected_reaction(self, item):
-        logger.debug(f'Активная реакция: {item.text()}')
-        self.active_reaction = item.text()
+        row = item.row()
+        reaction_name = self.reactions_tables[self.active_file].item(row, 0).text()
+        self.active_reaction = reaction_name
+        logger.debug(f'Активная реакция: {reaction_name}')
         self.reaction_chosed.emit({
-            "path_keys": [item.text()],
+            "path_keys": [reaction_name],
             "operation": "highlight_reaction"
         })
 
     def open_settings(self):
-        if self.active_file and self.reactions_lists[self.active_file].currentItem():
-            reaction_name = self.reactions_lists[self.active_file].currentItem().text()
-            QMessageBox.information(self, "Настройки Реакции", f"Настройки для {reaction_name}")
+        if self.active_file:
+            table = self.reactions_tables[self.active_file]
+            current_item = table.currentItem()
+            if current_item:
+                row = current_item.row()
+                reaction_name = table.item(row, 0).text()
+                QMessageBox.information(self, "Настройки Реакции", f"Настройки для {reaction_name}")
+            else:
+                QMessageBox.warning(self, "Настройки Реакции", "Пожалуйста, выберите реакцию из таблицы.")
         else:
-            QMessageBox.warning(self, "Настройки Реакции", "Пожалуйста, выберите реакцию из списка.")
+            QMessageBox.warning(self, "Настройки Реакции", "Файл не выбран.")
 
 
 class CoeffsTable(QTableWidget):
     update_value = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        super().__init__(5, 3, parent)
+        super().__init__(6, 3, parent)
         self.header_labels = ['low', 'val', 'up']
-        self.row_labels = ['h', 'z', 'w', 'a1', 'a2']
+        self.row_labels = ['h', 'z', 'w', 'fs', 'ads1', 'ads2']
 
         self.setHorizontalHeaderLabels(self.header_labels)
         self.setVerticalHeaderLabels(self.row_labels)
@@ -140,15 +166,15 @@ class CoeffsTable(QTableWidget):
 
     def calculate_fixed_height(self):
         row_height = self.rowHeight(0)
-        borders_height = 10
+        borders_height = len(self.row_labels) * 2
         header_height = self.horizontalHeader().height()
-        total_height = (row_height * 5) + header_height + borders_height
+        total_height = (row_height * len(self.row_labels)) + header_height + borders_height
         self.setFixedHeight(total_height)
 
     def mock_table(self):
-        for i in range(5):
-            for j in range(3):
-                self.setItem(i, j, QTableWidgetItem(f"Mock,{i+1},{j+1}"))
+        for i in range(len(self.row_labels)):
+            for j in range(len(self.header_labels)):
+                self.setItem(i, j, QTableWidgetItem("NaN"))
 
     def fill_table(self, reaction_params: dict):
         logger.debug(f"Приняты параметры реакции для таблицы {reaction_params}")
@@ -157,10 +183,10 @@ class CoeffsTable(QTableWidget):
         for j, key in enumerate(param_keys):
             try:
                 data = reaction_params[key][2]  # струтура ключей: x_range, function_type, params
-                if len(data) > 5:
+                if len(data) > 6:
                     logger.error(f"Ошибка: Параметры реакции для '{key}' содержат больше 5 элементов.")
                     continue
-                for i in range(min(5, len(data))):
+                for i in range(min(6, len(data))):
                     value = f"{data[i]:.2f}"
                     self.setItem(i, j, QTableWidgetItem(value))
             except IndexError as e:

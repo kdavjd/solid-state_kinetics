@@ -27,7 +27,7 @@ class Calculations(QObject):
         y_columns = [col for col in df.columns if col != 'temperature']
         if y_columns:
             y = df[y_columns[0]]
-            h = 0.8 * y.max()
+            h = 0.3 * y.max()
             z = x.mean()
             w = 0.1 * (x.max() - x.min())
 
