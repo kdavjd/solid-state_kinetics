@@ -43,8 +43,9 @@ class ReactionTable(QWidget):
         self.reactions_counters = defaultdict(int)
         self.active_file = None
         self.active_reaction = ''
+        self.calculation_settings = defaultdict(dict)
 
-        self.settings_button = QPushButton("Настройки")
+        self.settings_button = QPushButton("Настрйоки расчета")
         self.layout.addWidget(self.settings_button)
 
         self.add_reaction_button.clicked.connect(self.add_reaction)
@@ -156,20 +157,23 @@ class ReactionTable(QWidget):
                 combo = table.cellWidget(row, 1)
                 reactions[reaction_name] = combo
 
-            dialog = ReactionSettingsDialog(reactions, self)
+            initial_settings = self.calculation_settings[self.active_file]
+            dialog = CalculationSettingsDialog(reactions, initial_settings, self)
             if dialog.exec():
                 selected_functions = dialog.get_selected_functions()
+                self.calculation_settings[self.active_file] = selected_functions
                 logger.debug(f'Выбранные функции: {selected_functions}')
-                QMessageBox.information(self, "Настройки Реакции", f"Настройки обновлены для {self.active_file}")
+                QMessageBox.information(self, "Фуннкции на расчет", f"Настройки обновлены для {self.active_file}")
         else:
-            QMessageBox.warning(self, "Настройки Реакции", "Файл не выбран.")
+            QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
 
 
-class ReactionSettingsDialog(QDialog):
-    def __init__(self, reactions, parent=None):
+class CalculationSettingsDialog(QDialog):
+    def __init__(self, reactions, initial_settings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Настройки Реакции")
+        self.setWindowTitle("Фуннкции на расчет")
         self.reactions = reactions
+        self.initial_settings = initial_settings
         self.init_ui()
 
     def init_ui(self):
@@ -183,7 +187,7 @@ class ReactionSettingsDialog(QDialog):
             self.checkboxes[reaction_name] = []
             for function in functions:
                 checkbox = QCheckBox(function)
-                checkbox.setChecked(combo.currentText() == function)
+                checkbox.setChecked(function in self.initial_settings.get(reaction_name, []))
                 self.checkboxes[reaction_name].append(checkbox)
                 checkbox_layout.addWidget(checkbox)
             self.form_layout.addRow(reaction_name, checkbox_layout)
