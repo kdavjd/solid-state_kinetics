@@ -1,9 +1,10 @@
 from collections import defaultdict
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QHeaderView, QMessageBox,
-                             QPushButton, QTableWidget, QTableWidgetItem,
-                             QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFormLayout, QHBoxLayout, QHeaderView,
+                             QMessageBox, QPushButton, QTableWidget,
+                             QTableWidgetItem, QVBoxLayout, QWidget)
 
 from core.logger_config import logger
 
@@ -149,15 +150,56 @@ class ReactionTable(QWidget):
     def open_settings(self):
         if self.active_file:
             table = self.reactions_tables[self.active_file]
-            current_item = table.currentItem()
-            if current_item:
-                row = current_item.row()
+            reactions = {}
+            for row in range(table.rowCount()):
                 reaction_name = table.item(row, 0).text()
-                QMessageBox.information(self, "Настройки Реакции", f"Настройки для {reaction_name}")
-            else:
-                QMessageBox.warning(self, "Настройки Реакции", "Пожалуйста, выберите реакцию из таблицы.")
+                combo = table.cellWidget(row, 1)
+                reactions[reaction_name] = combo
+
+            dialog = ReactionSettingsDialog(reactions, self)
+            if dialog.exec():
+                selected_functions = dialog.get_selected_functions()
+                logger.debug(f'Выбранные функции: {selected_functions}')
+                QMessageBox.information(self, "Настройки Реакции", f"Настройки обновлены для {self.active_file}")
         else:
             QMessageBox.warning(self, "Настройки Реакции", "Файл не выбран.")
+
+
+class ReactionSettingsDialog(QDialog):
+    def __init__(self, reactions, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Настройки Реакции")
+        self.reactions = reactions
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+
+        self.form_layout = QFormLayout()
+        self.checkboxes = {}
+        for reaction_name, combo in self.reactions.items():
+            functions = [combo.itemText(i) for i in range(combo.count())]
+            checkbox_layout = QVBoxLayout()
+            self.checkboxes[reaction_name] = []
+            for function in functions:
+                checkbox = QCheckBox(function)
+                checkbox.setChecked(combo.currentText() == function)
+                self.checkboxes[reaction_name].append(checkbox)
+                checkbox_layout.addWidget(checkbox)
+            self.form_layout.addRow(reaction_name, checkbox_layout)
+
+        layout.addLayout(self.form_layout)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+    def get_selected_functions(self):
+        selected_functions = {}
+        for reaction_name, checkboxes in self.checkboxes.items():
+            selected_functions[reaction_name] = [cb.text() for cb in checkboxes if cb.isChecked()]
+        return selected_functions
 
 
 class CoeffsTable(QTableWidget):
