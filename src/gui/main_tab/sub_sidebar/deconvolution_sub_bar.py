@@ -164,12 +164,16 @@ class CoeffsTable(QTableWidget):
     update_value = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        super().__init__(6, 3, parent)
+        super().__init__(5, 3, parent)
         self.header_labels = ['low', 'val', 'up']
-        self.row_labels = ['h', 'z', 'w', 'fr', 'ads1', 'ads2']
-
+        self.row_labels_dict = {
+            'gauss': ['h', 'z', 'w'],
+            'fraser': ['h', 'z', 'w', 'fr'],
+            'ads': ['h', 'z', 'w', 'ads1', 'ads2']
+        }
+        self.default_row_labels = ['h', 'z', 'w', '_', '_']
         self.setHorizontalHeaderLabels(self.header_labels)
-        self.setVerticalHeaderLabels(self.row_labels)
+        self.setVerticalHeaderLabels(self.default_row_labels)
         self.mock_table()
         self.calculate_fixed_height()
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -178,35 +182,48 @@ class CoeffsTable(QTableWidget):
 
     def calculate_fixed_height(self):
         row_height = self.rowHeight(0)
-        borders_height = len(self.row_labels) * 2
+        borders_height = len(self.default_row_labels) * 2
         header_height = self.horizontalHeader().height()
-        total_height = (row_height * len(self.row_labels)) + header_height + borders_height
+        total_height = (row_height * len(self.default_row_labels)) + header_height + borders_height
         self.setFixedHeight(total_height)
 
     def mock_table(self):
-        for i in range(len(self.row_labels)):
+        for i in range(len(self.default_row_labels)):
             for j in range(len(self.header_labels)):
                 self.setItem(i, j, QTableWidgetItem("NaN"))
 
     def fill_table(self, reaction_params: dict):
         logger.debug(f"Приняты параметры реакции для таблицы {reaction_params}")
         param_keys = ['lower_bound_coeffs', 'coeffs', 'upper_bound_coeffs']
-        self._is_filling = True
+        function_type = reaction_params[param_keys[0]][1]
+        if function_type not in self.row_labels_dict:
+            logger.error(f"Неизвестный тип функции: {function_type}")
+            return
+
+        self._is_table_filling = True
+        row_labels = self.row_labels_dict[function_type]
+        self.setRowCount(len(row_labels))
+        self.setVerticalHeaderLabels(row_labels)
+
         for j, key in enumerate(param_keys):
             try:
-                data = reaction_params[key][2]  # струтура ключей: x_range, function_type, params
-                if len(data) > 6:
-                    logger.error(f"Ошибка: Параметры реакции для '{key}' содержат больше 6 элементов.")
-                    continue
-                for i in range(min(6, len(data))):
+                data = reaction_params[key][2]  # структура ключей: x_range, function_type, params
+                for i in range(min(len(row_labels), len(data))):
                     value = f"{data[i]:.2f}"
                     self.setItem(i, j, QTableWidgetItem(value))
             except IndexError as e:
                 logger.error(f"Ошибка индекса при обработке данных '{key}': {e}")
-        self._is_filling = False
+
+        self.mock_remaining_cells(len(row_labels))
+        self._is_table_filling = False
+
+    def mock_remaining_cells(self, num_rows):
+        for i in range(num_rows, len(self.default_row_labels)):
+            for j in range(len(self.header_labels)):
+                self.setItem(i, j, QTableWidgetItem("NaN"))
 
     def update_reaction_params(self, row, column):
-        if not self._is_filling:
+        if not self._is_table_filling:
             try:
                 item = self.item(row, column)
                 value = float(item.text())
