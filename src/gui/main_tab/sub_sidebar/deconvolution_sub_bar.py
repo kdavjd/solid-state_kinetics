@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
                              QTableWidgetItem, QVBoxLayout, QWidget)
 
 from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
 
 
 class FileTransferButtons(QWidget):
@@ -278,9 +279,9 @@ class CoeffsTable(QTableWidget):
 
                 path_keys = [self.column_to_bound(column_label), row_label]
                 data_change = {
-                    'path_keys': path_keys,
-                    'operation': 'update_value',
-                    'value': value
+                    "path_keys": path_keys,
+                    "operation": "update_value",
+                    "value": value
                 }
                 self.update_value.emit(data_change)
             except ValueError as e:
@@ -288,9 +289,9 @@ class CoeffsTable(QTableWidget):
 
     def column_to_bound(self, column_label):
         return {
-            'low': 'lower_bound_coeffs',
-            'val': 'coeffs',
-            'up': 'upper_bound_coeffs'
+            "low": "lower_bound_coeffs",
+            "val": "coeffs",
+            "up": "upper_bound_coeffs"
         }.get(column_label, '')
 
 
@@ -341,8 +342,11 @@ class DeconvolutionSubBar(QWidget):
 
     def handle_update_value(self, data: dict):
         if self.reactions_table.active_reaction:
-            data['path_keys'].insert(0, self.reactions_table.active_reaction)
-        self.update_value.emit(data)
+            data["path_keys"].insert(0, self.reactions_table.active_reaction)
+            self.update_value.emit(data)
+        else:
+            console.log("Для изменения значения выберите реакцию.")
 
     def handle_update_function_value(self, data: dict):
-        self.update_value.emit(data)
+        if self.reactions_table.active_reaction is not None:
+            self.update_value.emit(data)
