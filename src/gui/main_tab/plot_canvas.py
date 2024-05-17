@@ -80,4 +80,18 @@ class PlotCanvas(QWidget):
     def plot_reaction(self, keys, values):
         file_name, reaction_name = keys
         x, y = values
-        self.add_or_update_line(reaction_name, x, y, label=reaction_name)
+        if reaction_name in self.lines:
+            line = self.lines[reaction_name]
+            line.remove()
+            del self.lines[reaction_name]
+
+        if "cumulative" in reaction_name:
+            self.add_or_update_line(
+                reaction_name, x, y, linestyle='-.', color='red', linewidth=0.5, label=reaction_name)
+
+            if 'cumulative_upper_bound' in self.lines and 'cumulative_lower_bound' in self.lines:
+                upper_y = self.lines['cumulative_upper_bound'].get_ydata()
+                lower_y = self.lines['cumulative_lower_bound'].get_ydata()
+                self.axes.fill_between(x, lower_y, upper_y, color='grey', alpha=0.1)
+        else:
+            self.add_or_update_line(reaction_name, x, y, label=reaction_name)
