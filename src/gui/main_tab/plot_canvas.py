@@ -82,15 +82,15 @@ class PlotCanvas(QWidget):
         elif "cumulative_coeffs" in reaction_name:
             return {'linewidth': 1, 'linestyle': '--'}
         elif "upper_bound_coeffs" in reaction_name or "lower_bound_coeffs" in reaction_name:
-            return {'linewidth': 0.5, 'linestyle': '-'}
+            return {'linewidth': 1.5, 'linestyle': '-'}
         else:
             return {}
 
     def update_fill_between(self):
-        if 'cumulative_upper_bound' in self.lines and 'cumulative_lower_bound' in self.lines:
-            x = self.lines['cumulative_upper_bound'].get_xdata()
-            upper_y = self.lines['cumulative_upper_bound'].get_ydata()
-            lower_y = self.lines['cumulative_lower_bound'].get_ydata()
+        if 'cumulative_upper_bound_coeffs' in self.lines and 'cumulative_lower_bound_coeffs' in self.lines:
+            x = self.lines['cumulative_upper_bound_coeffs'].get_xdata()
+            upper_y = self.lines['cumulative_upper_bound_coeffs'].get_ydata()
+            lower_y = self.lines['cumulative_lower_bound_coeffs'].get_ydata()
             self.axes.fill_between(x, lower_y, upper_y, color='grey', alpha=0.1)
 
         if 'upper_bound_coeffs' in self.lines and 'lower_bound_coeffs' in self.lines:
