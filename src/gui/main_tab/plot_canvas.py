@@ -76,6 +76,29 @@ class PlotCanvas(QWidget):
                 "В DataFrame отсутствует столбец 'temperature' для оси X")
             console.log("В файле отсутствует столбец 'temperature' для оси X")
 
+    def determine_line_properties(self, reaction_name):
+        if "cumulative_upper_bound" in reaction_name or "cumulative_lower_bound" in reaction_name:
+            return {'linewidth': 0.1, 'linestyle': '-'}
+        elif "cumulative_coeffs" in reaction_name:
+            return {'linewidth': 1, 'linestyle': '--'}
+        elif "upper_bound_coeffs" in reaction_name or "lower_bound_coeffs" in reaction_name:
+            return {'linewidth': 0.5, 'linestyle': '-'}
+        else:
+            return {}
+
+    def update_fill_between(self):
+        if 'cumulative_upper_bound' in self.lines and 'cumulative_lower_bound' in self.lines:
+            x = self.lines['cumulative_upper_bound'].get_xdata()
+            upper_y = self.lines['cumulative_upper_bound'].get_ydata()
+            lower_y = self.lines['cumulative_lower_bound'].get_ydata()
+            self.axes.fill_between(x, lower_y, upper_y, color='grey', alpha=0.1)
+
+        if 'upper_bound_coeffs' in self.lines and 'lower_bound_coeffs' in self.lines:
+            x = self.lines['upper_bound_coeffs'].get_xdata()
+            upper_y = self.lines['upper_bound_coeffs'].get_ydata()
+            lower_y = self.lines['lower_bound_coeffs'].get_ydata()
+            self.axes.fill_between(x, lower_y, upper_y, color='grey', alpha=0.1)
+
     @pyqtSlot(tuple, list)
     def plot_reaction(self, keys, values):
         file_name, reaction_name = keys
@@ -85,13 +108,8 @@ class PlotCanvas(QWidget):
             line.remove()
             del self.lines[reaction_name]
 
-        if "cumulative" in reaction_name:
-            self.add_or_update_line(
-                reaction_name, x, y, linestyle='-.', color='red', linewidth=0.5, label=reaction_name)
+        line_properties = self.determine_line_properties(reaction_name)
+        self.add_or_update_line(reaction_name, x, y, **line_properties)
 
-            if 'cumulative_upper_bound' in self.lines and 'cumulative_lower_bound' in self.lines:
-                upper_y = self.lines['cumulative_upper_bound'].get_ydata()
-                lower_y = self.lines['cumulative_lower_bound'].get_ydata()
-                self.axes.fill_between(x, lower_y, upper_y, color='grey', alpha=0.1)
-        else:
-            self.add_or_update_line(reaction_name, x, y, label=reaction_name)
+        if any(bound in reaction_name for bound in ['upper_bound', 'lower_bound']):
+            self.update_fill_between()

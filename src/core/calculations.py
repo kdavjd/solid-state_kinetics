@@ -142,13 +142,14 @@ class Calculations(QObject):
 
         cumulative_upper_y = np.array([])
         cumulative_lower_y = np.array([])
+        cumulative_coeffs_y = np.array([])
         x = None
 
         for reaction_name in reactions:
             reaction_params = self.extract_reaction_params([file_name, reaction_name])
             for bound_label, params in reaction_params.items():
-                if bound_label in ["upper_bound_coeffs", "lower_bound_coeffs"]:
-                    y = self.calculate_reaction(params)
+                if bound_label in ["upper_bound_coeffs", "lower_bound_coeffs", "coeffs"]:
+                    y = self.calculate_reaction(reaction_params.get(bound_label, []))
                     if x is None:
                         x_min, x_max = params[0]
                         x = np.linspace(x_min, x_max, 100)
@@ -156,17 +157,21 @@ class Calculations(QObject):
                         cumulative_upper_y = cumulative_upper_y + y if cumulative_upper_y.size else y
                     elif bound_label == "lower_bound_coeffs":
                         cumulative_lower_y = cumulative_lower_y + y if cumulative_lower_y.size else y
+                    elif bound_label == "coeffs":
+                        cumulative_coeffs_y = cumulative_coeffs_y + y if cumulative_coeffs_y.size else y
 
             if reaction_name in path_keys:
                 self.reaction_params_to_gui.emit(reaction_params)
-                self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
+                self.plot_reaction_curve(
+                    file_name, reaction_name, "upper_bound_coeffs", reaction_params["upper_bound_coeffs"])
+                self.plot_reaction_curve(
+                    file_name, reaction_name, "lower_bound_coeffs", reaction_params["lower_bound_coeffs"])
             else:
-                self.plot_reaction_curve(file_name, reaction_name, 'coeffs', reaction_params['coeffs'])
+                self.plot_reaction_curve(file_name, reaction_name, 'coeffs', reaction_params["coeffs"])
 
-        if cumulative_upper_y.size:
-            self.plot_reaction.emit((file_name, 'cumulative_upper_bound'), [x, cumulative_upper_y])
-        if cumulative_lower_y.size:
-            self.plot_reaction.emit((file_name, 'cumulative_lower_bound'), [x, cumulative_lower_y])
+        self.plot_reaction.emit((file_name, 'cumulative_upper_bound'), [x, cumulative_upper_y])
+        self.plot_reaction.emit((file_name, 'cumulative_lower_bound'), [x, cumulative_lower_y])
+        self.plot_reaction.emit((file_name, 'cumulative_coeffs'), [x, cumulative_coeffs_y])
 
     def process_update_value(self, path_keys: list, params: dict):
         try:
