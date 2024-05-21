@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 from core.logger_config import logger
 
 from ..console_widget import ConsoleWidget
-from .plot_canvas import PlotCanvas
+from .PlotCanvas.plot_canvas import PlotCanvas
 from .sidebar import SideBar
 from .sub_sidebar.sub_side_hub import SubSideHub
 
