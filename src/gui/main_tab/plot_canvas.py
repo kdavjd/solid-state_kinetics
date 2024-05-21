@@ -243,32 +243,28 @@ class PlotCanvas(QWidget):
         self.figure.tight_layout()
 
     def on_click(self, event):
-        logger.info(f"Click event: {event}")
+        logger.debug(f"Событие нажатия мыши: {event}")
         if event.inaxes != self.axes:
             return
 
         for group in self.position_anchor_groups.values():
             if group.center.contains(event)[0]:
                 self.dragging_anchor = group.center
-                logger.info(f"Dragging position anchor: {self.dragging_anchor}")
                 break
             elif group.upper_bound.contains(event)[0] or group.lower_bound.contains(event)[0]:
                 self.dragging_anchor = group.upper_bound if group.upper_bound.contains(event)[0] else group.lower_bound
-                logger.info(f"Dragging bound anchor: {self.dragging_anchor}")
                 break
 
         for group in self.height_anchor_groups.values():
             if group.center.contains(event)[0]:
                 self.dragging_anchor = group.center
-                logger.info(f"Dragging height anchor: {self.dragging_anchor}")
                 break
             elif group.upper_bound.contains(event)[0] or group.lower_bound.contains(event)[0]:
                 self.dragging_anchor = group.upper_bound if group.upper_bound.contains(event)[0] else group.lower_bound
-                logger.info(f"Dragging bound anchor: {self.dragging_anchor}")
                 break
 
     def on_release(self, event):
-        logger.info(f"Release event: {event}")
+        logger.debug(f"Событие отпуска мыши: {event}")
         self.dragging_anchor = None
 
         for group in self.position_anchor_groups.values():
