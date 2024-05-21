@@ -169,13 +169,29 @@ class Calculations(QObject):
         for bound_label, y in cumulative_y.items():
             self.plot_reaction.emit((file_name, f'cumulative_{bound_label}'), [x, y])
 
-    def process_update_value(self, path_keys: list, params: dict):
+    def update_coeffs_value(self, path_keys: list[str], new_value):
+        bound_keys = ['upper_bound_coeffs', 'lower_bound_coeffs']
+        for key in bound_keys:
+            if key in path_keys:
+                opposite_key = bound_keys[1 - bound_keys.index(key)]
+                new_keys = path_keys.copy()
+                new_keys[new_keys.index(key)] = opposite_key
+                opposite_value = self.calculations_data.get_value(new_keys)
+
+                average_value = (new_value + opposite_value) / 2
+                new_keys[new_keys.index(opposite_key)] = 'coeffs'
+                self.calculations_data.set_value(new_keys, average_value)
+                logger.info(f"Данные по пути: {new_keys}\n изменены на: {average_value}")
+
+    def process_update_value(self, path_keys: list[str], params: dict):
         try:
             new_value = params.get('value')
             if self.calculations_data.exists(path_keys):
                 self.calculations_data.set_value(path_keys.copy(), new_value)
+                logger.info(f"Данные по пути: {path_keys}\n изменены на: {new_value}")
+
+                self.update_coeffs_value(path_keys.copy(), new_value)
                 self.process_highlight_reaction(path_keys[:2], params)
-                logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
             else:
                 logger.error(f"Все данные: {self.calculations_data._data}")
                 logger.error(f"Данных по пути: {path_keys} не найдено.")

@@ -211,8 +211,8 @@ class CoeffsTable(QTableWidget):
     update_value = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        super().__init__(5, 3, parent)
-        self.header_labels = ['low', 'val', 'up']
+        super().__init__(5, 2, parent)
+        self.header_labels = ['от', 'до']
         self.row_labels_dict = {
             'gauss': ['h', 'z', 'w'],
             'fraser': ['h', 'z', 'w', 'fr'],
@@ -241,7 +241,7 @@ class CoeffsTable(QTableWidget):
 
     def fill_table(self, reaction_params: dict):
         logger.debug(f"Приняты параметры реакции для таблицы {reaction_params}")
-        param_keys = ['lower_bound_coeffs', 'coeffs', 'upper_bound_coeffs']
+        param_keys = ['lower_bound_coeffs', 'upper_bound_coeffs']
         function_type = reaction_params[param_keys[0]][1]
         if function_type not in self.row_labels_dict:
             logger.error(f"Неизвестный тип функции: {function_type}")
@@ -285,13 +285,13 @@ class CoeffsTable(QTableWidget):
                 }
                 self.update_value.emit(data_change)
             except ValueError as e:
+                console.log(f"Неверные данные для преобразования в число: ряд {row+1}, колонка {column+1}")
                 logger.error(f"Неверные данные для преобразования в число: ряд {row}, колонка {column}: {e}")
 
     def column_to_bound(self, column_label):
         return {
-            "low": "lower_bound_coeffs",
-            "val": "coeffs",
-            "up": "upper_bound_coeffs"
+            "от": "lower_bound_coeffs",
+            "до": "upper_bound_coeffs"
         }.get(column_label, '')
 
 
