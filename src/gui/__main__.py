@@ -26,6 +26,8 @@ def main():
         window.main_tab.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction)
     calcultaions.reaction_params_to_gui.connect(
         window.main_tab.sub_sidebar.deconvolution_sub_bar.coeffs_table.fill_table)
+    calcultaions.reaction_params_to_gui.connect(
+        window.main_tab.plot_canvas.add_anchors)
     window.show()
     sys.exit(app.exec())
 

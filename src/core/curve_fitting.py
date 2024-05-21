@@ -29,7 +29,7 @@ class CurveFitting:
                 },
                 "upper_bound_coeffs": {
                     "h": h_upper,
-                    "z": z,
+                    "z": z + 5,
                     "w": w_upper,
                     "fr": fr,
                     "ads1": ads1,
@@ -37,7 +37,7 @@ class CurveFitting:
                 },
                 "lower_bound_coeffs": {
                     "h": h_lower,
-                    "z": z,
+                    "z": z - 5,
                     "w": w_lower,
                     "fr": fr,
                     "ads1": ads1,
