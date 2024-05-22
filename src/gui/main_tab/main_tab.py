@@ -64,6 +64,7 @@ class MainTab(QWidget):
             self.refer_to_calculations_data)
         self.sidebar.active_file_selected.connect(
             self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file)
+        self.plot_canvas.update_value.connect(self.update_anchors_slot)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -107,3 +108,7 @@ class MainTab(QWidget):
         params['file_name'] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
         logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
         self.active_file_modify_signal.emit(params)
+
+    def update_anchors_slot(self, params: dict):
+        params["path_keys"].insert(0, self.sub_sidebar.deconvolution_sub_bar.reactions_table.active_reaction)
+        self.refer_to_calculations_data(params)

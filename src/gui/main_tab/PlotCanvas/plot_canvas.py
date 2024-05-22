@@ -9,7 +9,7 @@ from matplotlib.backends.backend_qtagg import \
     NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from core.logger_config import logger
@@ -21,6 +21,8 @@ plt.style.use(['science', 'no-latex', 'nature', 'grid'])
 
 
 class PlotCanvas(QWidget):
+    update_value = pyqtSignal(dict)
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
@@ -124,7 +126,7 @@ class PlotCanvas(QWidget):
 
     @pyqtSlot(dict)
     def add_anchors(self, reaction_data: dict):
-        logger.info(f"Пришли данные: {reaction_data}")
+        logger.debug(f"Пришли данные: {reaction_data}")
 
         center_params = reaction_data['coeffs'][2]
         upper_params = reaction_data['upper_bound_coeffs'][2]
@@ -158,6 +160,13 @@ class PlotCanvas(QWidget):
             else:
                 anchor_group.set_bound_position(self.dragging_anchor, event.ydata)
 
+    def emit_anchor_update(self, path_keys, value):
+        self.update_value.emit({
+            "path_keys": path_keys,
+            "operation": "update_value",
+            "value": value
+        })
+
     def on_click(self, event):
         logger.debug(f"Событие нажатия мыши: {event}")
         if event.inaxes != self.axes:
@@ -175,6 +184,14 @@ class PlotCanvas(QWidget):
         logger.debug(f"Событие отпуска мыши: {event}")
         if self.dragging_anchor_group:
             logger.debug(f"Якорь принадлежит группе: {self.dragging_anchor_group}")
+
+            positions = (self.position_anchor_group if self.dragging_anchor_group == 'position'
+                         else self.height_anchor_group).get_bound_positions()
+            axis = 'z' if self.dragging_anchor_group == 'position' else 'h'
+
+            self.emit_anchor_update(["upper_bound_coeffs", axis], positions['upper_bound'][0 if axis == 'z' else 1])
+            self.emit_anchor_update(["lower_bound_coeffs", axis], positions['lower_bound'][0 if axis == 'z' else 1])
+
         self.dragging_anchor = None
         self.dragging_anchor_group = None
 
