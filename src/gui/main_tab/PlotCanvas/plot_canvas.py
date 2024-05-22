@@ -145,51 +145,53 @@ class PlotCanvas(QWidget):
         self.canvas.draw_idle()
         self.figure.tight_layout()
 
+    def find_dragging_anchor(self, event, anchor_groups):
+        for group in anchor_groups.values():
+            if group.center.contains(event)[0]:
+                return group.center
+            elif group.upper_bound.contains(event)[0] or group.lower_bound.contains(event)[0]:
+                return group.upper_bound if group.upper_bound.contains(event)[0] else group.lower_bound
+        return None
+
+    def log_anchor_positions(self, anchor_groups):
+        for group in anchor_groups.values():
+            group.log_anchor_positions()
+
+    def update_anchor_position(self, event, anchor_groups, axis):
+        for group in anchor_groups.values():
+            if self.dragging_anchor == group.center:
+                if axis == 'x':
+                    group.set_center_position(event.xdata)
+                else:
+                    group.set_center_position(event.ydata)
+            elif self.dragging_anchor in [group.upper_bound, group.lower_bound]:
+                if axis == 'x':
+                    group.set_bound_position(self.dragging_anchor, event.xdata)
+                else:
+                    group.set_bound_position(self.dragging_anchor, event.ydata)
+
     def on_click(self, event):
         logger.debug(f"Событие нажатия мыши: {event}")
         if event.inaxes != self.axes:
             return
 
-        for group in self.position_anchor_groups.values():
-            if group.center.contains(event)[0]:
-                self.dragging_anchor = group.center
-                break
-            elif group.upper_bound.contains(event)[0] or group.lower_bound.contains(event)[0]:
-                self.dragging_anchor = group.upper_bound if group.upper_bound.contains(event)[0] else group.lower_bound
-                break
-
-        for group in self.height_anchor_groups.values():
-            if group.center.contains(event)[0]:
-                self.dragging_anchor = group.center
-                break
-            elif group.upper_bound.contains(event)[0] or group.lower_bound.contains(event)[0]:
-                self.dragging_anchor = group.upper_bound if group.upper_bound.contains(event)[0] else group.lower_bound
-                break
+        self.dragging_anchor = self.find_dragging_anchor(event, self.position_anchor_groups)
+        if not self.dragging_anchor:
+            self.dragging_anchor = self.find_dragging_anchor(event, self.height_anchor_groups)
 
     def on_release(self, event):
         logger.debug(f"Событие отпуска мыши: {event}")
         self.dragging_anchor = None
 
-        for group in self.position_anchor_groups.values():
-            group.log_anchor_positions()
-        for group in self.height_anchor_groups.values():
-            group.log_anchor_positions()
+        self.log_anchor_positions(self.position_anchor_groups)
+        self.log_anchor_positions(self.height_anchor_groups)
 
     def on_motion(self, event):
         if self.dragging_anchor is None or event.inaxes != self.axes:
             return
 
-        for group in self.position_anchor_groups.values():
-            if self.dragging_anchor == group.center:
-                group.set_center_position(event.xdata)
-            elif self.dragging_anchor in [group.upper_bound, group.lower_bound]:
-                group.set_bound_position(self.dragging_anchor, event.xdata)
-
-        for group in self.height_anchor_groups.values():
-            if self.dragging_anchor == group.center:
-                group.set_center_position(event.ydata)
-            elif self.dragging_anchor in [group.upper_bound, group.lower_bound]:
-                group.set_bound_position(self.dragging_anchor, event.ydata)
+        self.update_anchor_position(event, self.position_anchor_groups, 'x')
+        self.update_anchor_position(event, self.height_anchor_groups, 'y')
 
         self.canvas.draw_idle()
         self.figure.tight_layout()
