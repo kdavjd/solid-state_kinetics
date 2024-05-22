@@ -48,6 +48,12 @@ class AnchorGroup:
         logger.debug(f"Upper bound: x={self.upper_bound.get_xdata()[0]}, y={self.upper_bound.get_ydata()[0]}")
         logger.debug(f"Lower bound: x={self.lower_bound.get_xdata()[0]}, y={self.lower_bound.get_ydata()[0]}")
 
+    def get_bound_positions(self):
+        return {
+            'upper_bound': (self.upper_bound.get_xdata()[0], self.upper_bound.get_ydata()[0]),
+            'lower_bound': (self.lower_bound.get_xdata()[0], self.lower_bound.get_ydata()[0])
+        }
+
 
 class PositionAnchorGroup(AnchorGroup):
     def __init__(self, axes, center_params, upper_params, lower_params):
