@@ -309,6 +309,8 @@ class CalcButtons(QWidget):
 
     def start_calculation(self):
         self.is_calculating = True
+        # selected_peak_types = [selected[reaction] for reaction in reactions]
+        # combinations = list(product(*selected_peak_types))
         self.layout.replaceWidget(self.start_button, self.stop_button)
         self.start_button.hide()
         self.stop_button.show()
