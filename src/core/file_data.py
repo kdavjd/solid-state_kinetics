@@ -1,11 +1,13 @@
 import os
 from functools import wraps
+from io import StringIO
 
 import chardet
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
 from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
 
 
 def detect_encoding(func):
@@ -114,7 +116,10 @@ class FileData(QObject):
 
         self.original_data[file_basename] = self.data.copy()
         self.dataframe_copies[file_basename] = self.data.copy()
-        logger.debug("Добавлен новый файл, размером: %s", self.dataframe_copies[file_basename].shape)
+        buffer = StringIO()
+        self.dataframe_copies[file_basename].info(buf=buffer)
+        file_info = buffer.getvalue()
+        console.log(f'Загружен файл:\n {file_info}')
         logger.debug(f"Ключи dataframe_copies: {self.dataframe_copies.keys()}")
         self.data_loaded_signal.emit(self.data)
 
