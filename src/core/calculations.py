@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
-from core.calculation_thread import CalculationThread as thread
+from core.calculation_thread import CalculationThread as Thread
 from core.calculations_data import CalculationsData
 from core.curve_fitting import CurveFitting as cft
 from core.file_data import FileData
@@ -24,7 +24,7 @@ class Calculations(QObject):
         self.thread = None
 
     def start_calculation_thread(self, func, *args, **kwargs):
-        self.thread: thread = thread(func, *args, **kwargs)
+        self.thread: Thread = Thread(func, *args, **kwargs)
         self.thread.result_ready.connect(self._calculation_finished)
         self.thread.start()
 
