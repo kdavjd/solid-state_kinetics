@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
+from core.calculation_thread import CalculationThread as thread
 from core.calculations_data import CalculationsData
 from core.curve_fitting import CurveFitting as cft
 from core.file_data import FileData
@@ -20,6 +21,20 @@ class Calculations(QObject):
         super().__init__()
         self.file_data = file_data
         self.calculations_data = calculations_data
+        self.thread = None
+
+    def start_calculation_thread(self, func, *args, **kwargs):
+        self.thread: thread = thread(func, *args, **kwargs)
+        self.thread.result_ready.connect(self._calculation_finished)
+        self.thread.start()
+
+    @pyqtSlot(object)
+    def _calculation_finished(self, result):
+        try:
+            # Обработка результата здесь
+            pass
+        except Exception as e:
+            logger.error(f"Ошибка при обработке результата: {e}")
 
     def extract_reaction_params(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
@@ -70,12 +85,15 @@ class Calculations(QObject):
         operation = params.get("operation")
         file_name = params.get("file_name")
         if operation == "differential":
-            if not self.file_data.check_operation_executed(file_name, operation):
-                self.file_data.modify_data(self.diff_function, params)
-            else:
-                console.log("Данные уже приведены к da/dT")
+            self._apply_differential_operation(file_name, params)
         elif operation == "cancel_changes":
             self.file_data.reset_dataframe_copy(file_name)
+
+    def _apply_differential_operation(self, file_name, params):
+        if not self.file_data.check_operation_executed(file_name, "differential"):
+            self.file_data.modify_data(self.diff_function, params)
+        else:
+            console.log("Данные уже приведены к da/dT")
 
     @pyqtSlot(dict)
     def modify_calculations_data_slot(self, params: dict):
@@ -88,10 +106,10 @@ class Calculations(QObject):
             return
 
         operations = {
-            "add_reaction": self.process_add_reaction,
-            "remove_reaction": self.process_remove_reaction,
-            "highlight_reaction": self.process_highlight_reaction,
-            "update_value": self.process_update_value
+            "add_reaction": self._process_add_reaction,
+            "remove_reaction": self._process_remove_reaction,
+            "highlight_reaction": self._process_highlight_reaction,
+            "update_value": self._process_update_value
         }
 
         if operation in operations:
@@ -106,7 +124,7 @@ class Calculations(QObject):
         curve_name = f"{reaction_name}_{bound_label}"
         self.plot_reaction.emit((file_name, curve_name), [x, y])
 
-    def process_add_reaction(self, path_keys: list, _params: dict):
+    def _process_add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
         if not self.file_data.check_operation_executed(file_name, "differential"):
             console.log("Данные нужно привести к da/dT")
@@ -121,7 +139,7 @@ class Calculations(QObject):
         for bound_label, params in reaction_params.items():
             self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
 
-    def process_remove_reaction(self, path_keys: list, _params: dict):
+    def _process_remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
             logger.error("Недостаточно информации в path_keys для удаления реакции")
             return
@@ -134,7 +152,7 @@ class Calculations(QObject):
             logger.warning(f"Реакция {reaction_name} не найдена в данных")
             console.log(f"Не удалось найти реакцию {reaction_name} для удаления")
 
-    def process_highlight_reaction(self, path_keys: list, _params: dict):
+    def _process_highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
         self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
         data = self.calculations_data.get_value([file_name])
@@ -169,7 +187,7 @@ class Calculations(QObject):
         for bound_label, y in cumulative_y.items():
             self.plot_reaction.emit((file_name, f'cumulative_{bound_label}'), [x, y])
 
-    def update_coeffs_value(self, path_keys: list[str], new_value):
+    def _update_coeffs_value(self, path_keys: list[str], new_value):
         bound_keys = ['upper_bound_coeffs', 'lower_bound_coeffs']
         for key in bound_keys:
             if key in path_keys:
@@ -183,15 +201,15 @@ class Calculations(QObject):
                 self.calculations_data.set_value(new_keys, average_value)
                 logger.info(f"Данные по пути: {new_keys}\n изменены на: {average_value}")
 
-    def process_update_value(self, path_keys: list[str], params: dict):
+    def _process_update_value(self, path_keys: list[str], params: dict):
         try:
             new_value = params.get('value')
             if self.calculations_data.exists(path_keys):
                 self.calculations_data.set_value(path_keys.copy(), new_value)
                 logger.info(f"Данные по пути: {path_keys}\n изменены на: {new_value}")
 
-                self.update_coeffs_value(path_keys.copy(), new_value)
-                self.process_highlight_reaction(path_keys[:2], params)
+                self._update_coeffs_value(path_keys.copy(), new_value)
+                self._process_highlight_reaction(path_keys[:2], params)
             else:
                 logger.error(f"Все данные: {self.calculations_data._data}")
                 logger.error(f"Данных по пути: {path_keys} не найдено.")
