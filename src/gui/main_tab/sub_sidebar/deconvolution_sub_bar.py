@@ -162,9 +162,23 @@ class ReactionTable(QWidget):
             dialog = CalculationSettingsDialog(reactions, initial_settings, self)
             if dialog.exec():
                 selected_functions = dialog.get_selected_functions()
+
+                empty_keys = [key for key, value in selected_functions.items() if not value]
+                if empty_keys:
+                    QMessageBox.warning(self, "Ошибка настроек",
+                                        f"{', '.join(empty_keys)} должна описываться хотя бы одной функцией.")
+                    self.open_settings()
+                    return
+
                 self.calculation_settings[self.active_file] = selected_functions
                 logger.debug(f'Выбранные функции: {selected_functions}')
-                QMessageBox.information(self, "Фуннкции на расчет", f"Настройки обновлены для {self.active_file}")
+
+                formatted_functions = "\n".join(
+                    [f"{key}: {value}" for key, value in selected_functions.items()]
+                )
+                message = f"    {self.active_file}\n{formatted_functions}"
+
+                QMessageBox.information(self, "Фуннкции на расчет", f"Настройки обновлены для:\n{message}")
         else:
             QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
 
@@ -365,18 +379,7 @@ class DeconvolutionSubBar(QWidget):
             self.update_value.emit(data)
 
     def open_settings_dialog(self):
-        if self.reactions_table.active_file:
-            reactions = self.get_reactions_for_file(self.reactions_table.active_file)
-            initial_settings = self.reactions_table.calculation_settings[self.reactions_table.active_file]
-            dialog = CalculationSettingsDialog(reactions, initial_settings, self)
-            if dialog.exec():
-                selected_functions = dialog.get_selected_functions()
-                self.reactions_table.calculation_settings[self.reactions_table.active_file] = selected_functions
-                logger.debug(f'Выбранные функции: {selected_functions}')
-                QMessageBox.information(self, "Фуннкции на расчет",
-                                        f"Настройки обновлены для {self.reactions_table.active_file}")
-        else:
-            QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
+        self.reactions_table.open_settings()
 
     def get_reactions_for_file(self, file_name):
         table = self.reactions_table.reactions_tables[file_name]
