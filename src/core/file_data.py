@@ -48,6 +48,7 @@ class FileData(QObject):
         self.skip_rows = 0
         self.columns_names = None
         self.operations_history = {}
+        self.loaded_files = set()
 
     def log_operation(self, params: dict):
         file_name = params.pop('file_name')
@@ -66,6 +67,11 @@ class FileData(QObject):
     @pyqtSlot(tuple)
     def load_file(self, file_info):
         self.file_path, self.delimiter, self.skip_rows, columns_names = file_info
+
+        if self.file_path in self.loaded_files:
+            console.log(f"Файл: {self.file_path} уже загружен.")
+            return
+
         if columns_names:
             column_delimiter = ',' if ',' in columns_names else ' '
             self.columns_names = [name.strip() for name in columns_names.split(column_delimiter)]
@@ -80,6 +86,8 @@ class FileData(QObject):
             self.load_csv()
         elif file_extension == '.txt':
             self.load_txt()
+
+        self.loaded_files.add(self.file_path)
 
     @detect_encoding
     @detect_decimal
