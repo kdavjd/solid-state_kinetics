@@ -303,14 +303,25 @@ class CalcButtons(QWidget):
         self.stop_button = QPushButton("Остановить расчет")
         self.layout.addWidget(self.start_button)
 
-        self.start_button.clicked.connect(self.start_calculation)
+        self.start_button.clicked.connect(self.check_and_start_calculation)
         self.stop_button.clicked.connect(self.stop_calculation)
         self.is_calculating = False
+        self.parent = parent
+
+    def check_and_start_calculation(self):
+        if not self.parent.reactions_table.active_file:
+            QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
+            return
+
+        settings = self.parent.reactions_table.calculation_settings.get(self.parent.reactions_table.active_file, {})
+        if not settings:
+            QMessageBox.information(self, "Настройки обязательны.", "Настройки расчета не установлены.")
+            self.parent.open_settings_dialog()
+        else:
+            self.start_calculation()
 
     def start_calculation(self):
         self.is_calculating = True
-        # selected_peak_types = [selected[reaction] for reaction in reactions]
-        # combinations = list(product(*selected_peak_types))
         self.layout.replaceWidget(self.start_button, self.stop_button)
         self.start_button.hide()
         self.stop_button.show()
@@ -352,3 +363,26 @@ class DeconvolutionSubBar(QWidget):
     def handle_update_function_value(self, data: dict):
         if self.reactions_table.active_reaction is not None:
             self.update_value.emit(data)
+
+    def open_settings_dialog(self):
+        if self.reactions_table.active_file:
+            reactions = self.get_reactions_for_file(self.reactions_table.active_file)
+            initial_settings = self.reactions_table.calculation_settings[self.reactions_table.active_file]
+            dialog = CalculationSettingsDialog(reactions, initial_settings, self)
+            if dialog.exec():
+                selected_functions = dialog.get_selected_functions()
+                self.reactions_table.calculation_settings[self.reactions_table.active_file] = selected_functions
+                logger.debug(f'Выбранные функции: {selected_functions}')
+                QMessageBox.information(self, "Фуннкции на расчет",
+                                        f"Настройки обновлены для {self.reactions_table.active_file}")
+        else:
+            QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
+
+    def get_reactions_for_file(self, file_name):
+        table = self.reactions_table.reactions_tables[file_name]
+        reactions = {}
+        for row in range(table.rowCount()):
+            reaction_name = table.item(row, 0).text()
+            combo = table.cellWidget(row, 1)
+            reactions[reaction_name] = combo
+        return reactions
