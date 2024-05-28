@@ -197,8 +197,8 @@ class Calculations(QObject):
     def _process_deconvolution(self, path_keys: list[str], params: dict):
         reaction_settings = params.get('reaction_settings')
         file_name = path_keys[0]
-        data = self.calculations_data.get_value([file_name])
+        model_of_experimental_data = self.calculations_data.get_value([file_name])
+        # experimental_data = self.file_data.dataframe_copies[file_name]
 
-        reaction_coeffs_sets = cft._get_reaction_coeffs_sets(reaction_settings)
-        reaction_bounds = cft._generate_coeffs_bounds(reaction_coeffs_sets, data)
+        reaction_bounds = cft._generate_reaction_bounds(reaction_settings, model_of_experimental_data)
         logger.debug(f"reaction_bounds: {reaction_bounds}")

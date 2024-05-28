@@ -30,29 +30,8 @@ class CurveFitting:
         }
 
     @staticmethod
-    def _generate_coeffs_bounds(reaction_coeffs_sets: Dict[str, set], data: dict) -> Dict[str, dict]:
+    def _generate_reaction_bounds(reaction_settings: Dict[str, List[str]], data: dict) -> Dict[str, dict]:
         reaction_bounds = {}
-
-        for reaction, coeffs in reaction_coeffs_sets.items():
-            reaction_data = data[reaction]
-            bounds = {}
-
-            for coeff in coeffs:
-                lower_bound = reaction_data['lower_bound_coeffs'].get(coeff)
-                upper_bound = reaction_data['upper_bound_coeffs'].get(coeff)
-
-                if lower_bound is not None and upper_bound is not None:
-                    bounds[coeff] = (lower_bound, upper_bound)
-                else:
-                    logger.warning(f"Coefficient {coeff} not found in bounds for reaction {reaction}")
-
-            reaction_bounds[reaction] = bounds
-
-        return reaction_bounds
-
-    @staticmethod
-    def _get_reaction_coeffs_sets(reaction_settings: Dict[str, List[str]]) -> Dict[str, set]:
-        reaction_coeffs_sets = {}
 
         for reaction_name, reaction_types in reaction_settings.items():
             combined_keys_set = set()
@@ -61,9 +40,22 @@ class CurveFitting:
                 allowed_keys = CurveFitting._get_allowed_keys_for_type(reaction_type)
                 combined_keys_set.update(allowed_keys)
 
-            reaction_coeffs_sets[reaction_name] = combined_keys_set
+            bounds = {}
+            reaction_data = data[reaction_name]
+
+            for coeff in combined_keys_set:
+                lower_bound = reaction_data['lower_bound_coeffs'].get(coeff)
+                upper_bound = reaction_data['upper_bound_coeffs'].get(coeff)
+
+                if lower_bound is not None and upper_bound is not None:
+                    bounds[coeff] = (lower_bound, upper_bound)
+                else:
+                    logger.warning(f"Границы коэффициента {coeff} не найдены для реакции {reaction_name}")
+
+            reaction_bounds[reaction_name] = bounds
             logger.debug(f"Для реакции {reaction_name} требуются коэффициенты: {combined_keys_set}")
-        return reaction_coeffs_sets
+
+        return reaction_bounds
 
     @staticmethod
     def _get_allowed_keys_for_type(function_type: str) -> List[str]:
