@@ -38,30 +38,7 @@ class Calculations(QObject):
 
     def extract_reaction_params(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
-        x: np.ndarray = reaction_params.get('x')
-        function_type: str = reaction_params.get('function')
-        coeffs: dict = reaction_params.get('coeffs', {})
-        upper_coeffs: dict = reaction_params.get('upper_bound_coeffs', {})
-        lower_coeffs: dict = reaction_params.get('lower_bound_coeffs', {})
-
-        x_range = (np.min(x), np.max(x))
-
-        default_keys = ['h', 'z', 'w']
-        function_specific_keys = {
-            'fraser': default_keys + ['fr'],
-            'ads': default_keys + ['ads1', 'ads2']
-        }
-        allowed_keys = function_specific_keys.get(function_type, default_keys)
-
-        coeffs_tuple = tuple(coeffs.get(key) for key in allowed_keys if key in coeffs)
-        upper_coeffs_tuple = tuple(upper_coeffs.get(key) for key in allowed_keys if key in upper_coeffs)
-        lower_coeffs_tuple = tuple(lower_coeffs.get(key) for key in allowed_keys if key in lower_coeffs)
-
-        return {
-            "coeffs": (x_range, function_type, coeffs_tuple),
-            "upper_bound_coeffs": (x_range, function_type, upper_coeffs_tuple),
-            "lower_bound_coeffs": (x_range, function_type, lower_coeffs_tuple)
-        }
+        return cft._parse_reaction_params(reaction_params)
 
     @lru_cache(maxsize=128)
     def calculate_reaction(self, reaction_params: tuple):
@@ -109,7 +86,8 @@ class Calculations(QObject):
             "add_reaction": self._process_add_reaction,
             "remove_reaction": self._process_remove_reaction,
             "highlight_reaction": self._process_highlight_reaction,
-            "update_value": self._process_update_value
+            "update_value": self._process_update_value,
+            "deconvolution": self._process_deconvolution
         }
 
         if operation in operations:
@@ -215,3 +193,12 @@ class Calculations(QObject):
                 logger.error(f"Данных по пути: {path_keys} не найдено.")
         except Exception as e:
             logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
+
+    def _process_deconvolution(self, path_keys: list[str], params: dict):
+        reaction_settings = params.get('reaction_settings')
+        file_name = path_keys[0]
+        data = self.calculations_data.get_value([file_name])
+
+        reaction_coeffs_sets = cft._get_reaction_coeffs_sets(reaction_settings)
+        reaction_bounds = cft._generate_coeffs_bounds(reaction_coeffs_sets, data)
+        logger.debug(f"reaction_bounds: {reaction_bounds}")

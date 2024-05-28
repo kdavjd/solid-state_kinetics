@@ -65,6 +65,8 @@ class MainTab(QWidget):
         self.sidebar.active_file_selected.connect(
             self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file)
         self.plot_canvas.update_value.connect(self.update_anchors_slot)
+        self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(
+            self.refer_to_calculations_data)
 
     def initialize_sizes(self):
         total_width = self.width()

@@ -310,6 +310,8 @@ class CoeffsTable(QTableWidget):
 
 
 class CalcButtons(QWidget):
+    calculation_started = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -332,6 +334,12 @@ class CalcButtons(QWidget):
             QMessageBox.information(self, "Настройки обязательны.", "Настройки расчета не установлены.")
             self.parent.open_settings_dialog()
         else:
+            data = {
+                "path_keys": [],
+                "operation": "deconvolution",
+                "reaction_settings": settings
+                }
+            self.calculation_started.emit(data)
             self.start_calculation()
 
     def start_calculation(self):

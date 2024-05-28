@@ -96,7 +96,7 @@ class FileData(QObject):
             self.data = pd.read_csv(
                 self.file_path, sep=self.delimiter, engine='python',
                 on_bad_lines='skip', skiprows=self.skip_rows, header=0, **kwargs)
-            self.fetch_data()
+            self._fetch_data()
         except Exception as e:
             logger.error("Ошибка при загрузке CSV файла: %s", e)
 
@@ -106,11 +106,11 @@ class FileData(QObject):
         try:
             self.data = pd.read_table(
                 self.file_path, sep=self.delimiter, skiprows=self.skip_rows, header=0, **kwargs)
-            self.fetch_data()
+            self._fetch_data()
         except Exception as e:
             logger.error("Ошибка при загрузке TXT файла: %s", e)
 
-    def fetch_data(self):
+    def _fetch_data(self):
         file_basename = os.path.basename(self.file_path)
 
         if self.columns_names is not None:
