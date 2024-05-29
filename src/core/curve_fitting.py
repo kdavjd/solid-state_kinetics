@@ -8,7 +8,7 @@ from core.logger_config import logger
 class CurveFitting:
 
     @staticmethod
-    def _parse_reaction_params(reaction_params: dict) -> Dict[str, Tuple[Tuple[float, float], str, Tuple[Any, ...]]]:
+    def parse_reaction_params(reaction_params: dict) -> Dict[str, Tuple[Tuple[float, float], str, Tuple[Any, ...]]]:
         x: np.ndarray = reaction_params.get('x', np.array([]))
         function_type: str = reaction_params.get('function', '')
         coeffs: dict = reaction_params.get('coeffs', {})
