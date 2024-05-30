@@ -1,4 +1,4 @@
-from functools import lru_cache, wraps
+from functools import wraps
 
 import numpy as np
 import pandas as pd
@@ -80,7 +80,7 @@ class Calculations(QObject):
             raise ValueError("Необходимо передать 'target_function' в аргументах kwargs")
 
         target_function = kwargs.pop('target_function')
-        callback = self.save_intermediate_result
+        callback = self._save_intermediate_result
 
         self.start_calculation_thread(
             differential_evolution,
@@ -90,11 +90,12 @@ class Calculations(QObject):
             *args, **kwargs
         )
 
-    def save_intermediate_result(self, xk, convergence):
+    def _save_intermediate_result(self, xk, convergence):
         self.differential_evolution_results.append((xk, convergence))
         logger.info(f"Промежуточный результат: xk = {xk}, convergence = {convergence}")
 
-    def target_function(self):
+    @staticmethod
+    def deconvolution(coeffs):
         pass
 
 
@@ -159,22 +160,9 @@ class CalculationsDataOperations:
     def plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
         x_min, x_max = params[0]
         x = np.linspace(x_min, x_max, 100)
-        y = self.calculate_reaction(params)
+        y = cft.calculate_reaction(params)
         curve_name = f"{reaction_name}_{bound_label}"
         self.calculations.plot_reaction.emit((file_name, curve_name), [x, y])
-
-    @lru_cache(maxsize=128)
-    def calculate_reaction(self, reaction_params: tuple):
-        x_range, function_type, coeffs = reaction_params
-        x = np.linspace(x_range[0], x_range[1], 100)
-        result = None
-        if function_type == "gauss":
-            result = cft.gaussian(x, *coeffs)
-        elif function_type == "fraser":
-            result = cft.fraser_suzuki(x, *coeffs)
-        elif function_type == "ads":
-            result = cft.asymmetric_double_sigmoid(x, *coeffs)
-        return result
 
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
@@ -221,7 +209,7 @@ class CalculationsDataOperations:
             reaction_params = self.extract_reaction_params([file_name, reaction_name])
             for bound_label, params in reaction_params.items():
                 if bound_label in cumulative_y:
-                    y = self.calculate_reaction(reaction_params.get(bound_label, []))
+                    y = cft.calculate_reaction(reaction_params.get(bound_label, []))
                     if x is None:
                         x_min, x_max = params[0]
                         x = np.linspace(x_min, x_max, 100)
@@ -269,10 +257,10 @@ class CalculationsDataOperations:
             logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
 
     def deconvolution(self, path_keys: list[str], params: dict):
-        reaction_settings = params.get('reaction_settings')
+        chosen_functions = params.get('reaction_settings')
         file_name = path_keys[0]
         model_of_experimental_data = self.calculations_data.get_value([file_name])
         # experimental_data = self.calculations.file_data.dataframe_copies[file_name]
 
-        reaction_bounds = cft._generate_reaction_bounds(reaction_settings, model_of_experimental_data)
+        reaction_bounds = cft._generate_reaction_bounds(chosen_functions, model_of_experimental_data)
         logger.debug(f"reaction_bounds: {reaction_bounds}")
