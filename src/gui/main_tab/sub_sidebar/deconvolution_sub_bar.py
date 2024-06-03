@@ -337,7 +337,7 @@ class CalcButtons(QWidget):
             data = {
                 "path_keys": [],
                 "operation": "deconvolution",
-                "reaction_settings": settings
+                "chosen_functions": settings
                 }
             self.calculation_started.emit(data)
             self.start_calculation()

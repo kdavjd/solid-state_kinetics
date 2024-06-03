@@ -3,8 +3,6 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-from core.logger_config import logger
-
 
 class CurveFitting:
 
@@ -29,34 +27,6 @@ class CurveFitting:
             "upper_bound_coeffs": (x_range, function_type, upper_coeffs_tuple),
             "lower_bound_coeffs": (x_range, function_type, lower_coeffs_tuple)
         }
-
-    @staticmethod
-    def _generate_reaction_bounds(reaction_settings: Dict[str, List[str]], data: dict) -> Dict[str, dict]:
-        reaction_bounds = {}
-
-        for reaction_name, reaction_types in reaction_settings.items():
-            combined_keys_set = set()
-
-            for reaction_type in reaction_types:
-                allowed_keys = CurveFitting._get_allowed_keys_for_type(reaction_type)
-                combined_keys_set.update(allowed_keys)
-
-            bounds = {}
-            reaction_data = data[reaction_name]
-
-            for coeff in combined_keys_set:
-                lower_bound = reaction_data['lower_bound_coeffs'].get(coeff)
-                upper_bound = reaction_data['upper_bound_coeffs'].get(coeff)
-
-                if lower_bound is not None and upper_bound is not None:
-                    bounds[coeff] = (lower_bound, upper_bound)
-                else:
-                    logger.warning(f"Границы коэффициента {coeff} не найдены для реакции {reaction_name}")
-
-            reaction_bounds[reaction_name] = bounds
-            logger.debug(f"Для реакции {reaction_name} требуются коэффициенты: {combined_keys_set}")
-
-        return reaction_bounds
 
     @staticmethod
     def _get_allowed_keys_for_type(function_type: str) -> List[str]:

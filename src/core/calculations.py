@@ -1,4 +1,6 @@
 from functools import wraps
+from itertools import product
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -36,6 +38,7 @@ def add_default_kwargs(func):
     def wrapper(*args, **kwargs):
         for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
             kwargs.setdefault(key, value)
+        logger.debug(f"Calling {func.__name__} with args: {args} and kwargs: {kwargs}")
         return func(*args, **kwargs)
     return wrapper
 
@@ -53,8 +56,10 @@ class Calculations(QObject):
         self.calculations_data_operations = CalculationsDataOperations(self, file_data, calculations_data)
         self.active_file_operations = ActiveFileOperations(self, file_data)
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
+        self.best_combination = None
+        self.best_mse = float('inf')
 
-    def start_calculation_thread(self, func, *args, **kwargs):
+    def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
         self.thread: Thread = Thread(func, *args, **kwargs)
         self.thread.result_ready.connect(self._calculation_finished)
         self.thread.start()
@@ -62,7 +67,7 @@ class Calculations(QObject):
     @pyqtSlot(object)
     def _calculation_finished(self, result):
         try:
-            pass
+            console.log(f"Вычисления выполнены успешно.{result}")
         except ValueError as e:
             logger.error(f"Ошибка при обработке результата: {e}")
 
@@ -72,7 +77,73 @@ class Calculations(QObject):
 
     @pyqtSlot(dict)
     def modify_calculations_data_slot(self, params: dict):
-        self.calculations_data_operations.modify_calculations_data(params)
+        response = self.calculations_data_operations.modify_calculations_data(params)
+        if response:
+            logger.info(f"response: {response}")
+            self._prepare_and_start_optimization(response)
+
+    def _prepare_and_start_optimization(self, response: dict):
+        try:
+
+            combined_keys = response['combined_keys']
+            bounds = response['bounds']
+            reaction_combinations = response['reaction_combinations']
+            experimental_data = response['experimental_data']
+
+            target_function = self.generate_target_function(combined_keys, reaction_combinations, experimental_data)
+
+            self.start_differential_evolution(bounds=bounds, target_function=target_function)
+        except Exception as e:
+            logger.error(f"Ошибка при подготовке и запуске оптимизации: {e}")
+
+    def generate_target_function(self, combined_keys: dict, reaction_combinations: list[tuple],
+                                 experimental_data: pd.DataFrame):
+        def target_function(params):
+            best_mse = float('inf')
+            # best_combination = None
+            mse_dict = {}
+
+            for combination in reaction_combinations:
+                cumulative_function = np.zeros(len(experimental_data['temperature']))
+                param_idx = 0
+                for (reaction, coeffs), func in zip(combined_keys.items(), combination):
+                    coeff_count = len(coeffs)
+                    func_params = params[param_idx:param_idx + coeff_count]
+                    param_idx += coeff_count
+
+                    x = experimental_data['temperature']
+
+                    if len(func_params) < 3:
+                        raise ValueError("Not enough parameters for the function.")
+
+                    h, z, w = func_params[0:3]  # First coefficients are universal for all functions
+                    func_idx = 3
+                    if func == 'gauss':
+                        reaction_values = cft.gaussian(x, h, z, w)
+                        cumulative_function += reaction_values
+
+                    elif func == 'fraser':
+                        fs = func_params[func_idx]
+                        reaction_values = cft.fraser_suzuki(x, h, z, w, fs)
+                        cumulative_function += reaction_values
+
+                    elif func == 'ads':
+                        ads1 = func_params[func_idx] if 'fs' not in coeffs else func_params[func_idx + 1]
+                        ads2 = func_params[func_idx + 1] if 'fs' not in coeffs else func_params[func_idx + 2]
+                        reaction_values = cft.asymmetric_double_sigmoid(x, h, z, w, ads1, ads2)
+                        cumulative_function += reaction_values
+
+                y_true = experimental_data.iloc[:, 1].to_numpy()
+                mse = np.mean((y_true - cumulative_function) ** 2)
+                mse_dict[combination] = mse
+
+                if mse < best_mse:
+                    best_mse = mse
+                    # best_combination = combination
+
+            return best_mse
+
+        return target_function
 
     @add_default_kwargs
     def start_differential_evolution(self, bounds, *args, **kwargs):
@@ -80,23 +151,21 @@ class Calculations(QObject):
             raise ValueError("Необходимо передать 'target_function' в аргументах kwargs")
 
         target_function = kwargs.pop('target_function')
-        callback = self._save_intermediate_result
+        callback = kwargs.pop('callback', None)
+
+        logger.debug(f"Starting differential evolution with bounds: {bounds} and kwargs: {kwargs}")
 
         self.start_calculation_thread(
             differential_evolution,
             target_function,
             bounds=bounds,
             callback=callback,
-            *args, **kwargs
+            **kwargs
         )
 
     def _save_intermediate_result(self, xk, convergence):
         self.differential_evolution_results.append((xk, convergence))
         logger.info(f"Промежуточный результат: xk = {xk}, convergence = {convergence}")
-
-    @staticmethod
-    def deconvolution(coeffs):
-        pass
 
 
 class ActiveFileOperations:
@@ -149,9 +218,10 @@ class CalculationsDataOperations:
         }
 
         if operation in operations:
-            operations[operation](path_keys, params)
+            response = operations[operation](path_keys, params)
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
+        return response
 
     def extract_reaction_params(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
@@ -257,10 +327,41 @@ class CalculationsDataOperations:
             logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
 
     def deconvolution(self, path_keys: list[str], params: dict):
-        chosen_functions = params.get('reaction_settings')
+        combined_keys = {}
+        num_coefficients = {}
+        bounds = []
+        check_keys = ['h', 'z', 'w', 'fr', 'ads1', 'ads2']
         file_name = path_keys[0]
-        model_of_experimental_data = self.calculations_data.get_value([file_name])
-        # experimental_data = self.calculations.file_data.dataframe_copies[file_name]
+        chosen_functions = params.get('chosen_functions')
+        if not chosen_functions:
+            raise ValueError("chosen_functions is None or empty")
 
-        reaction_bounds = cft._generate_reaction_bounds(chosen_functions, model_of_experimental_data)
-        logger.debug(f"reaction_bounds: {reaction_bounds}")
+        functions_data = self.calculations_data.get_value([file_name])
+        if not functions_data:
+            raise ValueError(f"No functions data found for file: {file_name}")
+
+        reaction_combinations = list(product(*chosen_functions.values()))
+
+        for reaction_name in chosen_functions:
+            combined_keys_set = set()
+            reaction_params = functions_data[reaction_name]
+            if not reaction_params:
+                raise ValueError(f"No reaction params found for reaction: {reaction_name}")
+            for reaction_type in chosen_functions[reaction_name]:
+                allowed_keys = cft._get_allowed_keys_for_type(reaction_type)
+                combined_keys_set.update(allowed_keys)
+            combined_keys[reaction_name] = combined_keys_set
+            lower_coeffs_tuple = reaction_params["lower_bound_coeffs"].values()
+            upper_coeffs_tuple = reaction_params["upper_bound_coeffs"].values()
+            filtered_pairs = [
+                (lc, uc) for lc, uc, key in zip(lower_coeffs_tuple, upper_coeffs_tuple, check_keys)
+                if key in combined_keys_set]
+            bounds.extend(filtered_pairs)
+            num_coefficients[reaction_name] = len(combined_keys_set)
+
+        return {
+            'combined_keys': combined_keys,
+            'bounds': bounds,
+            'reaction_combinations': reaction_combinations,
+            'experimental_data': self.calculations.file_data.dataframe_copies[file_name],
+        }
