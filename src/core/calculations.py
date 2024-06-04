@@ -47,6 +47,7 @@ class Calculations(QObject):
     plot_reaction = pyqtSignal(tuple, list)
     add_reaction_fail = pyqtSignal()
     reaction_params_to_gui = pyqtSignal(dict)
+    new_best_result = pyqtSignal(dict)
 
     def __init__(self, file_data: FileData, calculations_data: CalculationsData):
         super().__init__()
@@ -58,6 +59,7 @@ class Calculations(QObject):
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.best_combination = None
         self.best_mse = float('inf')
+        self.new_best_result.connect(self.handle_new_best_result)
 
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
         self.thread: Thread = Thread(func, *args, **kwargs)
@@ -116,7 +118,7 @@ class Calculations(QObject):
 
         def target_function(params):
             best_mse = float('inf')
-            # best_combination = None
+            best_combination = None
             mse_dict = {}
             for combination in reaction_combinations:
                 cumulative_function = np.zeros(len(experimental_data['temperature']))
@@ -153,7 +155,8 @@ class Calculations(QObject):
                 mse_dict[combination] = mse
                 if mse < best_mse:
                     best_mse = mse
-                    # best_combination = combination
+                    best_combination = combination
+            self.new_best_result.emit({'best_mse': best_mse, 'best_combination': best_combination})
             return best_mse
         return target_function
 
@@ -178,6 +181,17 @@ class Calculations(QObject):
     def _save_intermediate_result(self, xk, convergence):
         self.differential_evolution_results.append((xk, convergence))
         logger.info(f"Промежуточный результат: xk = {xk}, convergence = {convergence}")
+
+    @pyqtSlot(dict)
+    def handle_new_best_result(self, result: dict):
+        best_mse = result['best_mse']
+        best_combination = result['best_combination']
+        if best_mse < self.best_mse:
+            self.best_mse = best_mse
+            self.best_combination = best_combination
+            console.log(f"Новый лучший результат:\n"
+                        f"Лучшее MSE: {best_mse}\n"
+                        f"Комбинация реакций: {best_combination}\n\n")
 
 
 class ActiveFileOperations:
