@@ -5,7 +5,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
-from scipy.optimize import differential_evolution
+from scipy.optimize import OptimizeResult, differential_evolution
 
 from core.calculation_thread import CalculationThread as Thread
 from core.calculations_data import CalculationsData
@@ -67,7 +67,23 @@ class Calculations(QObject):
     @pyqtSlot(object)
     def _calculation_finished(self, result):
         try:
-            console.log(f"Вычисления выполнены успешно.{result}")
+            if isinstance(result, OptimizeResult):
+                x = result.x
+                fun = result.fun
+                success = result.success
+                message = result.message
+
+                console.log(f"Вычисления выполнены успешно.\n"
+                            f"Оптимальные параметры: {x}\n"
+                            f"Значение целевой функции: {fun}\n"
+                            f"Статус успеха: {success}\n"
+                            f"Сообщение: {message}")
+
+                self.best_combination = x
+                self.best_mse = fun
+            else:
+                console.log(f"Вычисления выполнены успешно. Результат: {result}")
+
         except ValueError as e:
             logger.error(f"Ошибка при обработке результата: {e}")
 
@@ -84,7 +100,6 @@ class Calculations(QObject):
 
     def _prepare_and_start_optimization(self, response: dict):
         try:
-
             combined_keys = response['combined_keys']
             bounds = response['bounds']
             reaction_combinations = response['reaction_combinations']
@@ -98,11 +113,11 @@ class Calculations(QObject):
 
     def generate_target_function(self, combined_keys: dict, reaction_combinations: list[tuple],
                                  experimental_data: pd.DataFrame):
+
         def target_function(params):
             best_mse = float('inf')
             # best_combination = None
             mse_dict = {}
-
             for combination in reaction_combinations:
                 cumulative_function = np.zeros(len(experimental_data['temperature']))
                 param_idx = 0
@@ -122,12 +137,12 @@ class Calculations(QObject):
                         reaction_values = cft.gaussian(x, h, z, w)
                         cumulative_function += reaction_values
 
-                    elif func == 'fraser':
+                    if func == 'fraser':
                         fs = func_params[func_idx]
                         reaction_values = cft.fraser_suzuki(x, h, z, w, fs)
                         cumulative_function += reaction_values
 
-                    elif func == 'ads':
+                    if func == 'ads':
                         ads1 = func_params[func_idx] if 'fs' not in coeffs else func_params[func_idx + 1]
                         ads2 = func_params[func_idx + 1] if 'fs' not in coeffs else func_params[func_idx + 2]
                         reaction_values = cft.asymmetric_double_sigmoid(x, h, z, w, ads1, ads2)
@@ -136,13 +151,10 @@ class Calculations(QObject):
                 y_true = experimental_data.iloc[:, 1].to_numpy()
                 mse = np.mean((y_true - cumulative_function) ** 2)
                 mse_dict[combination] = mse
-
                 if mse < best_mse:
                     best_mse = mse
                     # best_combination = combination
-
             return best_mse
-
         return target_function
 
     @add_default_kwargs
