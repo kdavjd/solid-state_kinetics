@@ -36,4 +36,4 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: exe-artifact
-        path: src/gui/__main__.exe
+        path: src/gui/build/__main__/__main__.exe
