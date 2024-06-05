@@ -1,79 +1,36 @@
-name: commit
+name: Build exe with Poetry
 
 on:
-    push:
-        branches: ['main']
-        paths-ignore: 
-            - '**.md'
-        
-
-# jobs:
-#     build:
-#         runs-on: ['windows-latest', 'ubuntu-latest']
-#         strategy:
-#             matrix:
-#                 python-version: ['3.12']
-
-#         steps:
-#             - uses: actions/checkout@v4
-#             - uses: actions/setup-python@v5
-#               with: 
-#                 python-version: '3.12'
-
-#         #   - name: installing python packages
-#         #   run: |
-#         #     python -m pip install pyinstaller
-#         #     pyinstaller --onefile /src/gui/
-
+  push:
+    branches:
+      - main
 
 jobs:
-    build:
-        strategy:
-          matrix:
-            os: [macos-latest, ubuntu-latest, windows-latest]
-            python-version: ['3.12']
+  build:
+    runs-on: ubuntu-latest
     
-        runs-on: ${{ matrix.os }}
-    
-        steps:
-        - name: Check-out repository
-          uses: actions/checkout@v4
-
-        - name: Qt6 GUI
-          uses: Nuitka/Nuitka-Action@main
-          with:
-            nuitka-version: main
-            script-name: src/gui/__main__.py
-            standalone: true
-            enable-plugins: pyqt6
-    
-        - name: Setup Python
-          uses: actions/setup-python@v5
-          with:
-            python-version: ${{ matrix.python-version }}
-    
-        - name: Restore cached python
-          id: python-cache
-          uses: actions/cache/restore@v4
-          with:
-            path: |
-              ~/.cache/pypoetry
-              ~/.local
-              .venv
-              key: ${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
-
-        - name: Build Executable
-          uses: Nuitka/Nuitka-Action@main
-          with:
-            nuitka-version: main
-            script-name: src/gui/__main__.py
-            onefile: true
-    
-        - name: Upload Artifacts
-          uses: actions/upload-artifact@v3
-          with:
-            name: ${{ runner.os }} Build
-            path: |
-                build/*.exe
-                build/*.bin
-                build/*.app/**/*
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.12
+      
+    - name: Install Poetry
+      run: |
+        curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+        source $HOME/.poetry/env
+      
+    - name: Install dependencies
+      run: poetry install
+      
+    - name: Build exe
+      run: poetry run pyinstaller -- $GITHUB_ACTION_PATH/src/gui/__main__.py
+      
+    - name: Upload exe artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: exe-artifact
+        path: dist/$GITHUB_ACTION_PATH/src/gui/__main__.exe
