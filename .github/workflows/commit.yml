@@ -36,4 +36,4 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: exe-artifact
-        path: src/gui/dist/__main__.exe
+        path: /home/runner/work/solid-state_kinetics/solid-state_kinetics/dist/__main__.exe
