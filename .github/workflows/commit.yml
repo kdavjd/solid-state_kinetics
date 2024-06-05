@@ -23,6 +23,11 @@ jobs:
       
     - name: Install dependencies
       run: poetry install
+
+    - name: PyInstaller Windows
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: src
       
     - name: Build exe
       run: poetry run pyinstaller -- $GITHUB_ACTION_PATH/src/gui/__main__.py
