@@ -45,7 +45,7 @@ jobs:
             nuitka-version: main
             script-name: src/gui/__main__.py
             standalone: true
-            enable-plugins: PyQt6
+            enable-plugins: pyqt6
     
         - name: Setup Python
           uses: actions/setup-python@v5
