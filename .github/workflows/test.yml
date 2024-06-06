@@ -1,0 +1,33 @@
+name: Build exe with Poetry
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.12
+
+    # Build python script into a stand-alone exe
+    - uses: Nuitka/Nuitka-Action@main
+      with:
+        nuitka-version: main
+        script-name: src/gui/__main__.py
+        onefile: true
+
+    # Uploads artifact
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: exe
+        path: build/__main__.exe
