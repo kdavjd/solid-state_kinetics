@@ -28,8 +28,6 @@ jobs:
       
     - name: Install dependencies
       run: |
-        poetry update
-        poetry lock --no-update
         poetry install
 
     - name: Installing pyinstaller
@@ -41,7 +39,7 @@ jobs:
       run: poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
       
     - name: Upload exe artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: exe-artifact
+        name: main
         path: D:\a\solid-state_kinetics\solid-state_kinetics\dist\main.exe
