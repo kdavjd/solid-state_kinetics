@@ -15,7 +15,7 @@ packages = [{ include = "*", from = "src" }]
 ssk-gui = "gui.__main__:main"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.13"
 pyqt6 = "^6.6.1"
 matplotlib = "^3.8.3"
 pandas = "^2.2.1"
