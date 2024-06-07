@@ -31,10 +31,10 @@ jobs:
         poetry lock
         poetry install
 
-    # - name: Installing pip
-    #   run: |
-    #     python -m pip install --upgrade pip wheel setuptools
-    #     pip install pyinstaller
+    - name: Installing pip
+      run: |
+        python -m pip install --upgrade pip wheel setuptools
+        pip install pyinstaller
       
     - name: Build exe
       run: poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
