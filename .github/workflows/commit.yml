@@ -36,7 +36,7 @@ jobs:
         pip install pyinstaller
       
     - name: Build exe
-      run: poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+      run: poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots pyqt6 --onefile --name main
       
     - name: Upload exe artifact
       uses: actions/upload-artifact@v4
