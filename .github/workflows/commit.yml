@@ -27,7 +27,9 @@ jobs:
         pipx install poetry
       
     - name: Install dependencies
-      run: poetry install
+      run: |
+        poetry lock [--no-update]
+        poetry install
 
     # - name: Installing pip
     #   run: |
