@@ -41,6 +41,6 @@ jobs:
         
     - name: Publishing in releases
       uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
+      # if: startsWith(github.ref, 'refs/tags/')
       with:
         files: D:\a\solid-state_kinetics\solid-state_kinetics\dist\main.exe
