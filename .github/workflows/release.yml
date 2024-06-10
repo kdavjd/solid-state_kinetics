@@ -73,14 +73,16 @@ jobs:
         if: ${{ matrix.os }} == 'ubuntu-latest'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: First release
+          name: Release ${{ github.run_number }}
+          tag_name: github.ref
           files: dist/main
             
       - name: Release Windows
         if: ${{ matrix.os }} == 'windows-latest'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: First release
+          name: Release ${{ github.run_number }}
+          tag_name: github.ref
           files: dist/main.exe
         
         env:
