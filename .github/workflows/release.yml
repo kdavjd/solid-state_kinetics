@@ -50,6 +50,9 @@ jobs:
         run: |
           poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
 
+
+# UPLOADING ARTIFACTS
+
       # - name: Upload artifacts linux
       #   if: ${{ matrix.os }} == 'ubuntu-latest'
       #   uses: actions/upload-artifact@v4
@@ -64,21 +67,20 @@ jobs:
       #     name: windows
       #     path: dist/main.exe
 
-        
 
  #RELEASE       
       - name: Release Linux
         if: ${{ matrix.os }} == 'ubuntu-latest'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: github.ref
+          tag_name: First release
           files: dist/main
             
       - name: Release Windows
         if: ${{ matrix.os }} == 'windows-latest'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: github.ref
+          tag_name: First release
           files: dist/main.exe
         
         env:
