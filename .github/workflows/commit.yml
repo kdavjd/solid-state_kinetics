@@ -8,14 +8,7 @@ on:
 jobs:
   build:
     name: Build ${{ matrix.artifact_name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: main
-          - os: ubuntu-latest
-            artifact_name: main.exe
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
@@ -33,26 +26,27 @@ jobs:
           poetry install
             
       - name: Build Linux
-        if: matrix.artifact_name == 'main'
-        run: poetry run ./pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+        run: |
+          poetry run ./pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+          ls
         
       - name: Build Win
-        if: matrix.artifact_name == 'main.exe'
-        run: poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+        run: |
+          poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+          ls
 
       - name: Upload artifacts linux
         if: matrix.artifact_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: dist/${{ matrix.artifact_name }}
+          path: dist/main
 
       - name: Upload artifacts windows
-        if: matrix.artifact_name == 'main.exe'
         uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/main/${{ matrix.artifact_name }}
+          path: dist/main.exe
 
         
 
