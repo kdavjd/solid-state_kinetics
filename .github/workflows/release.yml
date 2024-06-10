@@ -67,33 +67,19 @@ jobs:
         
 
  #RELEASE       
-      - name: Release
+      - name: Release Linux
+        if: ${{ matrix.os }} == 'ubuntu-latest'
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            dist/main
-            dist/main.exe
+          files: dist/main
+            
+      - name: Release Windows
+        if: ${{ matrix.os }} == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/main.exe
+        
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      # - name: Create Release
-      #   id: create_release
-      #   uses: actions/create-release@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-      #   with:
-      #     tag_name: ${{ github.run_number }}
-      #     release_name: Release ${{ github.run_number }}
-            
-      # - name: Upload release asset
-      #   id: upload-release-asset 
-      #   uses: actions/upload-release-asset@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #     asset_path: ./my-artifact.zip
-      #     asset_name: ${{ matrix.artifact_name }}
-      #     asset_content_type: application/zip
-        
+      
