@@ -32,7 +32,12 @@ jobs:
           pipx install poetry
           poetry install
             
-      - name: Build
+      - name: Build Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: poetry run ./pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+        
+      - name: Build Win
+        if: matrix.os == 'windows-latest'
         run: poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
 
       
@@ -53,7 +58,7 @@ jobs:
           
       - name: Upload release asset
         id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
