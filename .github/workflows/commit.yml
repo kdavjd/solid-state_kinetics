@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build for ${{ matrix.os }}
+    name: Build ${{ matrix.artifact_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -33,14 +33,13 @@ jobs:
           poetry install
             
       - name: Build Linux
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.artifact_name == 'main'
         run: poetry run ./pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
         
       - name: Build Win
-        if: matrix.os == 'windows-latest'
+        if: matrix.artifact_name == 'main.exe'
         run: poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
 
-      
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -67,10 +66,3 @@ jobs:
           asset_name: ${{ matrix.artifact_name }}
           asset_content_type: application/zip
           
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/${{ matrix.artifact_name }}
-          asset_name: ${{ matrix.asset_name }}
-          tag: ${{ github.ref }}
