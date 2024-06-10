@@ -1,9 +1,13 @@
-name: Build exe with Poetry
+name: Release
 
 on:
+  workflow_dispatch:
+  pull_request:
   push:
     branches:
       - main
+    paths-ignore:
+       - '**.md'
 
 jobs:
   build:
@@ -13,9 +17,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: main
+            artifact_name: linux
           - os: windows-latest
-            artifact_name: main.exe
+            artifact_name: windows
     
     steps:
       - name: Checkout code
