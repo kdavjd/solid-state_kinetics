@@ -33,10 +33,10 @@ jobs:
       - name: Build Win
         run: |
           poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+          cd dist
           ls
 
       - name: Upload artifacts linux
-        if: matrix.artifact_name == 'main'
         uses: actions/upload-artifact@v4
         with:
           name: linux
