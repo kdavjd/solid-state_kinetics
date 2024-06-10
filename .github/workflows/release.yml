@@ -50,28 +50,28 @@ jobs:
         run: |
           poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
 
-      - name: Upload artifacts linux
-        if: ${{ matrix.os }} == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux
-          path: dist/main
+      # - name: Upload artifacts linux
+      #   if: ${{ matrix.os }} == 'ubuntu-latest'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: linux
+      #     path: dist/main
 
-      - name: Upload artifacts windows
-        if: ${{ matrix.os }} == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: dist/main.exe
+      # - name: Upload artifacts windows
+      #   if: ${{ matrix.os }} == 'windows-latest'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: windows
+      #     path: dist/main.exe
 
         
 
  #RELEASE       
-      # - name: Release Linux
-      #   if: ${{ matrix.os }} == 'ubuntu-latest'
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     files: dist/main
+      - name: Release Linux
+        if: ${{ matrix.os }} == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/main
             
       - name: Release Windows
         if: ${{ matrix.os }} == 'windows-latest'
