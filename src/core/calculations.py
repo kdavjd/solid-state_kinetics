@@ -245,9 +245,10 @@ class CalculationsDataOperations:
 
         if operation in operations:
             response = operations[operation](path_keys, params)
+            if response:
+                return response["data"]
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
-        return response
 
     def extract_reaction_params(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
@@ -345,7 +346,7 @@ class CalculationsDataOperations:
                 logger.info(f"Данные по пути: {path_keys}\n изменены на: {new_value}")
 
                 self._update_coeffs_value(path_keys.copy(), new_value)
-                self.highlight_reaction(path_keys[:2], params)
+                return {"operation": "update_value", "data": None}
             else:
                 logger.error(f"Все данные: {self.calculations_data._data}")
                 logger.error(f"Данных по пути: {path_keys} не найдено.")
@@ -386,8 +387,11 @@ class CalculationsDataOperations:
             num_coefficients[reaction_name] = len(combined_keys_set)
 
         return {
-            'combined_keys': combined_keys,
-            'bounds': bounds,
-            'reaction_combinations': reaction_combinations,
-            'experimental_data': self.calculations.file_data.dataframe_copies[file_name],
+            'operation': 'deconvolution',
+            'data': {
+                'combined_keys': combined_keys,
+                'bounds': bounds,
+                'reaction_combinations': reaction_combinations,
+                'experimental_data': self.calculations.file_data.dataframe_copies[file_name],
+            }
         }
