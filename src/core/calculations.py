@@ -1,158 +1,415 @@
-from functools import lru_cache
+import time
+from functools import wraps
+from itertools import product
+from typing import Callable
 
 import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+from scipy.optimize import OptimizeResult, differential_evolution
 
+from core.calculation_thread import CalculationThread as Thread
 from core.calculations_data import CalculationsData
 from core.curve_fitting import CurveFitting as cft
 from core.file_data import FileData
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
 
+DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
+    'strategy': 'best1bin',
+    'maxiter': 1000,
+    'popsize': 15,
+    'tol': 0.01,
+    'mutation': (0.5, 1),
+    'recombination': 0.7,
+    'seed': None,
+    'callback': None,
+    'disp': False,
+    'polish': True,
+    'init': 'latinhypercube',
+    'atol': 0,
+    'updating': 'deferred',
+    'workers': 1,
+    'constraints': ()
+}
+
+
+def add_default_kwargs(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
+            kwargs.setdefault(key, value)
+        logger.debug(f"Calling {func.__name__} with args: {args} and kwargs: {kwargs}")
+        return func(*args, **kwargs)
+    return wrapper
+
 
 class Calculations(QObject):
-    plot_reaction_signal = pyqtSignal(str, list)
+    plot_reaction = pyqtSignal(tuple, list)
+    add_reaction_fail = pyqtSignal()
+    reaction_params_to_gui = pyqtSignal(dict)
+    new_best_result = pyqtSignal(dict)
 
     def __init__(self, file_data: FileData, calculations_data: CalculationsData):
         super().__init__()
         self.file_data = file_data
         self.calculations_data = calculations_data
+        self.thread = None
+        self.calculations_data_operations = CalculationsDataOperations(self, file_data, calculations_data)
+        self.active_file_operations = ActiveFileOperations(self, file_data)
+        self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
+        self.best_combination = None
+        self.best_mse = float('inf')
+        self.new_best_result.connect(self.handle_new_best_result)
 
-    def generate_default_gaussian_data(self, file_name):
-        df = self.file_data.dataframe_copies[file_name]
-        x = df['temperature'].copy()
-        y_columns = [col for col in df.columns if col != 'temperature']
-        if y_columns:
-            y = df[y_columns[0]]
-            h = 0.8 * y.max()
-            z = x.mean()
-            w = 0.1 * (x.max() - x.min())
+    def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
+        self.thread: Thread = Thread(func, *args, **kwargs)
+        self.thread.result_ready.connect(self._calculation_finished)
+        self.thread.start()
 
-            h_lower = h * 0.9
-            h_upper = h * 1.1
-            w_lower = w * 0.9
-            w_upper = w * 1.1
+    @pyqtSlot(object)
+    def _calculation_finished(self, result):
+        try:
+            if isinstance(result, OptimizeResult):
+                x = result.x
+                fun = result.fun
+                success = result.success
+                message = result.message
 
-            result_dict = {
-                "function": "gauss",
-                "x": x.to_numpy(),
-                "coeffs": {
-                    "h": h,
-                    "z": z,
-                    "w": w
-                },
-                "upper_bound_coeffs": {
-                    "h": h_upper,
-                    "z": z,
-                    "w": w_upper
-                },
-                "lower_bound_coeffs": {
-                    "h": h_lower,
-                    "z": z,
-                    "w": w_lower
-                }
-            }
-            return result_dict
-        return {}
+                console.log(f"Вычисления выполнены успешно.\n"
+                            f"Оптимальные параметры: {x}\n"
+                            f"Значение целевой функции: {fun}\n"
+                            f"Статус успеха: {success}\n"
+                            f"Сообщение: {message}")
 
-    def extract_reaction_params(self, path_keys: list):
-        reaction_params = self.calculations_data.get_value(path_keys)
-        x = reaction_params.get('x')
-        function_type = reaction_params.get('function')
-        coeffs = reaction_params.get('coeffs', {})
-        upper_coeffs = reaction_params.get('upper_bound_coeffs', {})
-        lower_coeffs = reaction_params.get('lower_bound_coeffs', {})
+                self.best_combination = x
+                self.best_mse = fun
+            else:
+                console.log(f"Вычисления выполнены успешно. Результат: {result}")
 
-        x_range = (np.min(x), np.max(x))
-        coeffs_tuple = (coeffs.get('h'), coeffs.get('z'), coeffs.get('w'))
-        upper_coeffs_tuple = (upper_coeffs.get('h'), upper_coeffs.get('z'), upper_coeffs.get('w'))
-        lower_coeffs_tuple = (lower_coeffs.get('h'), lower_coeffs.get('z'), lower_coeffs.get('w'))
+        except ValueError as e:
+            logger.error(f"Ошибка при обработке результата: {e}")
 
-        return {
-            'value': (x_range, function_type, coeffs_tuple),
-            'upper_bound': (x_range, function_type, upper_coeffs_tuple),
-            'lower_bound': (x_range, function_type, lower_coeffs_tuple)
-        }
+    @pyqtSlot(dict)
+    def modify_active_file_slot(self, params: dict):
+        self.active_file_operations.modify_active_file(params)
 
-    @lru_cache(maxsize=128)
-    def calculate_reaction(self, reaction_params: tuple):
-        x_range, function_type, coeffs = reaction_params
-        x = np.linspace(x_range[0], x_range[1], 100)
-        result = None
-        if function_type == 'gauss':
-            result = cft.gaussian(x, *coeffs)
-        elif function_type == 'fraser':
-            result = cft.fraser_suzuki(x, *coeffs)
-        elif function_type == 'ads':
-            result = cft.asymmetric_double_sigmoid(x, *coeffs)
-        return result
+    @pyqtSlot(dict)
+    def modify_calculations_data_slot(self, params: dict):
+        response = self.calculations_data_operations.modify_calculations_data(params)
+        if response:
+            logger.info(f"response: {response}")
+            self._prepare_and_start_optimization(response)
+
+    def _prepare_and_start_optimization(self, response: dict):
+        try:
+            combined_keys = response['combined_keys']
+            bounds = response['bounds']
+            reaction_combinations = response['reaction_combinations']
+            experimental_data = response['experimental_data']
+
+            target_function = self.generate_target_function(combined_keys, reaction_combinations, experimental_data)
+
+            self.start_differential_evolution(bounds=bounds, target_function=target_function)
+        except Exception as e:
+            logger.error(f"Ошибка при подготовке и запуске оптимизации: {e}")
+
+    def generate_target_function(self, combined_keys: dict, reaction_combinations: list[tuple],
+                                 experimental_data: pd.DataFrame):
+
+        def target_function(params):
+            best_mse = float('inf')
+            best_combination = None
+            mse_dict = {}
+            for combination in reaction_combinations:
+                cumulative_function = np.zeros(len(experimental_data['temperature']))
+                param_idx = 0
+                for (reaction, coeffs), func in zip(combined_keys.items(), combination):
+                    coeff_count = len(coeffs)
+                    func_params = params[param_idx:param_idx + coeff_count]
+                    param_idx += coeff_count
+
+                    x = experimental_data['temperature']
+
+                    if len(func_params) < 3:
+                        raise ValueError("Not enough parameters for the function.")
+
+                    h, z, w = func_params[0:3]  # First coefficients are universal for all functions
+                    func_idx = 3
+                    if func == 'gauss':
+                        reaction_values = cft.gaussian(x, h, z, w)
+                        cumulative_function += reaction_values
+
+                    if func == 'fraser':
+                        fs = func_params[func_idx]
+                        reaction_values = cft.fraser_suzuki(x, h, z, w, fs)
+                        cumulative_function += reaction_values
+
+                    if func == 'ads':
+                        ads1 = func_params[func_idx] if 'fs' not in coeffs else func_params[func_idx + 1]
+                        ads2 = func_params[func_idx + 1] if 'fs' not in coeffs else func_params[func_idx + 2]
+                        reaction_values = cft.asymmetric_double_sigmoid(x, h, z, w, ads1, ads2)
+                        cumulative_function += reaction_values
+
+                y_true = experimental_data.iloc[:, 1].to_numpy()
+                mse = np.mean((y_true - cumulative_function) ** 2)
+                mse_dict[combination] = mse
+                if mse < best_mse:
+                    best_mse = mse
+                    best_combination = combination
+            self.new_best_result.emit({'best_mse': best_mse, 'best_combination': best_combination})
+            return best_mse
+        return target_function
+
+    @add_default_kwargs
+    def start_differential_evolution(self, bounds, *args, **kwargs):
+        if 'target_function' not in kwargs:
+            raise ValueError("Необходимо передать 'target_function' в аргументах kwargs")
+
+        target_function = kwargs.pop('target_function')
+        callback = kwargs.pop('callback', None)
+
+        logger.debug(f"Starting differential evolution with bounds: {bounds} and kwargs: {kwargs}")
+
+        self.start_calculation_thread(
+            differential_evolution,
+            target_function,
+            bounds=bounds,
+            callback=callback,
+            **kwargs
+        )
+
+    def _save_intermediate_result(self, xk, convergence):
+        self.differential_evolution_results.append((xk, convergence))
+        logger.info(f"Промежуточный результат: xk = {xk}, convergence = {convergence}")
+
+    @pyqtSlot(dict)
+    def handle_new_best_result(self, result: dict):
+        best_mse = result['best_mse']
+        best_combination = result['best_combination']
+        if best_mse < self.best_mse:
+            self.best_mse = best_mse
+            self.best_combination = best_combination
+            console.log(f"Новый лучший результат:\n"
+                        f"Лучшее MSE: {best_mse}\n"
+                        f"Комбинация реакций: {best_combination}\n\n")
+
+    @pyqtSlot(bool)
+    def calc_data_operations_in_progress(self, in_progress: bool):
+        self.calculations_data_operations.calculations_in_progress = in_progress
+
+
+class ActiveFileOperations:
+    def __init__(self, calculations: Calculations, file_data: FileData):
+        self.calculations = calculations
+        self.file_data = file_data
+
+    @pyqtSlot(dict)
+    def modify_active_file(self, params: dict):
+        logger.debug(f"В modify_active_file пришли данные {params}")
+        operation = params.get("operation")
+        file_name = params.get("file_name")
+        if operation == "differential":
+            self._apply_differential_operation(file_name, params)
+        elif operation == "cancel_changes":
+            self.file_data.reset_dataframe_copy(file_name)
 
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
 
-    @pyqtSlot(dict)
-    def modify_active_file_slot(self, params: dict):
-        logger.debug(f'В modify_active_file_slot пришли данные {params}')
-        operation = params.get('operation')
-        file_name = params.get('file_name')
-        if operation == "differential":
-            if not self.file_data.check_operation_executed(file_name, operation):
-                self.file_data.modify_data(self.diff_function, params)
-            else:
-                console.log('Данные уже приведены к da/dT')
-        elif operation == "cancel_changes":
-            self.file_data.reset_dataframe_copy(file_name)
+    def _apply_differential_operation(self, file_name, params):
+        if not self.file_data.check_operation_executed(file_name, "differential"):
+            self.file_data.modify_data(self.diff_function, params)
+        else:
+            console.log("Данные уже приведены к da/dT")
+
+
+class CalculationsDataOperations:
+    def __init__(self, calculations: Calculations, file_data: FileData, calculations_data: CalculationsData):
+        self.calculations = calculations
+        self.file_data = file_data
+        self.calculations_data = calculations_data
+        self.last_plot_time = 0
+        self.calculations_in_progress = False
 
     @pyqtSlot(dict)
-    def modify_calculations_data_slot(self, params: dict):
-        logger.debug(f'В modify_calculations_data_slot пришли данные {params}')
-        path_keys = params.get('path_keys')
-        operation = params.get('operation')
+    def modify_calculations_data(self, params: dict):
+        logger.debug(f"В modify_calculations_data пришли данные {params}")
+        path_keys = params.get("path_keys")
+        operation = params.get("operation")
 
         if not path_keys or not isinstance(path_keys, list):
             logger.error("Некорректный или пустой список path_keys")
             return
 
         operations = {
-            'add_reaction': self.process_add_reaction,
-            'highlight_reaction': self.process_highlight_reaction
+            "add_reaction": self.add_reaction,
+            "remove_reaction": self.remove_reaction,
+            "highlight_reaction": self.highlight_reaction,
+            "update_value": self.update_value,
+            "deconvolution": self.deconvolution
         }
 
         if operation in operations:
-            operations[operation](path_keys, params)
+            response = operations[operation](path_keys, params)
+            if response:
+                if operation == "update_value":
+                    self.protected_plot_update_curves(path_keys, params)
+                if operation == "deconvolution":
+                    return response["data"]
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
-    def process_add_reaction(self, path_keys: list, _params: dict):
-        file_name = path_keys[0]
-        if not self.file_data.check_operation_executed(file_name, 'differential'):
-            console.log('Данные нужно привести к da/dT')
-            return  # Добавить delete_last_reaction
-        data = self.generate_default_gaussian_data(file_name)
+    def protected_plot_update_curves(self, path_keys, params):
+        if self.calculations_in_progress:
+            return
+        current_time = time.time()
+        if current_time - self.last_plot_time >= 0.5:
+            self.last_plot_time = current_time
+            self.highlight_reaction(path_keys, params)
+
+    def extract_reaction_params(self, path_keys: list):
+        reaction_params = self.calculations_data.get_value(path_keys)
+        return cft.parse_reaction_params(reaction_params)
+
+    def plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
+        x_min, x_max = params[0]
+        x = np.linspace(x_min, x_max, 100)
+        y = cft.calculate_reaction(params)
+        curve_name = f"{reaction_name}_{bound_label}"
+        self.calculations.plot_reaction.emit((file_name, curve_name), [x, y])
+
+    def add_reaction(self, path_keys: list, _params: dict):
+        file_name, reaction_name = path_keys
+        if not self.file_data.check_operation_executed(file_name, "differential"):
+            console.log("Данные нужно привести к da/dT")
+            self.calculations.add_reaction_fail.emit()
+            return
+
+        df = self.file_data.dataframe_copies[file_name]
+        data = cft.generate_default_function_data(df)
         self.calculations_data.set_value(path_keys.copy(), data)
         reaction_params = self.extract_reaction_params(path_keys)
-        reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
-        for label, y in reaction_results.items():
-            x_range = reaction_params[label][0]
-            x = np.linspace(x_range[0], x_range[1], 100)
-            self.plot_reaction_signal.emit(label, [x, y])
 
-    def process_highlight_reaction(self, path_keys: list, _params: dict):
+        for bound_label, params in reaction_params.items():
+            self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
+
+    def remove_reaction(self, path_keys: list, _params: dict):
+        if len(path_keys) < 2:
+            logger.error("Недостаточно информации в path_keys для удаления реакции")
+            return
+        file_name, reaction_name = path_keys
+        if self.calculations_data.exists(path_keys):
+            self.calculations_data.remove_value(path_keys)
+            logger.debug(f"Удалена реакция {reaction_name} для файла {file_name}")
+            console.log(f"Реакция {reaction_name} была успешно удалена")
+        else:
+            logger.warning(f"Реакция {reaction_name} не найдена в данных")
+            console.log(f"Не удалось найти реакцию {reaction_name} для удаления")
+
+    def highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
         self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
         data = self.calculations_data.get_value([file_name])
         reactions = data.keys()
-        for reaction in reactions:
-            reaction_params = self.extract_reaction_params([file_name, reaction])
-            if reaction in path_keys:
-                reaction_results = {key: self.calculate_reaction(params) for key, params in reaction_params.items()}
-                for label, y in reaction_results.items():
-                    x_range = reaction_params[label][0]
-                    x = np.linspace(x_range[0], x_range[1], 100)
-                    self.plot_reaction_signal.emit(label, [x, y])
+
+        cumulative_y = {
+            "upper_bound_coeffs": np.array([]),
+            "lower_bound_coeffs": np.array([]),
+            "coeffs": np.array([]),
+        }
+        x = None
+
+        for reaction_name in reactions:
+            reaction_params = self.extract_reaction_params([file_name, reaction_name])
+            for bound_label, params in reaction_params.items():
+                if bound_label in cumulative_y:
+                    y = cft.calculate_reaction(reaction_params.get(bound_label, []))
+                    if x is None:
+                        x_min, x_max = params[0]
+                        x = np.linspace(x_min, x_max, 100)
+                    cumulative_y[bound_label] = cumulative_y[bound_label] + y if cumulative_y[bound_label].size else y
+
+            if reaction_name in path_keys:
+                self.calculations.reaction_params_to_gui.emit(reaction_params)
+                self.plot_reaction_curve(
+                    file_name, reaction_name, "upper_bound_coeffs", reaction_params.get("upper_bound_coeffs", []))
+                self.plot_reaction_curve(
+                    file_name, reaction_name, "lower_bound_coeffs", reaction_params.get("lower_bound_coeffs", []))
             else:
-                value_x_range = reaction_params['value'][0]
-                value_x = np.linspace(value_x_range[0], value_x_range[1], 100)
-                value_y = self.calculate_reaction(reaction_params['value'])
-                self.plot_reaction_signal.emit('value', [value_x, value_y])
+                self.plot_reaction_curve(file_name, reaction_name, "coeffs", reaction_params.get("coeffs", []))
+
+        for bound_label, y in cumulative_y.items():
+            self.calculations.plot_reaction.emit((file_name, f'cumulative_{bound_label}'), [x, y])
+
+    def _update_coeffs_value(self, path_keys: list[str], new_value):
+        bound_keys = ['upper_bound_coeffs', 'lower_bound_coeffs']
+        for key in bound_keys:
+            if key in path_keys:
+                opposite_key = bound_keys[1 - bound_keys.index(key)]
+                new_keys = path_keys.copy()
+                new_keys[new_keys.index(key)] = opposite_key
+                opposite_value = self.calculations_data.get_value(new_keys)
+
+                average_value = (new_value + opposite_value) / 2
+                new_keys[new_keys.index(opposite_key)] = 'coeffs'
+                self.calculations_data.set_value(new_keys, average_value)
+                logger.info(f"Данные по пути: {new_keys}\n изменены на: {average_value}")
+
+    def update_value(self, path_keys: list[str], params: dict):
+        try:
+            new_value = params.get('value')
+            if self.calculations_data.exists(path_keys):
+                self.calculations_data.set_value(path_keys.copy(), new_value)
+                logger.info(f"Данные по пути: {path_keys}\n изменены на: {new_value}")
+
+                self._update_coeffs_value(path_keys.copy(), new_value)
+                return {"operation": "update_value", "data": None}
+            else:
+                logger.error(f"Все данные: {self.calculations_data._data}")
+                logger.error(f"Данных по пути: {path_keys} не найдено.")
+        except ValueError as e:
+            logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
+
+    def deconvolution(self, path_keys: list[str], params: dict):
+        combined_keys = {}
+        num_coefficients = {}
+        bounds = []
+        check_keys = ['h', 'z', 'w', 'fr', 'ads1', 'ads2']
+        file_name = path_keys[0]
+        chosen_functions = params.get('chosen_functions')
+        if not chosen_functions:
+            raise ValueError("chosen_functions is None or empty")
+
+        functions_data = self.calculations_data.get_value([file_name])
+        if not functions_data:
+            raise ValueError(f"No functions data found for file: {file_name}")
+
+        reaction_combinations = list(product(*chosen_functions.values()))
+
+        for reaction_name in chosen_functions:
+            combined_keys_set = set()
+            reaction_params = functions_data[reaction_name]
+            if not reaction_params:
+                raise ValueError(f"No reaction params found for reaction: {reaction_name}")
+            for reaction_type in chosen_functions[reaction_name]:
+                allowed_keys = cft._get_allowed_keys_for_type(reaction_type)
+                combined_keys_set.update(allowed_keys)
+            combined_keys[reaction_name] = combined_keys_set
+            lower_coeffs_tuple = reaction_params["lower_bound_coeffs"].values()
+            upper_coeffs_tuple = reaction_params["upper_bound_coeffs"].values()
+            filtered_pairs = [
+                (lc, uc) for lc, uc, key in zip(lower_coeffs_tuple, upper_coeffs_tuple, check_keys)
+                if key in combined_keys_set]
+            bounds.extend(filtered_pairs)
+            num_coefficients[reaction_name] = len(combined_keys_set)
+
+        return {
+            'operation': 'deconvolution',
+            'data': {
+                'combined_keys': combined_keys,
+                'bounds': bounds,
+                'reaction_combinations': reaction_combinations,
+                'experimental_data': self.calculations.file_data.dataframe_copies[file_name],
+            }
+        }

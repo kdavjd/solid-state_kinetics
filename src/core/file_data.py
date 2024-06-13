@@ -1,11 +1,13 @@
 import os
 from functools import wraps
+from io import StringIO
 
 import chardet
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
 from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
 
 
 def detect_encoding(func):
@@ -46,6 +48,7 @@ class FileData(QObject):
         self.skip_rows = 0
         self.columns_names = None
         self.operations_history = {}
+        self.loaded_files = set()
 
     def log_operation(self, params: dict):
         file_name = params.pop('file_name')
@@ -64,6 +67,11 @@ class FileData(QObject):
     @pyqtSlot(tuple)
     def load_file(self, file_info):
         self.file_path, self.delimiter, self.skip_rows, columns_names = file_info
+
+        if self.file_path in self.loaded_files:
+            console.log(f"Файл: {self.file_path} уже загружен.")
+            return
+
         if columns_names:
             column_delimiter = ',' if ',' in columns_names else ' '
             self.columns_names = [name.strip() for name in columns_names.split(column_delimiter)]
@@ -79,6 +87,8 @@ class FileData(QObject):
         elif file_extension == '.txt':
             self.load_txt()
 
+        self.loaded_files.add(self.file_path)
+
     @detect_encoding
     @detect_decimal
     def load_csv(self, **kwargs):
@@ -86,7 +96,7 @@ class FileData(QObject):
             self.data = pd.read_csv(
                 self.file_path, sep=self.delimiter, engine='python',
                 on_bad_lines='skip', skiprows=self.skip_rows, header=0, **kwargs)
-            self.fetch_data()
+            self._fetch_data()
         except Exception as e:
             logger.error("Ошибка при загрузке CSV файла: %s", e)
 
@@ -96,11 +106,11 @@ class FileData(QObject):
         try:
             self.data = pd.read_table(
                 self.file_path, sep=self.delimiter, skiprows=self.skip_rows, header=0, **kwargs)
-            self.fetch_data()
+            self._fetch_data()
         except Exception as e:
             logger.error("Ошибка при загрузке TXT файла: %s", e)
 
-    def fetch_data(self):
+    def _fetch_data(self):
         file_basename = os.path.basename(self.file_path)
 
         if self.columns_names is not None:
@@ -114,7 +124,10 @@ class FileData(QObject):
 
         self.original_data[file_basename] = self.data.copy()
         self.dataframe_copies[file_basename] = self.data.copy()
-        logger.debug("Добавлен новый файл, размером: %s", self.dataframe_copies[file_basename].shape)
+        buffer = StringIO()
+        self.dataframe_copies[file_basename].info(buf=buffer)
+        file_info = buffer.getvalue()
+        console.log(f'Загружен файл:\n {file_info}')
         logger.debug(f"Ключи dataframe_copies: {self.dataframe_copies.keys()}")
         self.data_loaded_signal.emit(self.data)
 

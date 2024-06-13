@@ -1,10 +1,10 @@
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
 from core.logger_config import logger
 
 from ..console_widget import ConsoleWidget
-from .plot_canvas import PlotCanvas
+from .PlotCanvas.plot_canvas import PlotCanvas
 from .sidebar import SideBar
 from .sub_sidebar.sub_side_hub import SubSideHub
 
@@ -21,6 +21,7 @@ COMPONENTS_MIN_WIDTH = (
 class MainTab(QWidget):
     active_file_modify_signal = pyqtSignal(dict)
     calculations_data_modify_signal = pyqtSignal(dict)
+    processing_signal = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,7 +57,16 @@ class MainTab(QWidget):
             self.refer_to_active_file)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(
             self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_removed.connect(
+            self.refer_to_calculations_data)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(
+            self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.update_value.connect(
+            self.refer_to_calculations_data)
+        self.sidebar.active_file_selected.connect(
+            self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file)
+        self.plot_canvas.update_value.connect(self.update_anchors_slot)
+        self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(
             self.refer_to_calculations_data)
 
     def initialize_sizes(self):
@@ -101,3 +111,12 @@ class MainTab(QWidget):
         params['file_name'] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
         logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
         self.active_file_modify_signal.emit(params)
+
+    @pyqtSlot(list)
+    def update_anchors_slot(self, params_list: list):
+        self.processing_signal.emit(True)
+        for i, params in enumerate(params_list):
+            params["path_keys"].insert(0, self.sub_sidebar.deconvolution_sub_bar.reactions_table.active_reaction)
+            if i == len(params_list) - 1:
+                self.processing_signal.emit(False)
+            self.refer_to_calculations_data(params)
