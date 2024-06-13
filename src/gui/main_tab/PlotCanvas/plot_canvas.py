@@ -22,6 +22,7 @@ plt.style.use(['science', 'no-latex', 'nature', 'grid'])
 
 class PlotCanvas(QWidget):
     update_value = pyqtSignal(list)
+    update_value = pyqtSignal(list)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -182,6 +183,16 @@ class PlotCanvas(QWidget):
                          else self.height_anchor_group).get_bound_positions()
             axis = 'z' if self.dragging_anchor_group == 'position' else 'h'
 
+            updates = [
+                {"path_keys": ["upper_bound_coeffs", axis],
+                 "operation": "update_value",
+                 "value": positions['upper_bound'][0 if axis == 'z' else 1]
+                 },
+                {"path_keys": ["lower_bound_coeffs", axis],
+                 "operation": "update_value",
+                 "value": positions['lower_bound'][0 if axis == 'z' else 1]
+                 }]
+            self.update_value.emit(updates)
             updates = [
                 {"path_keys": ["upper_bound_coeffs", axis],
                  "operation": "update_value",
