@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
 from core.logger_config import logger
@@ -21,6 +21,7 @@ COMPONENTS_MIN_WIDTH = (
 class MainTab(QWidget):
     active_file_modify_signal = pyqtSignal(dict)
     calculations_data_modify_signal = pyqtSignal(dict)
+    processing_signal = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -111,6 +112,11 @@ class MainTab(QWidget):
         logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
         self.active_file_modify_signal.emit(params)
 
-    def update_anchors_slot(self, params: dict):
-        params["path_keys"].insert(0, self.sub_sidebar.deconvolution_sub_bar.reactions_table.active_reaction)
-        self.refer_to_calculations_data(params)
+    @pyqtSlot(list)
+    def update_anchors_slot(self, params_list: list):
+        self.processing_signal.emit(True)
+        for i, params in enumerate(params_list):
+            params["path_keys"].insert(0, self.sub_sidebar.deconvolution_sub_bar.reactions_table.active_reaction)
+            if i == len(params_list) - 1:
+                self.processing_signal.emit(False)
+            self.refer_to_calculations_data(params)

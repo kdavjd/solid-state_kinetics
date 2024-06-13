@@ -1,3 +1,4 @@
+import time
 from functools import wraps
 from itertools import product
 from typing import Callable
@@ -193,6 +194,10 @@ class Calculations(QObject):
                         f"Лучшее MSE: {best_mse}\n"
                         f"Комбинация реакций: {best_combination}\n\n")
 
+    @pyqtSlot(bool)
+    def calc_data_operations_in_progress(self, in_progress: bool):
+        self.calculations_data_operations.calculations_in_progress = in_progress
+
 
 class ActiveFileOperations:
     def __init__(self, calculations: Calculations, file_data: FileData):
@@ -224,6 +229,8 @@ class CalculationsDataOperations:
         self.calculations = calculations
         self.file_data = file_data
         self.calculations_data = calculations_data
+        self.last_plot_time = 0
+        self.calculations_in_progress = False
 
     @pyqtSlot(dict)
     def modify_calculations_data(self, params: dict):
@@ -246,9 +253,20 @@ class CalculationsDataOperations:
         if operation in operations:
             response = operations[operation](path_keys, params)
             if response:
-                return response["data"]
+                if operation == "update_value":
+                    self.protected_plot_update_curves(path_keys, params)
+                if operation == "deconvolution":
+                    return response["data"]
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
+
+    def protected_plot_update_curves(self, path_keys, params):
+        if self.calculations_in_progress:
+            return
+        current_time = time.time()
+        if current_time - self.last_plot_time >= 0.5:
+            self.last_plot_time = current_time
+            self.highlight_reaction(path_keys, params)
 
     def extract_reaction_params(self, path_keys: list):
         reaction_params = self.calculations_data.get_value(path_keys)
