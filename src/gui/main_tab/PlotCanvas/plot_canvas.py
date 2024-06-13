@@ -21,7 +21,7 @@ plt.style.use(['science', 'no-latex', 'nature', 'grid'])
 
 
 class PlotCanvas(QWidget):
-    update_value = pyqtSignal(dict)
+    update_value = pyqtSignal(list)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -160,13 +160,6 @@ class PlotCanvas(QWidget):
             else:
                 anchor_group.set_bound_position(self.dragging_anchor, event.ydata)
 
-    def emit_anchor_update(self, path_keys, value):
-        self.update_value.emit({
-            "path_keys": path_keys,
-            "operation": "update_value",
-            "value": value
-        })
-
     def on_click(self, event):
         logger.debug(f"Событие нажатия мыши: {event}")
         if event.inaxes != self.axes:
@@ -189,8 +182,16 @@ class PlotCanvas(QWidget):
                          else self.height_anchor_group).get_bound_positions()
             axis = 'z' if self.dragging_anchor_group == 'position' else 'h'
 
-            self.emit_anchor_update(["upper_bound_coeffs", axis], positions['upper_bound'][0 if axis == 'z' else 1])
-            self.emit_anchor_update(["lower_bound_coeffs", axis], positions['lower_bound'][0 if axis == 'z' else 1])
+            updates = [
+                {"path_keys": ["upper_bound_coeffs", axis],
+                 "operation": "update_value",
+                 "value": positions['upper_bound'][0 if axis == 'z' else 1]
+                 },
+                {"path_keys": ["lower_bound_coeffs", axis],
+                 "operation": "update_value",
+                 "value": positions['lower_bound'][0 if axis == 'z' else 1]
+                 }]
+            self.update_value.emit(updates)
 
         self.dragging_anchor = None
         self.dragging_anchor_group = None
