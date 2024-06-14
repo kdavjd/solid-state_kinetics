@@ -69,8 +69,7 @@ jobs:
 
 
  #RELEASE       
-      - name: Release Linux
-        if: ${{ matrix.os }} == 'ubuntu-latest'
+      - name: Release
         uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ github.ref_name }}
@@ -78,14 +77,6 @@ jobs:
           files: |
             dist/main.exe
             dist/main
-            
-      # - name: Release Windows
-      #   if: ${{ matrix.os }} == 'windows-latest'
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     name: Release ${{ github.ref_name }}
-      #     tag_name: ${{ github.ref_name }}
-      #     files: dist/main.exe
         
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
