@@ -12,3 +12,9 @@ poetry env use python3.12 # В случае ошибки указать полн
 poetry install
 poetry run pre-commit install
 ```
+## The entry point to the project.
+src.gui.__main__
+or
+```bash
+poetry run ssk-gui
+```
