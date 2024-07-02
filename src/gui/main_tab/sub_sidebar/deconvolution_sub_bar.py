@@ -54,7 +54,7 @@ class FileTransferButtons(QWidget):
                 except IOError as e:
                     QMessageBox.warning(self, "Ошибка", f"Ошибка сохранения таблицы: {e}")
             else:
-                QMessageBox.warning(self, "Ошибка", "Активная таблица реакций не найдена.")
+                QMessageBox.warning(self, "Ошибка", "Активная таблица не найдена.")
 
     def load_data(self):
         try:
