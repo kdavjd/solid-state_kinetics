@@ -1,18 +1,22 @@
+import json
 from collections import defaultdict
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QHBoxLayout, QHeaderView,
-                             QMessageBox, QPushButton, QTableWidget,
-                             QTableWidgetItem, QVBoxLayout, QWidget)
+                             QFileDialog, QFormLayout, QHBoxLayout,
+                             QHeaderView, QMessageBox, QPushButton,
+                             QTableWidget, QTableWidgetItem, QVBoxLayout,
+                             QWidget)
 
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
 
 
 class FileTransferButtons(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, reaction_table, parent=None):
         super().__init__(parent)
+        self.reaction_table = reaction_table
+
         self.layout = QVBoxLayout(self)
 
         self.load_reactions_button = QPushButton("Импорт")
@@ -21,6 +25,71 @@ class FileTransferButtons(QWidget):
         self.buttons_layout.addWidget(self.load_reactions_button)
         self.buttons_layout.addWidget(self.export_reactions_button)
         self.layout.addLayout(self.buttons_layout)
+
+        self.load_reactions_button.clicked.connect(self.load_data)
+        self.export_reactions_button.clicked.connect(self.save_data)
+
+    def save_data(self):
+        file_name, _ = QFileDialog.getSaveFileName(
+            self,
+            "Сохранить таблицу",
+            "",
+            "JSON Files (*.json);;All Files (*)"
+        )
+        if file_name:
+            active_table = self.reaction_table.get_active_table()
+            if active_table:
+                data = {}
+                for row in range(active_table.rowCount()):
+                    item = active_table.item(row, 0)
+                    combo = active_table.cellWidget(row, 1)
+                    if item and combo:
+                        reaction_name = item.text()
+                        function_type = combo.currentText()
+                        data[reaction_name] = function_type
+
+                try:
+                    with open(file_name, 'w') as file:
+                        json.dump(data, file, indent=4)
+                except IOError as e:
+                    QMessageBox.warning(self, "Ошибка", f"Ошибка сохранения таблицы: {e}")
+            else:
+                QMessageBox.warning(self, "Ошибка", "Таблица не найдена.")
+
+    def load_data(self):
+        try:
+            file_name, _ = QFileDialog.getOpenFileName(
+                self,
+                "Загрузить таблицу",
+                "",
+                "JSON Files (*.json);;All Files (*)"
+            )
+            if file_name:
+                active_table = self.reaction_table.get_active_table()
+                if active_table:
+                    try:
+                        with open(file_name, 'r') as file:
+                            data = json.load(file)
+                        active_table.setRowCount(0)
+                        for reaction_name, function_type in data.items():
+                            row_count = active_table.rowCount()
+                            active_table.insertRow(row_count)
+                            active_table.setItem(row_count, 0, QTableWidgetItem(reaction_name))
+
+                            combo = QComboBox()
+                            combo.addItems(["gauss", "fraser", "ads"])
+                            combo.setCurrentText(function_type)
+                            combo.currentIndexChanged.connect(
+                                lambda index, r=reaction_name: self.reaction_table.function_changed(r, combo)
+                            )
+                            active_table.setCellWidget(row_count, 1, combo)
+
+                    except IOError as e:
+                        QMessageBox.warning(self, "Ошибка", f"Ошибка загрузки таблицы: {e}")
+                else:
+                    QMessageBox.warning(self, "Ошибка", "Таблица с функциями не найдена.")
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Ошибка при загрузке файла: {e}")
 
 
 class ReactionTable(QWidget):
@@ -181,6 +250,11 @@ class ReactionTable(QWidget):
                 QMessageBox.information(self, "Фуннкции на расчет", f"Настройки обновлены для:\n{message}")
         else:
             QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
+
+    def get_active_table(self):
+        if self.active_file and self.active_file in self.reactions_tables:
+            return self.reactions_tables[self.active_file]
+        return None
 
 
 class CalculationSettingsDialog(QDialog):
@@ -364,7 +438,7 @@ class DeconvolutionSubBar(QWidget):
 
         self.reactions_table = ReactionTable(self)
         self.coeffs_table = CoeffsTable(self)
-        self.file_transfer_buttons = FileTransferButtons(self)
+        self.file_transfer_buttons = FileTransferButtons(self.reactions_table)
         self.calc_buttons = CalcButtons(self)
 
         layout.addWidget(self.reactions_table)
