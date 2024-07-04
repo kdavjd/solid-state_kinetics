@@ -1,0 +1,78 @@
+# pyproject.toml
+# url: https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+# url: https://python-poetry.org/docs/pyproject/
+
+[tool.poetry]
+name = "solid-state-kinetics"
+version = "0.1.0"
+description = "calculating kinetic models of chemical solid-state reactions"
+authors = ["kdavjd <105581554+kdavjd@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "*", from = "src" }]
+
+[tool.poetry.scripts]
+ssk-gui = "gui.__main__:main"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+pyqt6 = "^6.6.1"
+matplotlib = "^3.8.3"
+pandas = "^2.2.1"
+numpy = "^1.26.4"
+scienceplots = "^2.1.1"
+chardet = "^5.2.0"
+scipy = "^1.13.1"
+pyinstaller = "^6.7.0"
+
+[tool.poetry.dev-dependencies]
+pre-commit = "^3.6.2"
+pytest = "^8.0.2"
+flake8 = "^7.0.0"
+pylint = "^3.1.0"
+Flake8-pyproject = "^1.2.3"
+mypy = "^1.8.0"
+isort = "^5.13.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# https://mypy.readthedocs.io/en/stable/config_file.html#example-pyproject-toml
+[tool.mypy]
+python_version = "3.12"
+cache_dir = "/tmp/pytest-cache"
+
+# https://docs.pytest.org/en/latest/reference/customize.html
+[tool.pytest.ini_options]
+cache_dir = "/tmp/pytest-cache"
+addopts = "--verbose --exitfirst"
+testpaths = "tests/"
+
+log_cli = 1
+log_cli_level = "DEBUG"
+log_cli_format = "[%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+
+# Config support profided by flake8-pyproject
+# https://pypi.org/project/Flake8-pyproject/
+[tool.flake8]
+max-line-length = 120
+exclude = [".git", "__pycache__"]
+
+# https://pylint.pycqa.org/en/latest/user_guide/configuration/index.html
+# Example configuration: `pylint --generate-toml-config`
+[tool.pylint.main]
+# Return non-zero exit code if any of these messages/categories are detected,
+# even if score is above --fail-under value. Syntax same as enable. Messages
+# specified are enabled, while categories only check already-enabled messages.
+fail-on = ["E"]
+
+# Specify a score threshold under which the program will exit with error.
+fail-under = 9
+
+extension-pkg-whitelist = ["PyQt6"]
+
+[tool.pylint.messages_control]
+max-line-length = 120
+
+disable = "C0114,C0115,C0116,C0103,W1203"

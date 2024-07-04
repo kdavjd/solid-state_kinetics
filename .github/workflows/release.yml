@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+    paths-ignore:
+       - '**.md'
+  release:
+    types: created
+       
+permissions: write-all
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: linux
+          - os: windows-latest
+            artifact_name: windows
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+  
+      - name: Installing Poetry via pip
+        run: |
+          python -m pip install --user pipx
+          pipx install poetry
+          poetry install
+            
+      #- name: Build Linux
+        #if: ${{ matrix.os }} == 'ubuntu-latest'
+        #run: |
+          #poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+        
+      - name: Build #Win
+        #if: ${{ matrix.os }} == 'windows-latest'
+        run: |
+          poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
+
+
+# UPLOADING ARTIFACTS
+
+      # - name: Upload artifacts linux
+      #   if: ${{ matrix.os }} == 'ubuntu-latest'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: linux
+      #     path: dist/main
+
+      # - name: Upload artifacts windows
+      #   if: ${{ matrix.os }} == 'windows-latest'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: windows
+      #     path: dist/main.exe
+
+
+ #RELEASE       
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/main.exe
+            dist/main
+        
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      
