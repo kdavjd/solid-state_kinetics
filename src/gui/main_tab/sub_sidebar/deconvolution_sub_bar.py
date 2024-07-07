@@ -10,9 +10,13 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
 
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
+from src.core.calculations_data import CalculationsData
 
 
 class FileTransferButtons(QWidget):
+    file_saved = pyqtSignal(dict, str)
+    file_loaded = pyqtSignal(dict)
+
     def __init__(self, reaction_table, parent=None):
         super().__init__(parent)
         self.reaction_table = reaction_table
@@ -49,8 +53,7 @@ class FileTransferButtons(QWidget):
                         data[reaction_name] = function_type
 
                 try:
-                    with open(file_name, 'w') as file:
-                        json.dump(data, file, indent=4)
+                    self.file_saved.emit(data, file_name)
                 except IOError as e:
                     QMessageBox.warning(self, "Ошибка", f"Ошибка сохранения таблицы: {e}")
             else:
@@ -68,7 +71,7 @@ class FileTransferButtons(QWidget):
                 active_table = self.reaction_table.get_active_table()
                 if active_table:
                     try:
-                        with open(file_name, 'r') as file:
+                        with open(file_name, 'r', encoding='utf-8') as file:
                             data = json.load(file)
                         active_table.setRowCount(0)
                         for reaction_name, function_type in data.items():
@@ -83,7 +86,7 @@ class FileTransferButtons(QWidget):
                                 lambda index, r=reaction_name: self.reaction_table.function_changed(r, combo)
                             )
                             active_table.setCellWidget(row_count, 1, combo)
-
+                        self.file_loaded.emit(data)
                     except IOError as e:
                         QMessageBox.warning(self, "Ошибка", f"Ошибка загрузки таблицы: {e}")
                 else:
@@ -437,6 +440,7 @@ class DeconvolutionSubBar(QWidget):
         layout = QVBoxLayout(self)
 
         self.reactions_table = ReactionTable(self)
+        self.calculations_data = CalculationsData()
         self.coeffs_table = CoeffsTable(self)
         self.file_transfer_buttons = FileTransferButtons(self.reactions_table)
         self.calc_buttons = CalcButtons(self)
@@ -446,6 +450,8 @@ class DeconvolutionSubBar(QWidget):
         layout.addWidget(self.file_transfer_buttons)
         layout.addWidget(self.calc_buttons)
 
+        self.file_transfer_buttons.file_saved.connect(self.calculations_data.save_data)
+        self.file_transfer_buttons.file_loaded.connect(self.calculations_data.load_data)
         self.coeffs_table.update_value.connect(self.handle_update_value)
         self.reactions_table.reaction_function_changed.connect(self.handle_update_function_value)
 

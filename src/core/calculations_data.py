@@ -13,20 +13,22 @@ class CalculationsData(QObject):
         super().__init__(parent)
         self._filename = filename
         self._data = {}
+
+    def load_data(self, data):
+        self._data = data
+        print(f"Загруженные данные: {self._data}")
+        return self._data
+
+    def save_data(self, export_data, filename=None):
+        self._data = export_data
+        print(f"Сохранённые данные: {self._data}")
+
         if filename:
-            self.load_data()
+            self._filename = filename
 
-    def load_data(self):
         try:
-            with open(self._filename, 'r') as file:
-                self.data = json.load(file)
-        except IOError as e:
-            print(f"Ошибка загрузки данных: {e}")
-
-    def save_data(self):
-        try:
-            with open(self._filename, 'w') as file:
-                json.dump(self.data, file, indent=4)
+            with open(self._filename, 'w', encoding='utf-8') as file:
+                json.dump(self._data, file, indent=4)
         except IOError as e:
             print(f"Ошибка сохранения данных: {e}")
 
