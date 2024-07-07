@@ -71,7 +71,7 @@ class FileTransferButtons(QWidget):
                 active_table = self.reaction_table.get_active_table()
                 if active_table:
                     try:
-                        with open(file_name, 'r', encoding='utf-8') as file:
+                        with open(file_name, 'r') as file:
                             data = json.load(file)
                         active_table.setRowCount(0)
                         for reaction_name, function_type in data.items():

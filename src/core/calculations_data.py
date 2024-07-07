@@ -27,7 +27,7 @@ class CalculationsData(QObject):
             self._filename = filename
 
         try:
-            with open(self._filename, 'w', encoding='utf-8') as file:
+            with open(self._filename, 'w') as file:
                 json.dump(self._data, file, indent=4)
         except IOError as e:
             print(f"Ошибка сохранения данных: {e}")
