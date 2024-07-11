@@ -34,65 +34,21 @@ class FileTransferButtons(QWidget):
         self.export_reactions_button.clicked.connect(self.save_data)
 
     def save_data(self):
-        file_name, _ = QFileDialog.getSaveFileName(
-            self,
-            "Сохранить таблицу",
-            "",
-            "JSON Files (*.json);;All Files (*)"
-        )
-        if file_name:
-            active_table = self.reaction_table.get_active_table()
-            if active_table:
-                data = {}
-                for row in range(active_table.rowCount()):
-                    item = active_table.item(row, 0)
-                    combo = active_table.cellWidget(row, 1)
-                    if item and combo:
-                        reaction_name = item.text()
-                        function_type = combo.currentText()
-                        data[reaction_name] = function_type
-
-                try:
-                    self.file_saved.emit(data, file_name)
-                except IOError as e:
-                    QMessageBox.warning(self, "Ошибка", f"Ошибка сохранения таблицы: {e}")
-            else:
-                QMessageBox.warning(self, "Ошибка", "Таблица с функциями не найдена.")
+        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot save data 2.")
+        self.file_saved.emit(active_file_name)
 
     def load_data(self):
-        try:
-            file_name, _ = QFileDialog.getOpenFileName(
+        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot save data 2.")
+        file_name, _ = QFileDialog.getOpenFileName(
                 self,
                 "Загрузить таблицу",
                 "",
-                "JSON Files (*.json);;All Files (*)"
-            )
-            if file_name:
-                active_table = self.reaction_table.get_active_table()
-                if active_table:
-                    try:
-                        with open(file_name, 'r') as file:
-                            data = json.load(file)
-                        active_table.setRowCount(0)
-                        for reaction_name, function_type in data.items():
-                            row_count = active_table.rowCount()
-                            active_table.insertRow(row_count)
-                            active_table.setItem(row_count, 0, QTableWidgetItem(reaction_name))
+                "JSON Files (*.json);;All Files (*)")
 
-                            combo = QComboBox()
-                            combo.addItems(["gauss", "fraser", "ads"])
-                            combo.setCurrentText(function_type)
-                            combo.currentIndexChanged.connect(
-                                lambda index, r=reaction_name: self.reaction_table.function_changed(r, combo)
-                            )
-                            active_table.setCellWidget(row_count, 1, combo)
-                        self.file_loaded.emit(data)
-                    except IOError as e:
-                        QMessageBox.warning(self, "Ошибка", f"Ошибка загрузки таблицы: {e}")
-                else:
-                    QMessageBox.warning(self, "Ошибка", "Таблица с функциями не найдена.")
-        except Exception as e:
-            QMessageBox.warning(self, "Ошибка", f"Ошибка при загрузке файла: {e}")
+        if file_name:
+            print(file_name)
+            print(active_file_name)
+            self.file_loaded.emit(file_name, active_file_name)
 
 
 class ReactionTable(QWidget):
@@ -438,11 +394,12 @@ class DeconvolutionSubBar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        self.active_file = None
 
         self.reactions_table = ReactionTable(self)
         self.calculations_data = CalculationsData()
         self.coeffs_table = CoeffsTable(self)
-        self.file_transfer_buttons = FileTransferButtons(self.reactions_table)
+        self.file_transfer_buttons = FileTransferButtons(self)
         self.calc_buttons = CalcButtons(self)
 
         layout.addWidget(self.reactions_table)
