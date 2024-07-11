@@ -34,11 +34,11 @@ class FileTransferButtons(QWidget):
         self.export_reactions_button.clicked.connect(self.save_data)
 
     def save_data(self):
-        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot save data 2.")
+        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot save data.")
         self.file_saved.emit(active_file_name)
 
     def load_data(self):
-        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot save data 2.")
+        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot load data.")
         file_name, _ = QFileDialog.getOpenFileName(
                 self,
                 "Загрузить таблицу",
