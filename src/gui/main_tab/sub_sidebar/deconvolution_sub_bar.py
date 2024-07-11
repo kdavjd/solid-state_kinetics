@@ -1,18 +1,26 @@
+import json
 from collections import defaultdict
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                             QFormLayout, QHBoxLayout, QHeaderView,
-                             QMessageBox, QPushButton, QTableWidget,
-                             QTableWidgetItem, QVBoxLayout, QWidget)
+                             QFileDialog, QFormLayout, QHBoxLayout,
+                             QHeaderView, QMessageBox, QPushButton,
+                             QTableWidget, QTableWidgetItem, QVBoxLayout,
+                             QWidget)
 
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
+from src.core.calculations_data import CalculationsData
 
 
 class FileTransferButtons(QWidget):
-    def __init__(self, parent=None):
+    file_saved = pyqtSignal(dict, str)
+    file_loaded = pyqtSignal(dict)
+
+    def __init__(self, reaction_table, parent=None):
         super().__init__(parent)
+        self.reaction_table = reaction_table
+
         self.layout = QVBoxLayout(self)
 
         self.load_reactions_button = QPushButton("Импорт")
@@ -21,6 +29,26 @@ class FileTransferButtons(QWidget):
         self.buttons_layout.addWidget(self.load_reactions_button)
         self.buttons_layout.addWidget(self.export_reactions_button)
         self.layout.addLayout(self.buttons_layout)
+
+        self.load_reactions_button.clicked.connect(self.load_data)
+        self.export_reactions_button.clicked.connect(self.save_data)
+
+    def save_data(self):
+        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot save data.")
+        self.file_saved.emit(active_file_name)
+
+    def load_data(self):
+        active_file_name = self.parent().reactions_table.active_file if self.parent().reactions_table.active_file else logger.error("Active file is not set. Cannot load data.")
+        file_name, _ = QFileDialog.getOpenFileName(
+                self,
+                "Загрузить таблицу",
+                "",
+                "JSON Files (*.json);;All Files (*)")
+
+        if file_name:
+            print(file_name)
+            print(active_file_name)
+            self.file_loaded.emit(file_name, active_file_name)
 
 
 class ReactionTable(QWidget):
@@ -181,6 +209,11 @@ class ReactionTable(QWidget):
                 QMessageBox.information(self, "Фуннкции на расчет", f"Настройки обновлены для:\n{message}")
         else:
             QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
+
+    def get_active_table(self):
+        if self.active_file and self.active_file in self.reactions_tables:
+            return self.reactions_tables[self.active_file]
+        return None
 
 
 class CalculationSettingsDialog(QDialog):
@@ -361,8 +394,10 @@ class DeconvolutionSubBar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        self.active_file = None
 
         self.reactions_table = ReactionTable(self)
+        self.calculations_data = CalculationsData()
         self.coeffs_table = CoeffsTable(self)
         self.file_transfer_buttons = FileTransferButtons(self)
         self.calc_buttons = CalcButtons(self)
@@ -372,6 +407,8 @@ class DeconvolutionSubBar(QWidget):
         layout.addWidget(self.file_transfer_buttons)
         layout.addWidget(self.calc_buttons)
 
+        self.file_transfer_buttons.file_saved.connect(self.calculations_data.save_data)
+        self.file_transfer_buttons.file_loaded.connect(self.calculations_data.load_data)
         self.coeffs_table.update_value.connect(self.handle_update_value)
         self.reactions_table.reaction_function_changed.connect(self.handle_update_function_value)
 
