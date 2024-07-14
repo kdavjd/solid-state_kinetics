@@ -5,27 +5,16 @@
 default_language_version:
   python: python3.12
 repos:
-  - repo: local
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.5.1
     hooks:
-      - id: flake8
-        name: flake8
-        description: "`flake8` is a command-line utility for enforcing style consistency across Python projects."
-        entry: poetry run flake8
-        language: python
-        types: [python]
-        require_serial: true
-  - repo: local
-    hooks:
-      - id: pylint
-        name: pylint
-        entry: poetry run pylint
-        language: system
-        types: [python]
-        args: [
-            "--rcfile=pyproject.toml",
-            "-rn", # Only display messages
-            "-sn", # Don't display the score
-          ]
+      # Run the linter.
+      - id: ruff
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
+
   - repo: local
     hooks:
       - id: pytest
@@ -34,6 +23,7 @@ repos:
         language: system
         types: [python]
         args: []
+
   - repo: local
     hooks:
       - id: mypy
@@ -45,16 +35,4 @@ repos:
         args: ["--ignore-missing-imports", "--scripts-are-modules"]
         require_serial: true
         additional_dependencies: []
-        minimum_pre_commit_version: "2.9.2"
-
-  - repo: local
-    hooks:
-      - id: isort
-        name: isort
-        entry: poetry run isort
-        stages: [commit, merge-commit, push, manual]
-        require_serial: true
-        language: python
-        types_or: [cython, pyi, python]
-        args: ["--filter-files"]
         minimum_pre_commit_version: "2.9.2"
