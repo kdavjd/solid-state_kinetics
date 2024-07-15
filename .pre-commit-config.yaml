@@ -5,15 +5,19 @@
 default_language_version:
   python: python3.12
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.5.1
+  - repo: local
     hooks:
-      # Run the linter.
       - id: ruff
-        args: [ --fix ]
-      # Run the formatter.
+        name: ruff
+        entry: poetry run ruff check
+        language: python
+        types: [python]
+        args: [--fix]
       - id: ruff-format
+        name: ruff-format
+        entry: poetry run ruff format
+        language: python
+        types: [python]
 
   - repo: local
     hooks:
