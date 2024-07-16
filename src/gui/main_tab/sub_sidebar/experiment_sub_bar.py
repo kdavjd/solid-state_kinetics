@@ -1,6 +1,13 @@
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class SmoothingBlock(QWidget):
@@ -47,9 +54,18 @@ class BackgroundSubtractionBlock(QWidget):
         self.setLayout(QVBoxLayout())
 
         self.background_method = QComboBox()
-        self.background_method.addItems(["Линейная", "Сигмоидальная", "Тангенциальная",
-                                         "Левая Тангенциальная", "Левая Сигмоидальная",
-                                         "Правая Тангенциальная", "Правая Сигмоидальная", "Безье"])
+        self.background_method.addItems(
+            [
+                "Линейная",
+                "Сигмоидальная",
+                "Тангенциальная",
+                "Левая Тангенциальная",
+                "Левая Сигмоидальная",
+                "Правая Тангенциальная",
+                "Правая Сигмоидальная",
+                "Безье",
+            ]
+        )
         self.range_left = QLineEdit()
         self.range_right = QLineEdit()
         self.apply_button = QPushButton("Применить")
@@ -89,9 +105,11 @@ class ActionButtonsBlock(QWidget):
         self.derivative_button = QPushButton("Привести к da/dT")
 
         self.cancel_changes_button.clicked.connect(
-            lambda: self.cancel_changes_clicked.emit({'operation': "cancel_changes"}))
+            lambda: self.cancel_changes_clicked.emit({"operation": "cancel_changes"})
+        )
         self.derivative_button.clicked.connect(
-            lambda: self.derivative_clicked.emit({'operation': "differential"}))
+            lambda: self.derivative_clicked.emit({"operation": "differential"})
+        )
 
         self.layout().addWidget(self.derivative_button)
         self.layout().addWidget(self.cancel_changes_button)

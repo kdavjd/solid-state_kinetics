@@ -103,7 +103,9 @@ class SideBar(QWidget):
 
     def add_experiment_file(self, file_info):
         new_file_item = QStandardItem(path.basename(file_info[0]))
-        self.experiments_data_root.insertRow(self.experiments_data_root.rowCount() - 1, new_file_item)
+        self.experiments_data_root.insertRow(
+            self.experiments_data_root.rowCount() - 1, new_file_item
+        )
         self.tree_view.expandAll()
         self.mark_as_active(new_file_item)
         self.sub_side_bar_needed.emit(new_file_item.text())
