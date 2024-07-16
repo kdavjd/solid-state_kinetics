@@ -105,20 +105,20 @@ class PreLoadDialog(QDialog):
             logger.error("Некорректный путь к файлу")
             return
         try:
-            with open(self.file_path(), 'r') as file:
+            with open(self.file_path(), "r") as file:
                 data = file.read(1024)
                 sniffer = csv.Sniffer()
                 dialect = sniffer.sniff(data)
                 self.delimiter_edit.setText(dialect.delimiter)
-                logger.debug(f"Определён разделитель: \"{dialect.delimiter}\"")
+                logger.debug(f'Определён разделитель: "{dialect.delimiter}"')
         except csv.Error:
             logger.error("Не удалось определить разделить")
 
     def is_data_line(self, line, delimeter):
         try:
             parts = line.split(delimeter)
-            float(parts[0].replace(',', '.'))
-            float(parts[1].replace(',', '.'))
+            float(parts[0].replace(",", "."))
+            float(parts[1].replace(",", "."))
             return True
         except ValueError:
             return False
@@ -127,10 +127,12 @@ class PreLoadDialog(QDialog):
         if not os.path.isfile(self.file_path()):
             logger.error("Некорректный путь к файлу")
             return
-        with open(self.file_path(), 'r') as file:
+        with open(self.file_path(), "r") as file:
             for line_number, line in enumerate(file):
                 if self.is_data_line(line, self.delimiter()):
                     self.skip_rows_edit.setText(str(line_number))
-                    logger.debug(f"Определено количество пропускаемых строк: {line_number}")
+                    logger.debug(
+                        f"Определено количество пропускаемых строк: {line_number}"
+                    )
                     return
         logger.error("Не удалось определить количество пропускаемых строк")
