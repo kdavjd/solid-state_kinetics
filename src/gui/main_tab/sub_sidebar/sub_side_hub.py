@@ -1,8 +1,7 @@
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from src.core.logger_config import logger
-from src.gui.main_tab.sub_sidebar.deconvolution_sub_bar import \
-    DeconvolutionSubBar
+from src.gui.main_tab.sub_sidebar.deconvolution_sub_bar import DeconvolutionSubBar
 from src.gui.main_tab.sub_sidebar.ea_sub_bar import EaSubBar
 from src.gui.main_tab.sub_sidebar.experiment_sub_bar import ExperimentSubBar
 

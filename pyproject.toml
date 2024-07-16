@@ -28,11 +28,11 @@ pyinstaller = "^6.7.0"
 [tool.poetry.dev-dependencies]
 pre-commit = "^3.6.2"
 pytest = "^8.0.2"
-flake8 = "^7.0.0"
-pylint = "^3.1.0"
-Flake8-pyproject = "^1.2.3"
 mypy = "^1.8.0"
-isort = "^5.13.2"
+ruff = "^0.5.1"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -53,26 +53,10 @@ log_cli = 1
 log_cli_level = "DEBUG"
 log_cli_format = "[%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 
-# Config support profided by flake8-pyproject
-# https://pypi.org/project/Flake8-pyproject/
-[tool.flake8]
-max-line-length = 120
-exclude = [".git", "__pycache__"]
-
-# https://pylint.pycqa.org/en/latest/user_guide/configuration/index.html
-# Example configuration: `pylint --generate-toml-config`
-[tool.pylint.main]
-# Return non-zero exit code if any of these messages/categories are detected,
-# even if score is above --fail-under value. Syntax same as enable. Messages
-# specified are enabled, while categories only check already-enabled messages.
-fail-on = ["E"]
-
 # Specify a score threshold under which the program will exit with error.
 fail-under = 9
 
 extension-pkg-whitelist = ["PyQt6"]
 
-[tool.pylint.messages_control]
-max-line-length = 120
 
 disable = "C0114,C0115,C0116,C0103,W1203"
