@@ -7,6 +7,13 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from scipy.optimize import OptimizeResult, differential_evolution
+from PyQt6.QtWidgets import QApplication
+from scipy.signal import savgol_filter
+
+from scipy.ndimage import gaussian_filter
+from scipy.signal import medfilt
+
+
 
 from core.calculation_thread import CalculationThread as Thread
 from core.calculations_data import CalculationsData
@@ -14,6 +21,8 @@ from core.curve_fitting import CurveFitting as cft
 from core.file_data import FileData
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
+
+
 
 DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
     'strategy': 'best1bin',
@@ -62,6 +71,9 @@ class Calculations(QObject):
         self.best_mse = float('inf')
         self.new_best_result.connect(self.handle_new_best_result)
 
+
+
+
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
         self.thread: Thread = Thread(func, *args, **kwargs)
         self.thread.result_ready.connect(self._calculation_finished)
@@ -92,6 +104,7 @@ class Calculations(QObject):
 
     @pyqtSlot(dict)
     def modify_active_file_slot(self, params: dict):
+        print("Slot called with params:", params)
         self.active_file_operations.modify_active_file(params)
 
     @pyqtSlot(dict)
@@ -198,21 +211,61 @@ class Calculations(QObject):
     def calc_data_operations_in_progress(self, in_progress: bool):
         self.calculations_data_operations.calculations_in_progress = in_progress
 
+    @pyqtSlot(dict)
+    def modify_active_file_slot(self, params: dict):
+        print("Slot called with params:", params)
+        self.active_file_operations.modify_active_file(params)
+
+
+    @pyqtSlot(dict)
+    def modify_calculations_data_slot(self, params: dict):
+        response = self.calculations_data_operations.modify_calculations_data(params)
+        if response:
+            logger.info(f"response: {response}")
+            self._prepare_and_start_optimization(response)
+
+    
+
 
 class ActiveFileOperations:
     def __init__(self, calculations: Calculations, file_data: FileData):
         self.calculations = calculations
         self.file_data = file_data
-
+        
     @pyqtSlot(dict)
     def modify_active_file(self, params: dict):
+        print("modify_active_file called with params:", params)
         logger.debug(f"В modify_active_file пришли данные {params}")
+        
         operation = params.get("operation")
         file_name = params.get("file_name")
-        if operation == "differential":
+        
+        if operation == "smooth":
+            if not self.file_data.check_operation_executed(file_name, "differential"):
+                console.log("Нужно сначала продифференцировать данные перед сглаживанием")
+                return
+            
+            method = params.get("method")
+            if method == "sav":
+                print(f"Applying Savitzky-Golay smooth operation to file {file_name}")
+                self._apply_smooth_operation(file_name, params)
+            elif method == "gauss":
+                print(f"Applying Gaussian smooth operation to file {file_name}")
+                self._apply_gaussian_smooth_operation(file_name, params)
+            elif method == "medi":
+                print(f"Applying Median smooth operation to file {file_name}")
+                self._apply_median_smooth_operation(file_name, params)
+            elif method == "mov":
+                print(f"Applying Moving Average smooth operation to file {file_name}")
+                self._apply_moving_average_smooth_operation(file_name, params)
+
+        elif operation == "differential":
+            print(f"Applying differential operation to file {file_name}")
             self._apply_differential_operation(file_name, params)
+            
         elif operation == "cancel_changes":
             self.file_data.reset_dataframe_copy(file_name)
+
 
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1
@@ -223,6 +276,78 @@ class ActiveFileOperations:
         else:
             console.log("Данные уже приведены к da/dT")
 
+# Метод Савицкого-Голэя ===========================================================================================
+    def smooth_function(self, data: pd.DataFrame, n_window_value, n_poly_value):
+        y_smooth = savgol_filter(data.iloc[1:,], n_window_value, n_poly_value)
+        result_df = data.copy()
+        result_df.iloc[1:,] = y_smooth
+        return result_df
+
+
+    def _apply_smooth_operation(self, file_name, params):
+        try:
+            n_window_value = params['n_window_value']
+            n_poly_value = params['n_poly_value']
+            print("Params for smooth operation:", params)           
+            self.file_data.modify_data(lambda data: self.smooth_function(data, n_window_value, n_poly_value), params)
+        except KeyError as e:
+            logger.error(f"KeyError при обработке параметров для сглаживания: {str(e)}")
+            
+            
+# Метод Гаусса =============================================================================================
+
+
+    def gaussian_smooth_function(self, data: pd.DataFrame, sigma_value):
+        y_smooth = gaussian_filter(data.iloc[1:,], sigma=sigma_value)
+        result_df = data.copy()
+        result_df.iloc[1:,] = y_smooth
+        return result_df
+
+    def _apply_gaussian_smooth_operation(self, file_name, params):
+        try:
+            sigma_value = params['sigma_value']
+            print("Params for Gaussian smooth operation:", params)
+            self.file_data.modify_data(lambda data: self.gaussian_smooth_function(data, sigma_value), params)
+        except KeyError as e:
+            logger.error(f"KeyError при обработке параметров для сглаживания: {str(e)}")
+            
+            
+#Метод Медианы====================================================================================================
+
+    def median_smooth_function(self, data: pd.DataFrame, kernel_size):
+        y_smooth = medfilt(data.iloc[1:,], kernel_size=kernel_size)
+        result_df = data.copy()
+        result_df.iloc[1:,] = y_smooth
+        return result_df
+
+    def _apply_median_smooth_operation(self, file_name, params):
+        try:
+            kernel_size = params['kernel_size']
+            print("Params for median smooth operation:", params)
+            self.file_data.modify_data(lambda data: self.median_smooth_function(data, kernel_size), params)
+        except KeyError as e:
+            logger.error(f"KeyError при обработке параметров для сглаживания: {str(e)}")
+            
+            
+            
+#Метод скользящего среднего=====================================================================================================
+
+    def moving_average_smooth_function(self, data: pd.DataFrame, window_size):
+        y_smooth = data.iloc[1:,].rolling(window=window_size).mean()
+        result_df = data.copy()
+        result_df.iloc[1:,] = y_smooth
+        return result_df
+
+    def _apply_moving_average_smooth_operation(self, file_name, params):
+        try:
+            window_size = params['window_size']
+            print("Params for moving average smooth operation:", params)
+            self.file_data.modify_data(lambda data: self.moving_average_smooth_function(data, window_size), params)
+        except KeyError as e:
+            logger.error(f"KeyError при обработке параметров для сглаживания: {str(e)}")
+
+
+#======================================================================================================
 
 class CalculationsDataOperations:
     def __init__(self, calculations: Calculations, file_data: FileData, calculations_data: CalculationsData):

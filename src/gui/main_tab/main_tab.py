@@ -55,6 +55,8 @@ class MainTab(QWidget):
             self.refer_to_active_file)
         self.sub_sidebar.experiment_sub_bar.action_buttons_block.derivative_clicked.connect(
             self.refer_to_active_file)
+        self.sub_sidebar.experiment_sub_bar.smoothing_block.apply_clicked.connect(
+            self.refer_to_active_file)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(
             self.refer_to_calculations_data)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_removed.connect(

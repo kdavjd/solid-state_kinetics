@@ -1,15 +1,18 @@
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QVBoxLayout, QWidget)
 
 
 class SmoothingBlock(QWidget):
+
+    apply_clicked = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setLayout(QVBoxLayout())
 
         self.smoothing_method = QComboBox()
-        self.smoothing_method.addItems(["Савицкий-Голэй", "другой"])
+        self.smoothing_method.addItems(["Савицкий-Голэй", "Гаусса", "Средненего скользящего", "Медианный"])
 
         self.n_window = QLineEdit("1")
         self.n_poly = QLineEdit("0")
@@ -37,9 +40,29 @@ class SmoothingBlock(QWidget):
 
         layout.addWidget(QLabel("Специфические настройки:"))
         layout.addWidget(self.spec_settings)
+        
+        self.apply_button.clicked.connect(self.apply_smoothing)
+
+
         layout.addWidget(self.apply_button)
         self.layout().addLayout(layout)
 
+
+    def apply_smoothing(self):
+        method = self.smoothing_method.currentText()
+        n_poly_value = int(self.n_poly.text())
+        n_window_value = int(self.n_window.text())
+        sigma = 3
+
+        if method == "Савицкий-Голэй":
+            self.apply_clicked.emit({'operation': "smooth", "method": "sav", "n_poly_value": n_poly_value, "n_window_value": n_window_value})
+        elif method == "Гаусса":
+            self.apply_clicked.emit({'operation': "smooth", "method": "gauss", "sigma_value": sigma})
+        elif method == "Средненего скользящего":
+            self.apply_clicked.emit({'operation': "smooth", "method": "mov", "window_size": n_window_value})
+        elif method == "Медианный":
+            self.apply_clicked.emit({'operation': "smooth", "method": "medi", "kernel_size": n_window_value})
+            
 
 class BackgroundSubtractionBlock(QWidget):
     def __init__(self, parent=None):
@@ -78,6 +101,7 @@ class BackgroundSubtractionBlock(QWidget):
 
 
 class ActionButtonsBlock(QWidget):
+    
     cancel_changes_clicked = pyqtSignal(dict)
     derivative_clicked = pyqtSignal(dict)
 
@@ -88,10 +112,11 @@ class ActionButtonsBlock(QWidget):
         self.cancel_changes_button = QPushButton("Отменить изменения")
         self.derivative_button = QPushButton("Привести к da/dT")
 
-        self.cancel_changes_button.clicked.connect(
-            lambda: self.cancel_changes_clicked.emit({'operation': "cancel_changes"}))
         self.derivative_button.clicked.connect(
             lambda: self.derivative_clicked.emit({'operation': "differential"}))
+        
+        self.cancel_changes_button.clicked.connect(
+            lambda: self.cancel_changes_clicked.emit({'operation': "cancel_changes"}))
 
         self.layout().addWidget(self.derivative_button)
         self.layout().addWidget(self.cancel_changes_button)

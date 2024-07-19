@@ -50,6 +50,7 @@ class FileData(QObject):
         self.operations_history = {}
         self.loaded_files = set()
 
+
     def log_operation(self, params: dict):
         file_name = params.pop('file_name')
         if file_name not in self.operations_history:
@@ -165,6 +166,14 @@ class FileData(QObject):
             self.log_operation(params)
             self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
             logger.info("Данные были успешно модифицированы.")
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+                # Проверка на наличие второго столбца
+                if dataframe.shape[1] >= 2:
+                    second_column_name = dataframe.columns[1]
+                    print(dataframe[second_column_name])  # Выводим только второй столбец
+                    logger.info(f"Второй столбец DataFrame:\n{dataframe[second_column_name]}")
+                else:
+                    logger.warning("DataFrame имеет меньше двух столбцов.")
 
         except Exception as e:
-            logger.error(f"Ошибка при модификации данных файла:{file_name}: {e}")
+            logger.error(f"Ошибка при модификации данных файла: {file_name}: {e}")

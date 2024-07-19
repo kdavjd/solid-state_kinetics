@@ -40,3 +40,5 @@ class SubSideHub(QWidget):
 
         self.current_widget.show()
         self.layout.addWidget(self.current_widget)
+
+

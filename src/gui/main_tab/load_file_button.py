@@ -1,4 +1,3 @@
-import csv
 import os
 
 from PyQt6.QtCore import QSize, pyqtSignal
@@ -40,8 +39,8 @@ class PreLoadDialog(QDialog):
         self.file_path_edit = QLineEdit(file_path)
         self.columns_names_edit = QLineEdit()
         self.columns_names_edit.setPlaceholderText("temperature, 3, 5, 10")
-        self.delimiter_edit = QLineEdit("")
-        self.skip_rows_edit = QLineEdit("")
+        self.delimiter_edit = QLineEdit(',')
+        self.skip_rows_edit = QLineEdit('0')
 
         layout = QVBoxLayout()
 
@@ -65,12 +64,6 @@ class PreLoadDialog(QDialog):
 
         self.setLayout(layout)
 
-        self.auto_update_delimeter()
-        self.auto_update_skip_rows()
-
-        self.file_path_edit.textChanged.connect(self.auto_update_delimeter)
-        self.delimiter_edit.textChanged.connect(self.auto_update_skip_rows)
-
     def file_path(self):
         return self.file_path_edit.text()
 
@@ -82,38 +75,3 @@ class PreLoadDialog(QDialog):
 
     def skip_rows(self):
         return int(self.skip_rows_edit.text())
-
-    def auto_update_delimeter(self):
-        if not os.path.isfile(self.file_path()):
-            logger.error("Некорректный путь к файлу")
-            return
-        try:
-            with open(self.file_path(), 'r') as file:
-                data = file.read(1024)
-                sniffer = csv.Sniffer()
-                dialect = sniffer.sniff(data)
-                self.delimiter_edit.setText(dialect.delimiter)
-                logger.debug(f"Определён разделитель: \"{dialect.delimiter}\"")
-        except csv.Error:
-            logger.error("Не удалось определить разделить")
-
-    def is_data_line(self, line, delimeter):
-        try:
-            parts = line.split(delimeter)
-            float(parts[0].replace(',', '.'))
-            float(parts[1].replace(',', '.'))
-            return True
-        except ValueError:
-            return False
-
-    def auto_update_skip_rows(self):
-        if not os.path.isfile(self.file_path()):
-            logger.error("Некорректный путь к файлу")
-            return
-        with open(self.file_path(), 'r') as file:
-            for line_number, line in enumerate(file):
-                if self.is_data_line(line, self.delimiter()):
-                    self.skip_rows_edit.setText(str(line_number))
-                    logger.debug(f"Определено количество пропускаемых строк: {line_number}")
-                    return
-        logger.error("Не удалось определить количество пропускаемых строк")
