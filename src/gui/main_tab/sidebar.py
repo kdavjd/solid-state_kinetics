@@ -47,12 +47,9 @@ class SideBar(QWidget):
         self.console_show_state = QStandardItem("Отобразить")
         self.console_show_state.setCheckable(True)
         self.console_show_state.setCheckState(Qt.CheckState.Checked)
-        self.console_hide_state = QStandardItem("Скрыть")
-        self.console_hide_state.setCheckable(True)
         self.model.appendRow(self.settings_root)
         self.settings_root.appendRow(self.console_subroot)
         self.console_subroot.appendRow(self.console_show_state)
-        self.console_subroot.appendRow(self.console_hide_state)
 
         self.layout.addWidget(self.tree_view)
         self.setLayout(self.layout)
@@ -89,13 +86,10 @@ class SideBar(QWidget):
             self.chosen_experiment_signal.emit(item.text())
             self.mark_as_active(item)
         elif item == self.console_show_state:
-            if item.checkState() == Qt.CheckState.Checked:
-                self.console_show_signal.emit(True)
-                self.console_hide_state.setCheckState(Qt.CheckState.Unchecked)
-        elif item == self.console_hide_state:
-            if item.checkState() == Qt.CheckState.Checked:
+            if item.checkState() == Qt.CheckState.Unchecked:
                 self.console_show_signal.emit(False)
-                self.console_show_state.setCheckState(Qt.CheckState.Unchecked)
+            else:
+                self.console_show_signal.emit(True)
         elif item.parent() == self.model_free_root:
             self.sub_side_bar_needed.emit(item.text())
         else:
@@ -103,9 +97,7 @@ class SideBar(QWidget):
 
     def add_experiment_file(self, file_info):
         new_file_item = QStandardItem(path.basename(file_info[0]))
-        self.experiments_data_root.insertRow(
-            self.experiments_data_root.rowCount() - 1, new_file_item
-        )
+        self.experiments_data_root.insertRow(self.experiments_data_root.rowCount() - 1, new_file_item)
         self.tree_view.expandAll()
         self.mark_as_active(new_file_item)
         self.sub_side_bar_needed.emit(new_file_item.text())
