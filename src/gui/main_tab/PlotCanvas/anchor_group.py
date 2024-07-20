@@ -8,9 +8,9 @@ class AnchorGroup:
         h_upper, z_upper, _ = upper_params[:3]
         h_lower, z_lower, _ = lower_params[:3]
 
-        self.center, = self.axes.plot(z_center, h_center, 'ko', picker=5)
-        self.upper_bound, = self.axes.plot(z_upper, h_upper, 'ro', picker=5)
-        self.lower_bound, = self.axes.plot(z_lower, h_lower, 'ro', picker=5)
+        (self.center,) = self.axes.plot(z_center, h_center, "ko", picker=5)
+        (self.upper_bound,) = self.axes.plot(z_upper, h_upper, "ro", picker=5)
+        (self.lower_bound,) = self.axes.plot(z_lower, h_lower, "ro", picker=5)
 
     def set_center_position(self, x, y):
         dx = x - self.center.get_xdata()[0]
@@ -44,14 +44,26 @@ class AnchorGroup:
         opposite_bound.set_ydata(self.center.get_ydata()[0] - dy)
 
     def log_anchor_positions(self):
-        logger.debug(f"Center: x={self.center.get_xdata()[0]}, y={self.center.get_ydata()[0]}")
-        logger.debug(f"Upper bound: x={self.upper_bound.get_xdata()[0]}, y={self.upper_bound.get_ydata()[0]}")
-        logger.debug(f"Lower bound: x={self.lower_bound.get_xdata()[0]}, y={self.lower_bound.get_ydata()[0]}")
+        logger.debug(
+            f"Center: x={self.center.get_xdata()[0]}, y={self.center.get_ydata()[0]}"
+        )
+        logger.debug(
+            f"Upper bound: x={self.upper_bound.get_xdata()[0]}, y={self.upper_bound.get_ydata()[0]}"
+        )
+        logger.debug(
+            f"Lower bound: x={self.lower_bound.get_xdata()[0]}, y={self.lower_bound.get_ydata()[0]}"
+        )
 
     def get_bound_positions(self):
         return {
-            'upper_bound': (self.upper_bound.get_xdata()[0], self.upper_bound.get_ydata()[0]),
-            'lower_bound': (self.lower_bound.get_xdata()[0], self.lower_bound.get_ydata()[0])
+            "upper_bound": (
+                self.upper_bound.get_xdata()[0],
+                self.upper_bound.get_ydata()[0],
+            ),
+            "lower_bound": (
+                self.lower_bound.get_xdata()[0],
+                self.lower_bound.get_ydata()[0],
+            ),
         }
 
 

@@ -5,7 +5,6 @@ from .table_tab.table_tab import TableTab
 
 
 class MainWindow(QMainWindow):
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Кинетика твердофазных реакций")

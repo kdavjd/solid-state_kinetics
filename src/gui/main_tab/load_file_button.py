@@ -2,9 +2,16 @@ import csv
 import os
 
 from PyQt6.QtCore import QSize, pyqtSignal
-from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                             QHBoxLayout, QLabel, QLineEdit, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.core.logger_config import logger
 
@@ -12,12 +19,13 @@ from src.core.logger_config import logger
 class LoadButton(QWidget):
     file_selected = pyqtSignal(tuple)
 
-    file_extensions = 'CSV files (*.csv);;Text files (*.txt)'
+    file_extensions = "CSV files (*.csv);;Text files (*.txt)"
 
     def open_file_dialog(self):
         try:
             file_path, _ = QFileDialog.getOpenFileName(
-                self, 'Open File', os.getenv('HOME', ''), self.file_extensions)
+                self, "Open File", os.getenv("HOME", ""), self.file_extensions
+            )
             if file_path:
                 logger.debug("Выбран файл: %s", file_path)
                 self.pre_load_dialog(file_path)
@@ -28,7 +36,13 @@ class LoadButton(QWidget):
         dialog = PreLoadDialog(file_path, self)
         if dialog.exec():
             self.file_selected.emit(
-                (dialog.file_path(), dialog.delimiter(), dialog.skip_rows(), dialog.columns_names()))
+                (
+                    dialog.file_path(),
+                    dialog.delimiter(),
+                    dialog.skip_rows(),
+                    dialog.columns_names(),
+                )
+            )
 
 
 class PreLoadDialog(QDialog):
@@ -40,8 +54,9 @@ class PreLoadDialog(QDialog):
         self.file_path_edit = QLineEdit(file_path)
         self.columns_names_edit = QLineEdit()
         self.columns_names_edit.setPlaceholderText("temperature, 3, 5, 10")
-        self.delimiter_edit = QLineEdit("")
-        self.skip_rows_edit = QLineEdit("")
+
+        self.delimiter_edit = QLineEdit(",")
+        self.skip_rows_edit = QLineEdit("0")
 
         layout = QVBoxLayout()
 
@@ -58,7 +73,9 @@ class PreLoadDialog(QDialog):
         row_layout.addWidget(self.skip_rows_edit)
         layout.addLayout(row_layout)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -88,20 +105,20 @@ class PreLoadDialog(QDialog):
             logger.error("Некорректный путь к файлу")
             return
         try:
-            with open(self.file_path(), 'r') as file:
+            with open(self.file_path(), "r") as file:
                 data = file.read(1024)
                 sniffer = csv.Sniffer()
                 dialect = sniffer.sniff(data)
                 self.delimiter_edit.setText(dialect.delimiter)
-                logger.debug(f"Определён разделитель: \"{dialect.delimiter}\"")
+                logger.debug(f'Определён разделитель: "{dialect.delimiter}"')
         except csv.Error:
             logger.error("Не удалось определить разделить")
 
     def is_data_line(self, line, delimeter):
         try:
             parts = line.split(delimeter)
-            float(parts[0].replace(',', '.'))
-            float(parts[1].replace(',', '.'))
+            float(parts[0].replace(",", "."))
+            float(parts[1].replace(",", "."))
             return True
         except ValueError:
             return False
@@ -110,10 +127,12 @@ class PreLoadDialog(QDialog):
         if not os.path.isfile(self.file_path()):
             logger.error("Некорректный путь к файлу")
             return
-        with open(self.file_path(), 'r') as file:
+        with open(self.file_path(), "r") as file:
             for line_number, line in enumerate(file):
                 if self.is_data_line(line, self.delimiter()):
                     self.skip_rows_edit.setText(str(line_number))
-                    logger.debug(f"Определено количество пропускаемых строк: {line_number}")
+                    logger.debug(
+                        f"Определено количество пропускаемых строк: {line_number}"
+                    )
                     return
         logger.error("Не удалось определить количество пропускаемых строк")
