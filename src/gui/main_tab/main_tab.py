@@ -1,7 +1,6 @@
+from core.logger_config import logger
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
-
-from core.logger_config import logger
 
 from ..console_widget import ConsoleWidget
 from .PlotCanvas.plot_canvas import PlotCanvas
@@ -15,11 +14,7 @@ MIN_WIDTH_PLOTCANVAS = 500
 SPLITTER_WIDTH = 100
 MIN_HEIGHT_MAINTAB = 700
 COMPONENTS_MIN_WIDTH = (
-    MIN_WIDTH_SIDEBAR
-    + MIN_WIDTH_SUBSIDEBAR
-    + MIN_WIDTH_CONSOLE
-    + MIN_WIDTH_PLOTCANVAS
-    + SPLITTER_WIDTH
+    MIN_WIDTH_SIDEBAR + MIN_WIDTH_SUBSIDEBAR + MIN_WIDTH_CONSOLE + MIN_WIDTH_PLOTCANVAS + SPLITTER_WIDTH
 )
 
 
@@ -59,28 +54,14 @@ class MainTab(QWidget):
         self.sub_sidebar.experiment_sub_bar.action_buttons_block.cancel_changes_clicked.connect(
             self.refer_to_active_file
         )
-        self.sub_sidebar.experiment_sub_bar.action_buttons_block.derivative_clicked.connect(
-            self.refer_to_active_file
-        )
-        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(
-            self.refer_to_calculations_data
-        )
-        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_removed.connect(
-            self.refer_to_calculations_data
-        )
-        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(
-            self.refer_to_calculations_data
-        )
-        self.sub_sidebar.deconvolution_sub_bar.update_value.connect(
-            self.refer_to_calculations_data
-        )
-        self.sidebar.active_file_selected.connect(
-            self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file
-        )
+        self.sub_sidebar.experiment_sub_bar.action_buttons_block.derivative_clicked.connect(self.refer_to_active_file)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_removed.connect(self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(self.refer_to_calculations_data)
+        self.sub_sidebar.deconvolution_sub_bar.update_value.connect(self.refer_to_calculations_data)
+        self.sidebar.active_file_selected.connect(self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file)
         self.plot_canvas.update_value.connect(self.update_anchors_slot)
-        self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(
-            self.refer_to_calculations_data
-        )
+        self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(self.refer_to_calculations_data)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -90,16 +71,10 @@ class MainTab(QWidget):
         console_ratio = MIN_WIDTH_CONSOLE / COMPONENTS_MIN_WIDTH
 
         sidebar_width = int(total_width * sidebar_ratio)
-        console_width = (
-            int(total_width * console_ratio) if self.console_widget.isVisible() else 0
-        )
-        sub_sidebar_width = (
-            int(total_width * subsidebar_ratio) if self.sub_sidebar.isVisible() else 0
-        )
+        console_width = int(total_width * console_ratio) if self.console_widget.isVisible() else 0
+        sub_sidebar_width = int(total_width * subsidebar_ratio) if self.sub_sidebar.isVisible() else 0
         canvas_width = total_width - (sidebar_width + sub_sidebar_width + console_width)
-        self.splitter.setSizes(
-            [sidebar_width, sub_sidebar_width, canvas_width, console_width]
-        )
+        self.splitter.setSizes([sidebar_width, sub_sidebar_width, canvas_width, console_width])
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -121,24 +96,14 @@ class MainTab(QWidget):
         self.initialize_sizes()
 
     def refer_to_calculations_data(self, params: dict):
-        active_file_name = (
-            self.sidebar.active_file_item.text()
-            if self.sidebar.active_file_item
-            else "no_file"
-        )
+        active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
         params["path_keys"].insert(0, active_file_name)
         logger.debug(f"Данные: {params} запрашивают операцию изменения данных расчета")
         self.calculations_data_modify_signal.emit(params)
 
     def refer_to_active_file(self, params: dict):
-        params["file_name"] = (
-            self.sidebar.active_file_item.text()
-            if self.sidebar.active_file_item
-            else "no_file"
-        )
-        logger.debug(
-            f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}"
-        )
+        params["file_name"] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
+        logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
         self.active_file_modify_signal.emit(params)
 
     @pyqtSlot(list)

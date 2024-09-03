@@ -1,9 +1,8 @@
 import json
 from functools import reduce
 
-from PyQt6.QtCore import QObject, pyqtSignal
-
 from core.logger_config import logger
+from PyQt6.QtCore import QObject, pyqtSignal
 
 
 class CalculationsData(QObject):
@@ -35,9 +34,7 @@ class CalculationsData(QObject):
 
     def set_value(self, keys: list[str], value):
         last_key = keys.pop()
-        nested_dict = reduce(
-            lambda data, key: data.setdefault(key, {}), keys, self._data
-        )
+        nested_dict = reduce(lambda data, key: data.setdefault(key, {}), keys, self._data)
         nested_dict[last_key] = value
 
     def exists(self, keys: list[str]) -> bool:
@@ -52,6 +49,4 @@ class CalculationsData(QObject):
             parent_dict = reduce(lambda data, key: data.get(key, {}), keys, self._data)
             if last_key in parent_dict:
                 del parent_dict[last_key]
-                logger.debug(
-                    {"operation": "remove_reaction", "keys": keys + [last_key]}
-                )
+                logger.debug({"operation": "remove_reaction", "keys": keys + [last_key]})

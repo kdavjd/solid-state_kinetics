@@ -5,16 +5,15 @@ import pandas as pd
 
 # see: https://pypi.org/project/SciencePlots/
 import scienceplots  # noqa pylint: disable=unused-import
+from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
+from gui.main_tab.PlotCanvas.anchor_group import HeightAnchorGroup, PositionAnchorGroup
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
-
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
-from gui.main_tab.PlotCanvas.anchor_group import HeightAnchorGroup, PositionAnchorGroup
 
 plt.style.use(["science", "no-latex", "nature", "grid"])
 
@@ -86,26 +85,17 @@ class PlotCanvas(QWidget):
             console.log("В файле отсутствует столбец 'temperature' для оси X")
 
     def determine_line_properties(self, reaction_name):
-        if (
-            "cumulative_upper_bound" in reaction_name
-            or "cumulative_lower_bound" in reaction_name
-        ):
+        if "cumulative_upper_bound" in reaction_name or "cumulative_lower_bound" in reaction_name:
             return {"linewidth": 0.1, "linestyle": "-", "color": "grey"}
         elif "cumulative_coeffs" in reaction_name:
             return {"linewidth": 1, "linestyle": "dotted"}
-        elif (
-            "upper_bound_coeffs" in reaction_name
-            or "lower_bound_coeffs" in reaction_name
-        ):
+        elif "upper_bound_coeffs" in reaction_name or "lower_bound_coeffs" in reaction_name:
             return {"linewidth": 1.25, "linestyle": "-."}
         else:
             return {}
 
     def update_fill_between(self):
-        if (
-            "cumulative_upper_bound_coeffs" in self.lines
-            and "cumulative_lower_bound_coeffs" in self.lines
-        ):
+        if "cumulative_upper_bound_coeffs" in self.lines and "cumulative_lower_bound_coeffs" in self.lines:
             x = self.lines["cumulative_upper_bound_coeffs"].get_xdata()
             upper_y = self.lines["cumulative_upper_bound_coeffs"].get_ydata()
             lower_y = self.lines["cumulative_lower_bound_coeffs"].get_ydata()
@@ -140,12 +130,8 @@ class PlotCanvas(QWidget):
         upper_params = reaction_data["upper_bound_coeffs"][2]
         lower_params = reaction_data["lower_bound_coeffs"][2]
 
-        self.position_anchor_group = PositionAnchorGroup(
-            self.axes, center_params, upper_params, lower_params
-        )
-        self.height_anchor_group = HeightAnchorGroup(
-            self.axes, center_params, upper_params, lower_params
-        )
+        self.position_anchor_group = PositionAnchorGroup(self.axes, center_params, upper_params, lower_params)
+        self.height_anchor_group = HeightAnchorGroup(self.axes, center_params, upper_params, lower_params)
 
         self.canvas.draw_idle()
         self.figure.tight_layout()
@@ -153,15 +139,8 @@ class PlotCanvas(QWidget):
     def find_dragging_anchor(self, event, anchor_group):
         if anchor_group.center.contains(event)[0]:
             return anchor_group.center
-        elif (
-            anchor_group.upper_bound.contains(event)[0]
-            or anchor_group.lower_bound.contains(event)[0]
-        ):
-            return (
-                anchor_group.upper_bound
-                if anchor_group.upper_bound.contains(event)[0]
-                else anchor_group.lower_bound
-            )
+        elif anchor_group.upper_bound.contains(event)[0] or anchor_group.lower_bound.contains(event)[0]:
+            return anchor_group.upper_bound if anchor_group.upper_bound.contains(event)[0] else anchor_group.lower_bound
         return None
 
     def log_anchor_positions(self, anchor_group):
@@ -187,15 +166,11 @@ class PlotCanvas(QWidget):
         if event.inaxes != self.axes:
             return
 
-        self.dragging_anchor = self.find_dragging_anchor(
-            event, self.position_anchor_group
-        )
+        self.dragging_anchor = self.find_dragging_anchor(event, self.position_anchor_group)
         if self.dragging_anchor:
             self.dragging_anchor_group = "position"
         else:
-            self.dragging_anchor = self.find_dragging_anchor(
-                event, self.height_anchor_group
-            )
+            self.dragging_anchor = self.find_dragging_anchor(event, self.height_anchor_group)
             if self.dragging_anchor:
                 self.dragging_anchor_group = "height"
 
@@ -205,9 +180,7 @@ class PlotCanvas(QWidget):
             logger.debug(f"Якорь принадлежит группе: {self.dragging_anchor_group}")
 
             positions = (
-                self.position_anchor_group
-                if self.dragging_anchor_group == "position"
-                else self.height_anchor_group
+                self.position_anchor_group if self.dragging_anchor_group == "position" else self.height_anchor_group
             ).get_bound_positions()
             axis = "z" if self.dragging_anchor_group == "position" else "h"
 
