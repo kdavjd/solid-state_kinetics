@@ -11,7 +11,8 @@ on:
   release:
     types: created
        
-permissions: write-all
+permissions:
+  contents: write
 
 jobs:
   build:
