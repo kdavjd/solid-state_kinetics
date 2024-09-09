@@ -17,7 +17,7 @@ ssk-gui = "gui.__main__:main"
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
 pyqt6 = "^6.6.1"
-matplotlib = "^3.8.3"
+matplotlib = "3.8.3"
 pandas = "^2.2.1"
 numpy = "^1.26.4"
 scienceplots = "^2.1.1"
@@ -30,10 +30,49 @@ pre-commit = "^3.6.2"
 pytest = "^8.0.2"
 mypy = "^1.8.0"
 ruff = "^0.5.1"
+black = "^24.8.0"
 
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.5.2"
-pre-commit = "^3.7.1"
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+
+# Включаем максимальное количество проверок.
+lint.select = [
+    "E",  # Ошибки стиля (PEP 8)
+    "W",  # Предупреждения (PEP 8)
+    "F",  # Ошибки (например, Flake8)
+    "C",  # Сложность кода (например, цикломатическая сложность)
+    #"N", Проверка именования (например, переменные, функции)
+    "I",  # Сортировка импортов (isort)
+    "Q",  # Quirks (редкие ошибки)
+    #"UP", Совместимость с новыми версиями Python
+    "A",  # Аннотации типов
+    "M",  # Паттерны метрик
+    #"T",  Типизация
+    #"R",Проверки для неудачных конструкций
+    #"U",  Устаревшие конструкции
+]
+
+fix = true
+
+lint.external = ["black"] 
+
+exclude = [
+    ".git",
+    "pycache",
+    "build",
+    "dist",
+    "venv",
+    ".venv",
+]
+
+# Проверка цикломатической сложности.
+lint.extend-select = ["C901"]
+
+[tool.black]
+line-length = 120
+
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -58,6 +97,3 @@ log_cli_format = "[%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 fail-under = 9
 
 extension-pkg-whitelist = ["PyQt6"]
-
-
-disable = "C0114,C0115,C0116,C0103,W1203"

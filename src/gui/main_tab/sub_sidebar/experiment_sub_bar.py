@@ -107,9 +107,7 @@ class ActionButtonsBlock(QWidget):
         self.cancel_changes_button.clicked.connect(
             lambda: self.cancel_changes_clicked.emit({"operation": "cancel_changes"})
         )
-        self.derivative_button.clicked.connect(
-            lambda: self.derivative_clicked.emit({"operation": "differential"})
-        )
+        self.derivative_button.clicked.connect(lambda: self.derivative_clicked.emit({"operation": "differential"}))
 
         self.layout().addWidget(self.derivative_button)
         self.layout().addWidget(self.cancel_changes_button)

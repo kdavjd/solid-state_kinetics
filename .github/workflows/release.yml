@@ -10,13 +10,11 @@ on:
        - '**.md'
   release:
     types: created
-       
+
 permissions: write-all
 
 jobs:
   build:
-    name: Build ${{ matrix.artifact_name }}
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
@@ -24,6 +22,10 @@ jobs:
             artifact_name: linux
           - os: windows-latest
             artifact_name: windows
+
+    name: Build ${{ matrix.artifact_name }}
+
+    runs-on: ${{ matrix.os }}
     
     steps:
       - name: Checkout code
@@ -40,35 +42,20 @@ jobs:
           pipx install poetry
           poetry install
             
-      #- name: Build Linux
-        #if: ${{ matrix.os }} == 'ubuntu-latest'
-        #run: |
-          #poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
-        
-      - name: Build #Win
-        #if: ${{ matrix.os }} == 'windows-latest'
+      - name: Build ${{ matrix.os }}
         run: |
-          poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main
-
-
+          poetry run pyinstaller src/gui/__main__.py --collect-all scienceplots --onefile --name main.exe
+        
 # UPLOADING ARTIFACTS
 
-      # - name: Upload artifacts linux
-      #   if: ${{ matrix.os }} == 'ubuntu-latest'
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: linux
-      #     path: dist/main
+      - name: Upload artifacts ${{ matrix.artifact_name }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/main.exe
 
-      # - name: Upload artifacts windows
-      #   if: ${{ matrix.os }} == 'windows-latest'
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: windows
-      #     path: dist/main.exe
+# RELEASE
 
-
- #RELEASE       
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
@@ -77,8 +64,5 @@ jobs:
           files: |
             dist/main.exe
             dist/main
-        
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      

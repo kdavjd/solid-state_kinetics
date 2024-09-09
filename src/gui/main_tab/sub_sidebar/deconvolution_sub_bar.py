@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -16,9 +18,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
 
 
 class FileTransferButtons(QWidget):
@@ -68,12 +67,8 @@ class ReactionTable(QWidget):
         if file_name not in self.reactions_tables:
             self.reactions_tables[file_name] = QTableWidget()
             self.reactions_tables[file_name].setColumnCount(2)
-            self.reactions_tables[file_name].setHorizontalHeaderLabels(
-                ["Имя", "Функция"]
-            )
-            self.reactions_tables[file_name].horizontalHeader().setSectionResizeMode(
-                QHeaderView.ResizeMode.Stretch
-            )
+            self.reactions_tables[file_name].setHorizontalHeaderLabels(["Имя", "Функция"])
+            self.reactions_tables[file_name].horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.reactions_tables[file_name].itemClicked.connect(self.selected_reaction)
             self.layout.addWidget(self.reactions_tables[file_name])
 
@@ -106,9 +101,7 @@ class ReactionTable(QWidget):
         combo = QComboBox()
         combo.addItems(["gauss", "fraser", "ads"])
         combo.setCurrentText("gauss")
-        combo.currentIndexChanged.connect(
-            lambda: self.function_changed(reaction_name, combo)
-        )
+        combo.currentIndexChanged.connect(lambda: self.function_changed(reaction_name, combo))
 
         table.setItem(row_count, 0, QTableWidgetItem(reaction_name))
         table.setCellWidget(row_count, 1, combo)
@@ -151,18 +144,14 @@ class ReactionTable(QWidget):
             else:
                 logger.debug("Попытка удалить пустую ячейку.")
         else:
-            QMessageBox.warning(
-                self, "Удаление Реакции", "В списке нет реакций для удаления."
-            )
+            QMessageBox.warning(self, "Удаление Реакции", "В списке нет реакций для удаления.")
 
     def selected_reaction(self, item):
         row = item.row()
         reaction_name = self.reactions_tables[self.active_file].item(row, 0).text()
         self.active_reaction = reaction_name
         logger.debug(f"Активная реакция: {reaction_name}")
-        self.reaction_chosed.emit(
-            {"path_keys": [reaction_name], "operation": "highlight_reaction"}
-        )
+        self.reaction_chosed.emit({"path_keys": [reaction_name], "operation": "highlight_reaction"})
 
     def open_settings(self):
         if self.active_file:
@@ -178,9 +167,7 @@ class ReactionTable(QWidget):
             if dialog.exec():
                 selected_functions = dialog.get_selected_functions()
 
-                empty_keys = [
-                    key for key, value in selected_functions.items() if not value
-                ]
+                empty_keys = [key for key, value in selected_functions.items() if not value]
                 if empty_keys:
                     QMessageBox.warning(
                         self,
@@ -193,14 +180,10 @@ class ReactionTable(QWidget):
                 self.calculation_settings[self.active_file] = selected_functions
                 logger.debug(f"Выбранные функции: {selected_functions}")
 
-                formatted_functions = "\n".join(
-                    [f"{key}: {value}" for key, value in selected_functions.items()]
-                )
+                formatted_functions = "\n".join([f"{key}: {value}" for key, value in selected_functions.items()])
                 message = f"    {self.active_file}\n{formatted_functions}"
 
-                QMessageBox.information(
-                    self, "Фуннкции на расчет", f"Настройки обновлены для:\n{message}"
-                )
+                QMessageBox.information(self, "Фуннкции на расчет", f"Настройки обновлены для:\n{message}")
         else:
             QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
 
@@ -224,18 +207,14 @@ class CalculationSettingsDialog(QDialog):
             self.checkboxes[reaction_name] = []
             for function in functions:
                 checkbox = QCheckBox(function)
-                checkbox.setChecked(
-                    function in self.initial_settings.get(reaction_name, [])
-                )
+                checkbox.setChecked(function in self.initial_settings.get(reaction_name, []))
                 self.checkboxes[reaction_name].append(checkbox)
                 checkbox_layout.addWidget(checkbox)
             self.form_layout.addRow(reaction_name, checkbox_layout)
 
         layout.addLayout(self.form_layout)
 
-        self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         layout.addWidget(self.button_box)
@@ -243,9 +222,7 @@ class CalculationSettingsDialog(QDialog):
     def get_selected_functions(self):
         selected_functions = {}
         for reaction_name, checkboxes in self.checkboxes.items():
-            selected_functions[reaction_name] = [
-                cb.text() for cb in checkboxes if cb.isChecked()
-            ]
+            selected_functions[reaction_name] = [cb.text() for cb in checkboxes if cb.isChecked()]
         return selected_functions
 
 
@@ -273,9 +250,7 @@ class CoeffsTable(QTableWidget):
         row_height = self.rowHeight(0)
         borders_height = len(self.default_row_labels) * 2
         header_height = self.horizontalHeader().height()
-        total_height = (
-            (row_height * len(self.default_row_labels)) + header_height + borders_height
-        )
+        total_height = (row_height * len(self.default_row_labels)) + header_height + borders_height
         self.setFixedHeight(total_height)
 
     def mock_table(self):
@@ -298,9 +273,7 @@ class CoeffsTable(QTableWidget):
 
         for j, key in enumerate(param_keys):
             try:
-                data = reaction_params[key][
-                    2
-                ]  # структура ключей: x_range, function_type, params
+                data = reaction_params[key][2]  # структура ключей: x_range, function_type, params
                 for i in range(min(len(row_labels), len(data))):
                     value = f"{data[i]:.2f}"
                     self.setItem(i, j, QTableWidgetItem(value))
@@ -331,17 +304,11 @@ class CoeffsTable(QTableWidget):
                 }
                 self.update_value.emit(data_change)
             except ValueError as e:
-                console.log(
-                    f"Неверные данные для преобразования в число: ряд {row+1}, колонка {column+1}"
-                )
-                logger.error(
-                    f"Неверные данные для преобразования в число: ряд {row}, колонка {column}: {e}"
-                )
+                console.log(f"Неверные данные для преобразования в число: ряд {row+1}, колонка {column+1}")
+                logger.error(f"Неверные данные для преобразования в число: ряд {row}, колонка {column}: {e}")
 
     def column_to_bound(self, column_label):
-        return {"от": "lower_bound_coeffs", "до": "upper_bound_coeffs"}.get(
-            column_label, ""
-        )
+        return {"от": "lower_bound_coeffs", "до": "upper_bound_coeffs"}.get(column_label, "")
 
 
 class CalcButtons(QWidget):
@@ -364,13 +331,9 @@ class CalcButtons(QWidget):
             QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
             return
 
-        settings = self.parent.reactions_table.calculation_settings.get(
-            self.parent.reactions_table.active_file, {}
-        )
+        settings = self.parent.reactions_table.calculation_settings.get(self.parent.reactions_table.active_file, {})
         if not settings:
-            QMessageBox.information(
-                self, "Настройки обязательны.", "Настройки расчета не установлены."
-            )
+            QMessageBox.information(self, "Настройки обязательны.", "Настройки расчета не установлены.")
             self.parent.open_settings_dialog()
         else:
             data = {
@@ -412,9 +375,7 @@ class DeconvolutionSubBar(QWidget):
         layout.addWidget(self.calc_buttons)
 
         self.coeffs_table.update_value.connect(self.handle_update_value)
-        self.reactions_table.reaction_function_changed.connect(
-            self.handle_update_function_value
-        )
+        self.reactions_table.reaction_function_changed.connect(self.handle_update_function_value)
 
     def handle_update_value(self, data: dict):
         if self.reactions_table.active_reaction:

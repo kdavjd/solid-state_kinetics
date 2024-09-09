@@ -23,9 +23,7 @@ class LoadButton(QWidget):
 
     def open_file_dialog(self):
         try:
-            file_path, _ = QFileDialog.getOpenFileName(
-                self, "Open File", os.getenv("HOME", ""), self.file_extensions
-            )
+            file_path, _ = QFileDialog.getOpenFileName(self, "Open File", os.getenv("HOME", ""), self.file_extensions)
             if file_path:
                 logger.debug("Выбран файл: %s", file_path)
                 self.pre_load_dialog(file_path)
@@ -73,9 +71,7 @@ class PreLoadDialog(QDialog):
         row_layout.addWidget(self.skip_rows_edit)
         layout.addLayout(row_layout)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -131,8 +127,6 @@ class PreLoadDialog(QDialog):
             for line_number, line in enumerate(file):
                 if self.is_data_line(line, self.delimiter()):
                     self.skip_rows_edit.setText(str(line_number))
-                    logger.debug(
-                        f"Определено количество пропускаемых строк: {line_number}"
-                    )
+                    logger.debug(f"Определено количество пропускаемых строк: {line_number}")
                     return
         logger.error("Не удалось определить количество пропускаемых строк")
