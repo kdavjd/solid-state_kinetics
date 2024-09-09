@@ -4,10 +4,9 @@ from io import StringIO
 
 import chardet
 import pandas as pd
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
-
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
 
 def detect_encoding(func):
@@ -80,9 +79,7 @@ class FileData(QObject):
 
         if columns_names:
             column_delimiter = "," if "," in columns_names else " "
-            self.columns_names = [
-                name.strip() for name in columns_names.split(column_delimiter)
-            ]
+            self.columns_names = [name.strip() for name in columns_names.split(column_delimiter)]
             logger.debug(
                 "Загружен файл: путь=%s, разделитель=%s, пропуск строк=%s, имена столбцов=%s",
                 self.file_path,
@@ -143,15 +140,11 @@ class FileData(QObject):
 
         if self.columns_names is not None:
             if len(self.columns_names) != len(self.data.columns):
-                logger.warning(
-                    "Количество имен столбцов не соответствует количеству столбцов в данных."
-                )
+                logger.warning("Количество имен столбцов не соответствует количеству столбцов в данных.")
             self.data = self.data.apply(pd.to_numeric, errors="coerce")
             self.data.columns = [name.strip() for name in self.columns_names]
         else:
-            logger.debug(
-                "Первая строка оставлена как имена столбцов: %s", self.data.columns
-            )
+            logger.debug("Первая строка оставлена как имена столбцов: %s", self.data.columns)
 
         self.original_data[file_basename] = self.data.copy()
         self.dataframe_copies[file_basename] = self.data.copy()

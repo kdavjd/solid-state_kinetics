@@ -12,12 +12,14 @@ repos:
         entry: poetry run ruff check
         language: python
         types: [python]
-        args: [--fix]
+        args: ["--fix"]
+        pass_filenames: false
       - id: ruff-format
         name: ruff-format
         entry: poetry run ruff format
         language: python
         types: [python]
+        args: []
 
   - repo: local
     hooks:

@@ -44,15 +44,9 @@ class AnchorGroup:
         opposite_bound.set_ydata(self.center.get_ydata()[0] - dy)
 
     def log_anchor_positions(self):
-        logger.debug(
-            f"Center: x={self.center.get_xdata()[0]}, y={self.center.get_ydata()[0]}"
-        )
-        logger.debug(
-            f"Upper bound: x={self.upper_bound.get_xdata()[0]}, y={self.upper_bound.get_ydata()[0]}"
-        )
-        logger.debug(
-            f"Lower bound: x={self.lower_bound.get_xdata()[0]}, y={self.lower_bound.get_ydata()[0]}"
-        )
+        logger.debug(f"Center: x={self.center.get_xdata()[0]}, y={self.center.get_ydata()[0]}")
+        logger.debug(f"Upper bound: x={self.upper_bound.get_xdata()[0]}, y={self.upper_bound.get_ydata()[0]}")
+        logger.debug(f"Lower bound: x={self.lower_bound.get_xdata()[0]}, y={self.lower_bound.get_ydata()[0]}")
 
     def get_bound_positions(self):
         return {
