@@ -104,9 +104,7 @@ class ActionButtonsBlock(QWidget):
         self.cancel_changes_button = QPushButton("Отменить изменения")
         self.derivative_button = QPushButton("Привести к da/dT")
 
-        self.cancel_changes_button.clicked.connect(
-            lambda: self.cancel_changes_clicked.emit({"operation": "cancel_changes"})
-        )
+        self.cancel_changes_button.clicked.connect(lambda: self.cancel_changes_clicked.emit({"operation": "reset"}))
         self.derivative_button.clicked.connect(lambda: self.derivative_clicked.emit({"operation": "differential"}))
 
         self.layout().addWidget(self.derivative_button)

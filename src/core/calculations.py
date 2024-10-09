@@ -1,7 +1,8 @@
 import time
+import uuid
 from functools import wraps
 from itertools import product
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ from core.curve_fitting import CurveFitting as cft
 from core.file_data import FileData
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QEventLoop, QObject, QTimer, pyqtSignal, pyqtSlot
 from scipy.optimize import OptimizeResult, differential_evolution
 
 DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
@@ -56,7 +57,6 @@ class Calculations(QObject):
         self.calculations_data = calculations_data
         self.thread = None
         self.calculations_data_operations = CalculationsDataOperations(self, file_data, calculations_data)
-        self.active_file_operations = ActiveFileOperations(self, file_data)
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.best_combination = None
         self.best_mse = float("inf")
@@ -91,10 +91,6 @@ class Calculations(QObject):
 
         except ValueError as e:
             logger.error(f"Ошибка при обработке результата: {e}")
-
-    @pyqtSlot(dict)
-    def modify_active_file_slot(self, params: dict):
-        self.active_file_operations.modify_active_file(params)
 
     @pyqtSlot(dict)
     def modify_calculations_data_slot(self, params: dict):
@@ -205,43 +201,71 @@ class Calculations(QObject):
         self.calculations_data_operations.calculations_in_progress = in_progress
 
 
-class ActiveFileOperations:
-    def __init__(self, calculations: Calculations, file_data: FileData):
-        self.calculations = calculations
-        self.file_data = file_data
+class CalculationsDataOperations(QObject):
+    calculations_data_operations_signal = pyqtSignal(dict)
 
-    @pyqtSlot(dict)
-    def modify_active_file(self, params: dict):
-        logger.debug(f"В modify_active_file пришли данные {params}")
-        operation = params.get("operation")
-        file_name = params.get("file_name")
-        if operation == "differential":
-            self._apply_differential_operation(file_name, params)
-        elif operation == "cancel_changes":
-            self.file_data.reset_dataframe_copy(file_name)
-
-    def diff_function(self, data: pd.DataFrame):
-        return data.diff() * -1
-
-    def _apply_differential_operation(self, file_name, params):
-        if not self.file_data.check_operation_executed(file_name, "differential"):
-            self.file_data.modify_data(self.diff_function, params)
-        else:
-            console.log("Данные уже приведены к da/dT")
-
-
-class CalculationsDataOperations:
     def __init__(
         self,
         calculations: Calculations,
         file_data: FileData,
         calculations_data: CalculationsData,
     ):
+        super().__init__()
         self.calculations = calculations
         self.file_data = file_data
         self.calculations_data = calculations_data
         self.last_plot_time = 0
         self.calculations_in_progress = False
+        self.pending_requests: dict[str, Any] = {}
+        self.event_loops: dict[str, Any] = {}
+
+    @pyqtSlot(dict)
+    def calculations_data_operations_request_slot(self, params: dict):
+        request_id = params.get("request_id")
+
+        logger.debug(f"calculations_data_operations_request_slot: Получен ответ с UUID: {request_id}")
+
+        if request_id and request_id in self.pending_requests:
+            logger.debug(f"calculations_data_operations_request_slot: Обработка запроса с UUID: {request_id}")
+            self.pending_requests[request_id]["data"] = params
+            self.pending_requests[request_id]["received"] = True
+
+            if request_id in self.event_loops:
+                logger.debug(
+                    f"calculations_data_operations_request_slot: Завершаем цикл ожидания для UUID: {request_id}"
+                )
+                self.event_loops[request_id].quit()
+        else:
+            logger.error(f"calculations_data_operations_request_slot: Ответ с неизвестным UUID: {request_id}")
+
+    def create_and_emit_request(self, actor: str, target: str, file_name: str, operation: str) -> str:
+        request_id = str(uuid.uuid4())
+        self.pending_requests[request_id] = {"received": False, "data": None}
+        request = {
+            "actor": actor,
+            "target": target,
+            "file_name": file_name,
+            "operation": operation,
+            "request_id": request_id,
+        }
+        self.calculations_data_operations_signal.emit(request)
+        return request_id
+
+    def wait_for_response(self, request_id, timeout=1000):
+        if request_id not in self.pending_requests:
+            logger.debug(f"wait_for_response: Регистрация запроса UUID: {request_id} в pending_requests")
+            self.pending_requests[request_id] = {"received": False, "data": None}
+
+        loop = QEventLoop()
+        self.event_loops[request_id] = loop
+        QTimer.singleShot(timeout, loop.quit)
+
+        while not self.pending_requests[request_id]["received"]:
+            logger.debug(f"wait_for_response: Ожидание... UUID: {request_id}")
+            loop.exec()
+
+        del self.event_loops[request_id]
+        return self.pending_requests.pop(request_id)["data"]
 
     @pyqtSlot(dict)
     def modify_calculations_data(self, params: dict):
@@ -292,18 +316,28 @@ class CalculationsDataOperations:
 
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
-        if not self.file_data.check_operation_executed(file_name, "differential"):
-            console.log("Данные нужно привести к da/dT")
-            self.calculations.add_reaction_fail.emit()
-            return
 
-        df = self.file_data.dataframe_copies[file_name]
-        data = cft.generate_default_function_data(df)
-        self.calculations_data.set_value(path_keys.copy(), data)
-        reaction_params = self.extract_reaction_params(path_keys)
+        request_id = self.create_and_emit_request(
+            "calculations_data_operations", "file_data", file_name, "check_differential"
+        )
+        response_data = self.wait_for_response(request_id)
+        is_executed = response_data.pop("data", None)
 
-        for bound_label, params in reaction_params.items():
-            self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
+        if is_executed:
+            df_data_request_id = self.create_and_emit_request(
+                "calculations_data_operations", "file_data", file_name, "get_df_data"
+            )
+            df = self.wait_for_response(df_data_request_id).pop("data", None)
+
+            data = cft.generate_default_function_data(df)
+            self.calculations_data.set_value(path_keys.copy(), data)
+
+            reaction_params = self.extract_reaction_params(path_keys)
+            for bound_label, params in reaction_params.items():
+                self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
+        else:
+            logger.error(f"add_reaction: Дифференцирование не выполнено для файла: {file_name}")
+            console.log("Дифференцирование не выполнено")
 
     def remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
@@ -320,7 +354,14 @@ class CalculationsDataOperations:
 
     def highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
-        self.file_data.plot_dataframe_signal.emit(self.file_data.dataframe_copies[file_name])
+        self.calculations_data_operations_signal.emit(
+            {
+                "actor": "calculations_data_operations",
+                "target": "file_data",
+                "operation": "plot_dataframe",
+                "file_name": file_name,
+            }
+        )
         data = self.calculations_data.get_value([file_name])
         reactions = data.keys()
 
