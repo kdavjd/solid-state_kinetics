@@ -196,26 +196,29 @@ class FileData(QObject):
 
     @pyqtSlot(dict)
     def file_data_request_slot(self, params: dict):
-        if params["target"] == "file_data":
-            logger.debug(f"В handle_request пришли данные {params}")
-            operation = params.get("operation", None)
-            file_name = params.get("file_name", None)
-            func = params.get("function", None)
+        if params["target"] != "file_data":
+            return
 
-            if operation == "differential":
-                if not self.check_operation_executed(file_name, "differential"):
-                    self.modify_data(func, params)
-                else:
-                    console.log("Данные уже приведены к da/dT")
-            elif operation == "check_differential":
-                params["data"] = self.check_operation_executed(file_name, "differential")
-                params["target"], params["actor"] = params["actor"], params["target"]
-                self.file_data_signal.emit(params)
-            elif operation == "get_df_data":
-                params["data"] = self.dataframe_copies[file_name]
-                params["target"], params["actor"] = params["actor"], params["target"]
-                self.file_data_signal.emit(params)
-            elif operation == "reset":
-                self.reset_dataframe_copy(file_name)
-            elif operation == "plot_dataframe":
-                self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
+        logger.debug(f"В handle_request пришли данные {params}")
+        operation, file_name, func = params.get("operation"), params.get("file_name", None), params.get("function")
+
+        if operation == "differential":
+            if not self.check_operation_executed(file_name, "differential"):
+                self.modify_data(func, params)
+            else:
+                console.log("Данные уже приведены к da/dT")
+        elif operation == "check_differential":
+            params["data"] = self.check_operation_executed(file_name, "differential")
+        elif operation == "get_df_data":
+            params["data"] = self.dataframe_copies[file_name]
+        elif operation == "reset":
+            self.reset_dataframe_copy(file_name)
+            params["data"] = True
+        elif operation == "plot_dataframe":
+            self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
+            params["data"] = True
+        else:
+            return
+
+        params["target"], params["actor"] = params["actor"], params["target"]
+        self.file_data_signal.emit(params)

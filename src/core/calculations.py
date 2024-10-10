@@ -56,7 +56,7 @@ class Calculations(QObject):
         self.file_data = file_data
         self.calculations_data = calculations_data
         self.thread = None
-        self.calculations_data_operations = CalculationsDataOperations(self, file_data, calculations_data)
+        self.calculations_data_operations = CalculationsDataOperations(self, calculations_data)
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.best_combination = None
         self.best_mse = float("inf")
@@ -207,12 +207,10 @@ class CalculationsDataOperations(QObject):
     def __init__(
         self,
         calculations: Calculations,
-        file_data: FileData,
         calculations_data: CalculationsData,
     ):
         super().__init__()
         self.calculations = calculations
-        self.file_data = file_data
         self.calculations_data = calculations_data
         self.last_plot_time = 0
         self.calculations_in_progress = False
@@ -221,11 +219,12 @@ class CalculationsDataOperations(QObject):
 
     @pyqtSlot(dict)
     def calculations_data_operations_request_slot(self, params: dict):
+        if params["target"] != "calculations_data_operations":
+            return
+
         request_id = params.get("request_id")
 
-        logger.debug(f"calculations_data_operations_request_slot: Получен ответ с UUID: {request_id}")
-
-        if request_id and request_id in self.pending_requests:
+        if request_id in self.pending_requests:
             logger.debug(f"calculations_data_operations_request_slot: Обработка запроса с UUID: {request_id}")
             self.pending_requests[request_id]["data"] = params
             self.pending_requests[request_id]["received"] = True
@@ -238,15 +237,16 @@ class CalculationsDataOperations(QObject):
         else:
             logger.error(f"calculations_data_operations_request_slot: Ответ с неизвестным UUID: {request_id}")
 
-    def create_and_emit_request(self, actor: str, target: str, file_name: str, operation: str) -> str:
+    def create_and_emit_request(self, target: str, file_name: str, operation: str, **kwargs) -> str:
         request_id = str(uuid.uuid4())
         self.pending_requests[request_id] = {"received": False, "data": None}
         request = {
-            "actor": actor,
+            "actor": "calculations_data_operations",
             "target": target,
             "file_name": file_name,
             "operation": operation,
             "request_id": request_id,
+            **kwargs,
         }
         self.calculations_data_operations_signal.emit(request)
         return request_id
@@ -317,16 +317,12 @@ class CalculationsDataOperations(QObject):
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
 
-        request_id = self.create_and_emit_request(
-            "calculations_data_operations", "file_data", file_name, "check_differential"
-        )
+        request_id = self.create_and_emit_request("file_data", file_name, "check_differential")
         response_data = self.wait_for_response(request_id)
         is_executed = response_data.pop("data", None)
 
         if is_executed:
-            df_data_request_id = self.create_and_emit_request(
-                "calculations_data_operations", "file_data", file_name, "get_df_data"
-            )
+            df_data_request_id = self.create_and_emit_request("file_data", file_name, "get_df_data")
             df = self.wait_for_response(df_data_request_id).pop("data", None)
 
             data = cft.generate_default_function_data(df)
@@ -335,9 +331,6 @@ class CalculationsDataOperations(QObject):
             reaction_params = self.extract_reaction_params(path_keys)
             for bound_label, params in reaction_params.items():
                 self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
-        else:
-            logger.error(f"add_reaction: Дифференцирование не выполнено для файла: {file_name}")
-            console.log("Дифференцирование не выполнено")
 
     def remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
@@ -354,14 +347,10 @@ class CalculationsDataOperations(QObject):
 
     def highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
-        self.calculations_data_operations_signal.emit(
-            {
-                "actor": "calculations_data_operations",
-                "target": "file_data",
-                "operation": "plot_dataframe",
-                "file_name": file_name,
-            }
-        )
+        request_id = self.create_and_emit_request("file_data", file_name, "plot_dataframe")
+        if not self.wait_for_response(request_id).pop("data", None):
+            logger.warning("Ответ от file_data не получен")
+
         data = self.calculations_data.get_value([file_name])
         reactions = data.keys()
 
@@ -471,12 +460,15 @@ class CalculationsDataOperations(QObject):
             bounds.extend(filtered_pairs)
             num_coefficients[reaction_name] = len(combined_keys_set)
 
+        df_data_request_id = self.create_and_emit_request("file_data", file_name, "get_df_data")
+        df = self.wait_for_response(df_data_request_id).pop("data", None)
+
         return {
             "operation": "deconvolution",
             "data": {
                 "combined_keys": combined_keys,
                 "bounds": bounds,
                 "reaction_combinations": reaction_combinations,
-                "experimental_data": self.calculations.file_data.dataframe_copies[file_name],
+                "experimental_data": df,
             },
         }
