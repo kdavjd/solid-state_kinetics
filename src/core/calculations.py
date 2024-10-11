@@ -56,7 +56,7 @@ class Calculations(QObject):
         self.file_data = file_data
         self.calculations_data = calculations_data
         self.thread = None
-        self.calculations_data_operations = CalculationsDataOperations(self, calculations_data)
+        self.calculations_data_operations = CalculationsDataOperations(self)
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.best_combination = None
         self.best_mse = float("inf")
@@ -207,11 +207,9 @@ class CalculationsDataOperations(QObject):
     def __init__(
         self,
         calculations: Calculations,
-        calculations_data: CalculationsData,
     ):
         super().__init__()
         self.calculations = calculations
-        self.calculations_data = calculations_data
         self.last_plot_time = 0
         self.calculations_in_progress = False
         self.pending_requests: dict[str, Any] = {}
@@ -237,13 +235,12 @@ class CalculationsDataOperations(QObject):
         else:
             logger.error(f"calculations_data_operations_request_slot: Ответ с неизвестным UUID: {request_id}")
 
-    def create_and_emit_request(self, target: str, file_name: str, operation: str, **kwargs) -> str:
+    def create_and_emit_request(self, target: str, operation: str, **kwargs) -> str:
         request_id = str(uuid.uuid4())
         self.pending_requests[request_id] = {"received": False, "data": None}
         request = {
             "actor": "calculations_data_operations",
             "target": target,
-            "file_name": file_name,
             "operation": operation,
             "request_id": request_id,
             **kwargs,
@@ -303,8 +300,9 @@ class CalculationsDataOperations(QObject):
             self.last_plot_time = current_time
             self.highlight_reaction(path_keys, params)
 
-    def extract_reaction_params(self, path_keys: list):
-        reaction_params = self.calculations_data.get_value(path_keys)
+    def _extract_reaction_params(self, path_keys: list):
+        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=path_keys)
+        reaction_params = self.wait_for_response(request_id).pop("data", None)
         return cft.parse_reaction_params(reaction_params)
 
     def plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
@@ -317,18 +315,23 @@ class CalculationsDataOperations(QObject):
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
 
-        request_id = self.create_and_emit_request("file_data", file_name, "check_differential")
+        request_id = self.create_and_emit_request("file_data", "check_differential", file_name=file_name)
         response_data = self.wait_for_response(request_id)
         is_executed = response_data.pop("data", None)
 
         if is_executed:
-            df_data_request_id = self.create_and_emit_request("file_data", file_name, "get_df_data")
+            df_data_request_id = self.create_and_emit_request("file_data", "get_df_data", file_name=file_name)
             df = self.wait_for_response(df_data_request_id).pop("data", None)
 
             data = cft.generate_default_function_data(df)
-            self.calculations_data.set_value(path_keys.copy(), data)
+            request_id = self.create_and_emit_request(
+                "calculations_data", "set_value", path_keys=path_keys.copy(), value=data
+            )
+            is_exist = self.wait_for_response(request_id).pop("data", None)
+            if is_exist:
+                logger.warning(f"Данные по пути: {path_keys.copy()} уже существуют")
 
-            reaction_params = self.extract_reaction_params(path_keys)
+            reaction_params = self._extract_reaction_params(path_keys)
             for bound_label, params in reaction_params.items():
                 self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
 
@@ -337,21 +340,23 @@ class CalculationsDataOperations(QObject):
             logger.error("Недостаточно информации в path_keys для удаления реакции")
             return
         file_name, reaction_name = path_keys
-        if self.calculations_data.exists(path_keys):
-            self.calculations_data.remove_value(path_keys)
-            logger.debug(f"Удалена реакция {reaction_name} для файла {file_name}")
-            console.log(f"Реакция {reaction_name} была успешно удалена")
-        else:
+        request_id = self.create_and_emit_request("calculations_data", "remove_value", path_keys=path_keys)
+        is_exist = self.wait_for_response(request_id).pop("data", None)
+        if not is_exist:
             logger.warning(f"Реакция {reaction_name} не найдена в данных")
             console.log(f"Не удалось найти реакцию {reaction_name} для удаления")
+        logger.debug(f"Удалена реакция {reaction_name} для файла {file_name}")
+        console.log(f"Реакция {reaction_name} была успешно удалена")
 
     def highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
-        request_id = self.create_and_emit_request("file_data", file_name, "plot_dataframe")
+        request_id = self.create_and_emit_request("file_data", "plot_dataframe", file_name=file_name)
         if not self.wait_for_response(request_id).pop("data", None):
             logger.warning("Ответ от file_data не получен")
 
-        data = self.calculations_data.get_value([file_name])
+        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
+        data = self.wait_for_response(request_id).pop("data", None)
+
         reactions = data.keys()
 
         cumulative_y = {
@@ -362,7 +367,7 @@ class CalculationsDataOperations(QObject):
         x = None
 
         for reaction_name in reactions:
-            reaction_params = self.extract_reaction_params([file_name, reaction_name])
+            reaction_params = self._extract_reaction_params([file_name, reaction_name])
             for bound_label, params in reaction_params.items():
                 if bound_label in cumulative_y:
                     y = cft.calculate_reaction(reaction_params.get(bound_label, []))
@@ -403,24 +408,33 @@ class CalculationsDataOperations(QObject):
                 opposite_key = bound_keys[1 - bound_keys.index(key)]
                 new_keys = path_keys.copy()
                 new_keys[new_keys.index(key)] = opposite_key
-                opposite_value = self.calculations_data.get_value(new_keys)
+
+                request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=new_keys)
+                opposite_value = self.wait_for_response(request_id).pop("data", None)
 
                 average_value = (new_value + opposite_value) / 2
                 new_keys[new_keys.index(opposite_key)] = "coeffs"
-                self.calculations_data.set_value(new_keys, average_value)
-                logger.info(f"Данные по пути: {new_keys}\n изменены на: {average_value}")
+                request_id = self.create_and_emit_request(
+                    "calculations_data", "set_value", path_keys=new_keys, value=average_value
+                )
+                is_exist = self.wait_for_response(request_id).pop("data", None)
+                if is_exist:
+                    logger.info(f"Данные по пути: {new_keys} изменены на: {average_value}")
+                else:
+                    logger.error(f"Данных по пути: {new_keys} не найдено.")
 
     def update_value(self, path_keys: list[str], params: dict):
         try:
             new_value = params.get("value")
-            if self.calculations_data.exists(path_keys):
-                self.calculations_data.set_value(path_keys.copy(), new_value)
-                logger.info(f"Данные по пути: {path_keys}\n изменены на: {new_value}")
-
+            request_id = self.create_and_emit_request(
+                "calculations_data", "set_value", path_keys=path_keys.copy(), value=new_value
+            )
+            is_exist = self.wait_for_response(request_id).pop("data", None)
+            if is_exist:
+                logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
                 self._update_coeffs_value(path_keys.copy(), new_value)
                 return {"operation": "update_value", "data": None}
             else:
-                logger.error(f"Все данные: {self.calculations_data._data}")
                 logger.error(f"Данных по пути: {path_keys} не найдено.")
         except ValueError as e:
             logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
@@ -435,7 +449,9 @@ class CalculationsDataOperations(QObject):
         if not chosen_functions:
             raise ValueError("chosen_functions is None or empty")
 
-        functions_data = self.calculations_data.get_value([file_name])
+        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
+        functions_data = self.wait_for_response(request_id).pop("data", None)
+
         if not functions_data:
             raise ValueError(f"No functions data found for file: {file_name}")
 
@@ -460,7 +476,7 @@ class CalculationsDataOperations(QObject):
             bounds.extend(filtered_pairs)
             num_coefficients[reaction_name] = len(combined_keys_set)
 
-        df_data_request_id = self.create_and_emit_request("file_data", file_name, "get_df_data")
+        df_data_request_id = self.create_and_emit_request("file_data", "get_df_data", file_name=file_name)
         df = self.wait_for_response(df_data_request_id).pop("data", None)
 
         return {
