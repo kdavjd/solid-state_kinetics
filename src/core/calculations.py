@@ -43,55 +43,47 @@ def add_default_kwargs(func):
     return wrapper
 
 
-class Calculations(QObject):
+class BasicSignals(QObject):
     request_signal = pyqtSignal(dict)
-    new_best_result = pyqtSignal(dict)
+    response_signal = pyqtSignal(dict)
 
-    def __init__(self):
+    def __init__(self, actor_name: str):
         super().__init__()
-        self.thread = None
-        self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
-        self.best_combination = None
+        self.actor_name = actor_name
         self.pending_requests: dict[str, Any] = {}
         self.event_loops: dict[str, Any] = {}
-        self.best_mse = float("inf")
-        self.new_best_result.connect(self.handle_new_best_result)
 
     def create_and_emit_request(self, target: str, operation: str, **kwargs) -> str:
         request_id = str(uuid.uuid4())
         self.pending_requests[request_id] = {"received": False, "data": None}
         request = {
-            "actor": "calculations",
+            "actor": self.actor_name,
             "target": target,
             "operation": operation,
             "request_id": request_id,
             **kwargs,
         }
-        logger.debug(f"create_and_emit_request: request data: {request}")
         self.request_signal.emit(request)
         return request_id
 
     @pyqtSlot(dict)
     def response_slot(self, params: dict):
-        if params["target"] != "calculations":
+        if params["target"] != self.actor_name:
             return
 
         request_id = params.get("request_id")
 
         if request_id in self.pending_requests:
-            logger.debug(f"calculations_request_slot: Обработка запроса с UUID: {request_id}")
             self.pending_requests[request_id]["data"] = params
             self.pending_requests[request_id]["received"] = True
 
             if request_id in self.event_loops:
-                logger.debug(f"calculations_request_slot: Завершаем цикл ожидания для UUID: {request_id}")
                 self.event_loops[request_id].quit()
         else:
-            logger.error(f"calculations_request_slot: Ответ с неизвестным UUID: {request_id}")
+            logger.error(f"{self.actor_name}_response_slot: Ответ с неизвестным UUID: {request_id}")
 
     def wait_for_response(self, request_id, timeout=1000):
         if request_id not in self.pending_requests:
-            logger.debug(f"wait_for_response: Регистрация запроса UUID: {request_id} в pending_requests")
             self.pending_requests[request_id] = {"received": False, "data": None}
 
         loop = QEventLoop()
@@ -99,11 +91,22 @@ class Calculations(QObject):
         QTimer.singleShot(timeout, loop.quit)
 
         while not self.pending_requests[request_id]["received"]:
-            logger.debug(f"wait_for_response: Ожидание... UUID: {request_id}")
             loop.exec()
 
         del self.event_loops[request_id]
         return self.pending_requests.pop(request_id)["data"]
+
+
+class Calculations(BasicSignals):
+    new_best_result = pyqtSignal(dict)
+
+    def __init__(self):
+        super().__init__("calculations")
+        self.thread = None
+        self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
+        self.best_combination = None
+        self.best_mse = float("inf")
+        self.new_best_result.connect(self.handle_new_best_result)
 
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
         self.thread: Thread = Thread(func, *args, **kwargs)
@@ -239,19 +242,15 @@ class Calculations(QObject):
         pass
 
 
-class CalculationsDataOperations(QObject):
-    request_signal = pyqtSignal(dict)
-    response_signal = pyqtSignal(dict)
+class CalculationsDataOperations(BasicSignals):
     deconvolution_signal = pyqtSignal(dict)
     plot_reaction = pyqtSignal(tuple, list)
     reaction_params_to_gui = pyqtSignal(dict)
 
     def __init__(self):
-        super().__init__()
+        super().__init__("calculations_data_operations")
         self.last_plot_time = 0
         self.calculations_in_progress = False
-        self.pending_requests: dict[str, Any] = {}
-        self.event_loops: dict[str, Any] = {}
 
     @pyqtSlot(dict)
     def request_slot(self, params: dict):
@@ -288,53 +287,6 @@ class CalculationsDataOperations(QObject):
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
-    @pyqtSlot(dict)
-    def response_slot(self, params: dict):
-        if params["target"] != "calculations_data_operations":
-            return
-
-        request_id = params.get("request_id")
-
-        if request_id in self.pending_requests:
-            logger.debug(f"response_slot: Обработка запроса с UUID: {request_id}")
-            self.pending_requests[request_id]["data"] = params
-            self.pending_requests[request_id]["received"] = True
-
-            if request_id in self.event_loops:
-                logger.debug(f"response_slot: Завершаем цикл ожидания для UUID: {request_id}")
-                self.event_loops[request_id].quit()
-        else:
-            logger.error(f"response_slot: Ответ с неизвестным UUID: {request_id}")
-
-    def create_and_emit_request(self, target: str, operation: str, **kwargs) -> str:
-        request_id = str(uuid.uuid4())
-        self.pending_requests[request_id] = {"received": False, "data": None}
-        request = {
-            "actor": "calculations_data_operations",
-            "target": target,
-            "operation": operation,
-            "request_id": request_id,
-            **kwargs,
-        }
-        self.request_signal.emit(request)
-        return request_id
-
-    def wait_for_response(self, request_id, timeout=1000):
-        if request_id not in self.pending_requests:
-            logger.debug(f"wait_for_response: Регистрация запроса UUID: {request_id} в pending_requests")
-            self.pending_requests[request_id] = {"received": False, "data": None}
-
-        loop = QEventLoop()
-        self.event_loops[request_id] = loop
-        QTimer.singleShot(timeout, loop.quit)
-
-        while not self.pending_requests[request_id]["received"]:
-            logger.debug(f"wait_for_response: Ожидание... UUID: {request_id}")
-            loop.exec()
-
-        del self.event_loops[request_id]
-        return self.pending_requests.pop(request_id)["data"]
-
     def _protected_plot_update_curves(self, path_keys, params):
         if self.calculations_in_progress:
             return
@@ -359,8 +311,7 @@ class CalculationsDataOperations(QObject):
         file_name, reaction_name = path_keys
 
         request_id = self.create_and_emit_request("file_data", "check_differential", file_name=file_name)
-        response_data = self.wait_for_response(request_id)
-        is_executed = response_data.pop("data", None)
+        is_executed = self.wait_for_response(request_id).pop("data", None)
 
         if is_executed:
             df_data_request_id = self.create_and_emit_request("file_data", "get_df_data", file_name=file_name)
