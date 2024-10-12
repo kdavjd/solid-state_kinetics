@@ -7,7 +7,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
 class CalculationsData(QObject):
     dataChanged = pyqtSignal(dict)
-    calculations_data_signal = pyqtSignal(dict)
+    response_signal = pyqtSignal(dict)
 
     def __init__(self, filename=None, parent=None):
         super().__init__(parent)
@@ -53,11 +53,11 @@ class CalculationsData(QObject):
                 logger.debug({"operation": "remove_reaction", "keys": keys + [last_key]})
 
     @pyqtSlot(dict)
-    def calculations_data_request_slot(self, params: dict):
+    def request_slot(self, params: dict):
         if params["target"] != "calculations_data":
             return
 
-        logger.debug(f"В calculations_data_request_slot пришли данные {params}")
+        logger.debug(f"В calculations_data_slot пришли данные {params}")
         operation, path_keys, value = params.get("operation"), params.get("path_keys", None), params.get("value", None)
 
         if operation == "get_value":
@@ -70,4 +70,4 @@ class CalculationsData(QObject):
             self.remove_value(path_keys)
 
         params["target"], params["actor"] = params["actor"], params["target"]
-        self.calculations_data_signal.emit(params)
+        self.response_signal.emit(params)

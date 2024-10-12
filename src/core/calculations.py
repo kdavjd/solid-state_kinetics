@@ -7,9 +7,7 @@ from typing import Any, Callable
 import numpy as np
 import pandas as pd
 from core.calculation_thread import CalculationThread as Thread
-from core.calculations_data import CalculationsData
 from core.curve_fitting import CurveFitting as cft
-from core.file_data import FileData
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
 from PyQt6.QtCore import QEventLoop, QObject, QTimer, pyqtSignal, pyqtSlot
@@ -46,21 +44,66 @@ def add_default_kwargs(func):
 
 
 class Calculations(QObject):
-    plot_reaction = pyqtSignal(tuple, list)
-    add_reaction_fail = pyqtSignal()
-    reaction_params_to_gui = pyqtSignal(dict)
+    request_signal = pyqtSignal(dict)
     new_best_result = pyqtSignal(dict)
 
-    def __init__(self, file_data: FileData, calculations_data: CalculationsData):
+    def __init__(self):
         super().__init__()
-        self.file_data = file_data
-        self.calculations_data = calculations_data
         self.thread = None
-        self.calculations_data_operations = CalculationsDataOperations(self)
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.best_combination = None
+        self.pending_requests: dict[str, Any] = {}
+        self.event_loops: dict[str, Any] = {}
         self.best_mse = float("inf")
         self.new_best_result.connect(self.handle_new_best_result)
+
+    def create_and_emit_request(self, target: str, operation: str, **kwargs) -> str:
+        request_id = str(uuid.uuid4())
+        self.pending_requests[request_id] = {"received": False, "data": None}
+        request = {
+            "actor": "calculations",
+            "target": target,
+            "operation": operation,
+            "request_id": request_id,
+            **kwargs,
+        }
+        logger.debug(f"create_and_emit_request: request data: {request}")
+        self.request_signal.emit(request)
+        return request_id
+
+    @pyqtSlot(dict)
+    def response_slot(self, params: dict):
+        if params["target"] != "calculations":
+            return
+
+        request_id = params.get("request_id")
+
+        if request_id in self.pending_requests:
+            logger.debug(f"calculations_request_slot: Обработка запроса с UUID: {request_id}")
+            self.pending_requests[request_id]["data"] = params
+            self.pending_requests[request_id]["received"] = True
+
+            if request_id in self.event_loops:
+                logger.debug(f"calculations_request_slot: Завершаем цикл ожидания для UUID: {request_id}")
+                self.event_loops[request_id].quit()
+        else:
+            logger.error(f"calculations_request_slot: Ответ с неизвестным UUID: {request_id}")
+
+    def wait_for_response(self, request_id, timeout=1000):
+        if request_id not in self.pending_requests:
+            logger.debug(f"wait_for_response: Регистрация запроса UUID: {request_id} в pending_requests")
+            self.pending_requests[request_id] = {"received": False, "data": None}
+
+        loop = QEventLoop()
+        self.event_loops[request_id] = loop
+        QTimer.singleShot(timeout, loop.quit)
+
+        while not self.pending_requests[request_id]["received"]:
+            logger.debug(f"wait_for_response: Ожидание... UUID: {request_id}")
+            loop.exec()
+
+        del self.event_loops[request_id]
+        return self.pending_requests.pop(request_id)["data"]
 
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
         self.thread: Thread = Thread(func, *args, **kwargs)
@@ -93,13 +136,8 @@ class Calculations(QObject):
             logger.error(f"Ошибка при обработке результата: {e}")
 
     @pyqtSlot(dict)
-    def modify_calculations_data_slot(self, params: dict):
-        response = self.calculations_data_operations.modify_calculations_data(params)
-        if response:
-            logger.info(f"response: {response}")
-            self._prepare_and_start_optimization(response)
-
-    def _prepare_and_start_optimization(self, response: dict):
+    def run_deconvolution(self, response: dict):
+        logger.debug(f"run_deconvolution: response: {response}")
         try:
             combined_keys = response["combined_keys"]
             bounds = response["bounds"]
@@ -198,42 +236,75 @@ class Calculations(QObject):
 
     @pyqtSlot(bool)
     def calc_data_operations_in_progress(self, in_progress: bool):
-        self.calculations_data_operations.calculations_in_progress = in_progress
+        pass
 
 
 class CalculationsDataOperations(QObject):
-    calculations_data_operations_signal = pyqtSignal(dict)
+    request_signal = pyqtSignal(dict)
+    response_signal = pyqtSignal(dict)
+    deconvolution_signal = pyqtSignal(dict)
+    plot_reaction = pyqtSignal(tuple, list)
+    reaction_params_to_gui = pyqtSignal(dict)
 
-    def __init__(
-        self,
-        calculations: Calculations,
-    ):
+    def __init__(self):
         super().__init__()
-        self.calculations = calculations
         self.last_plot_time = 0
         self.calculations_in_progress = False
         self.pending_requests: dict[str, Any] = {}
         self.event_loops: dict[str, Any] = {}
 
     @pyqtSlot(dict)
-    def calculations_data_operations_request_slot(self, params: dict):
+    def request_slot(self, params: dict):
+        if params["target"] != "calculations_data_operations":
+            return
+        logger.debug(f"В request_slot пришли данные {params}")
+        path_keys = params.get("path_keys")
+        operation = params.get("operation")
+
+        if not path_keys or not isinstance(path_keys, list):
+            logger.error("Некорректный или пустой список path_keys")
+            return
+
+        operations = {
+            "add_reaction": self.add_reaction,
+            "remove_reaction": self.remove_reaction,
+            "highlight_reaction": self.highlight_reaction,
+            "update_value": self.update_value,
+            "deconvolution": self.deconvolution,
+        }
+
+        if operation in operations:
+            params["data"] = True
+            answer = operations[operation](path_keys, params)
+            if answer:
+                if operation == "update_value":
+                    self._protected_plot_update_curves(path_keys, params)
+
+                if operation == "deconvolution":
+                    self.deconvolution_signal.emit(answer)
+
+            params["target"], params["actor"] = params["actor"], params["target"]
+            self.response_signal.emit(params)
+        else:
+            logger.warning("Неизвестная или отсутствующая операция над данными.")
+
+    @pyqtSlot(dict)
+    def response_slot(self, params: dict):
         if params["target"] != "calculations_data_operations":
             return
 
         request_id = params.get("request_id")
 
         if request_id in self.pending_requests:
-            logger.debug(f"calculations_data_operations_request_slot: Обработка запроса с UUID: {request_id}")
+            logger.debug(f"response_slot: Обработка запроса с UUID: {request_id}")
             self.pending_requests[request_id]["data"] = params
             self.pending_requests[request_id]["received"] = True
 
             if request_id in self.event_loops:
-                logger.debug(
-                    f"calculations_data_operations_request_slot: Завершаем цикл ожидания для UUID: {request_id}"
-                )
+                logger.debug(f"response_slot: Завершаем цикл ожидания для UUID: {request_id}")
                 self.event_loops[request_id].quit()
         else:
-            logger.error(f"calculations_data_operations_request_slot: Ответ с неизвестным UUID: {request_id}")
+            logger.error(f"response_slot: Ответ с неизвестным UUID: {request_id}")
 
     def create_and_emit_request(self, target: str, operation: str, **kwargs) -> str:
         request_id = str(uuid.uuid4())
@@ -245,7 +316,7 @@ class CalculationsDataOperations(QObject):
             "request_id": request_id,
             **kwargs,
         }
-        self.calculations_data_operations_signal.emit(request)
+        self.request_signal.emit(request)
         return request_id
 
     def wait_for_response(self, request_id, timeout=1000):
@@ -264,35 +335,7 @@ class CalculationsDataOperations(QObject):
         del self.event_loops[request_id]
         return self.pending_requests.pop(request_id)["data"]
 
-    @pyqtSlot(dict)
-    def modify_calculations_data(self, params: dict):
-        logger.debug(f"В modify_calculations_data пришли данные {params}")
-        path_keys = params.get("path_keys")
-        operation = params.get("operation")
-
-        if not path_keys or not isinstance(path_keys, list):
-            logger.error("Некорректный или пустой список path_keys")
-            return
-
-        operations = {
-            "add_reaction": self.add_reaction,
-            "remove_reaction": self.remove_reaction,
-            "highlight_reaction": self.highlight_reaction,
-            "update_value": self.update_value,
-            "deconvolution": self.deconvolution,
-        }
-
-        if operation in operations:
-            response = operations[operation](path_keys, params)
-            if response:
-                if operation == "update_value":
-                    self.protected_plot_update_curves(path_keys, params)
-                if operation == "deconvolution":
-                    return response["data"]
-        else:
-            logger.warning("Неизвестная или отсутствующая операция над данными.")
-
-    def protected_plot_update_curves(self, path_keys, params):
+    def _protected_plot_update_curves(self, path_keys, params):
         if self.calculations_in_progress:
             return
         current_time = time.time()
@@ -305,12 +348,12 @@ class CalculationsDataOperations(QObject):
         reaction_params = self.wait_for_response(request_id).pop("data", None)
         return cft.parse_reaction_params(reaction_params)
 
-    def plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
+    def _plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
         x_min, x_max = params[0]
         x = np.linspace(x_min, x_max, 100)
         y = cft.calculate_reaction(params)
         curve_name = f"{reaction_name}_{bound_label}"
-        self.calculations.plot_reaction.emit((file_name, curve_name), [x, y])
+        self.plot_reaction.emit((file_name, curve_name), [x, y])
 
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
@@ -333,7 +376,9 @@ class CalculationsDataOperations(QObject):
 
             reaction_params = self._extract_reaction_params(path_keys)
             for bound_label, params in reaction_params.items():
-                self.plot_reaction_curve(file_name, reaction_name, bound_label, params)
+                self._plot_reaction_curve(file_name, reaction_name, bound_label, params)
+        else:
+            _params["data"] = False
 
     def remove_reaction(self, path_keys: list, _params: dict):
         if len(path_keys) < 2:
@@ -377,21 +422,21 @@ class CalculationsDataOperations(QObject):
                     cumulative_y[bound_label] = cumulative_y[bound_label] + y if cumulative_y[bound_label].size else y
 
             if reaction_name in path_keys:
-                self.calculations.reaction_params_to_gui.emit(reaction_params)
-                self.plot_reaction_curve(
+                self.reaction_params_to_gui.emit(reaction_params)
+                self._plot_reaction_curve(
                     file_name,
                     reaction_name,
                     "upper_bound_coeffs",
                     reaction_params.get("upper_bound_coeffs", []),
                 )
-                self.plot_reaction_curve(
+                self._plot_reaction_curve(
                     file_name,
                     reaction_name,
                     "lower_bound_coeffs",
                     reaction_params.get("lower_bound_coeffs", []),
                 )
             else:
-                self.plot_reaction_curve(
+                self._plot_reaction_curve(
                     file_name,
                     reaction_name,
                     "coeffs",
@@ -399,7 +444,7 @@ class CalculationsDataOperations(QObject):
                 )
 
         for bound_label, y in cumulative_y.items():
-            self.calculations.plot_reaction.emit((file_name, f"cumulative_{bound_label}"), [x, y])
+            self.plot_reaction.emit((file_name, f"cumulative_{bound_label}"), [x, y])
 
     def _update_coeffs_value(self, path_keys: list[str], new_value):
         bound_keys = ["upper_bound_coeffs", "lower_bound_coeffs"]
@@ -480,11 +525,8 @@ class CalculationsDataOperations(QObject):
         df = self.wait_for_response(df_data_request_id).pop("data", None)
 
         return {
-            "operation": "deconvolution",
-            "data": {
-                "combined_keys": combined_keys,
-                "bounds": bounds,
-                "reaction_combinations": reaction_combinations,
-                "experimental_data": df,
-            },
+            "combined_keys": combined_keys,
+            "bounds": bounds,
+            "reaction_combinations": reaction_combinations,
+            "experimental_data": df,
         }

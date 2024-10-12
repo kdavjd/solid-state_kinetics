@@ -1,5 +1,8 @@
+import uuid
+from typing import Any
+
 from core.logger_config import logger
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QEventLoop, Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
 from ..console_widget import ConsoleWidget
@@ -22,9 +25,12 @@ class MainTab(QWidget):
     active_file_modify_signal = pyqtSignal(dict)
     calculations_data_modify_signal = pyqtSignal(dict)
     processing_signal = pyqtSignal(bool)
+    request_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.pending_requests: dict[str, Any] = {}
+        self.event_loops: dict[str, Any] = {}
         self.layout = QVBoxLayout(self)
         self.setMinimumHeight(MIN_HEIGHT_MAINTAB)
         self.setMinimumWidth(COMPONENTS_MIN_WIDTH + SPLITTER_WIDTH)
@@ -95,11 +101,66 @@ class MainTab(QWidget):
         self.console_widget.setVisible(visible)
         self.initialize_sizes()
 
+    def create_and_emit_request(self, target: str, operation: str, **kwargs) -> str:
+        request_id = str(uuid.uuid4())
+        self.pending_requests[request_id] = {"received": False, "data": None}
+        request = {
+            "actor": "main_tab",
+            "target": target,
+            "operation": operation,
+            "request_id": request_id,
+            **kwargs,
+        }
+        logger.debug(f"create_and_emit_request: request data: {request}")
+        self.request_signal.emit(request)
+        return request_id
+
+    def wait_for_response(self, request_id, timeout=1000):
+        if request_id not in self.pending_requests:
+            logger.debug(f"wait_for_response: Регистрация запроса UUID: {request_id} в pending_requests")
+            self.pending_requests[request_id] = {"received": False, "data": None}
+
+        loop = QEventLoop()
+        self.event_loops[request_id] = loop
+        QTimer.singleShot(timeout, loop.quit)
+
+        while not self.pending_requests[request_id]["received"]:
+            logger.debug(f"wait_for_response: Ожидание... UUID: {request_id}")
+            loop.exec()
+
+        del self.event_loops[request_id]
+        return self.pending_requests.pop(request_id)["data"]
+
+    @pyqtSlot(dict)
+    def response_slot(self, params: dict):
+        if params["target"] != "main_tab":
+            return
+
+        request_id = params.get("request_id")
+
+        if request_id in self.pending_requests:
+            logger.debug(f"main_tab_response_slot: Обработка запроса с UUID: {request_id}")
+            self.pending_requests[request_id]["data"] = params
+            self.pending_requests[request_id]["received"] = True
+
+            if request_id in self.event_loops:
+                logger.debug(f"main_tab_response_slot: Завершаем цикл ожидания для UUID: {request_id}")
+                self.event_loops[request_id].quit()
+
+            if params["operation"] == "add_reaction" and params["data"] is False:
+                self.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction()
+                logger.debug("Добавление реакции в таблицу не удалось. Ответ: False")
+
+        else:
+            logger.error(f"main_tab_response_slot: Ответ с неизвестным UUID: {request_id}")
+
     def refer_to_calculations_data(self, params: dict):
         active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
         params["path_keys"].insert(0, active_file_name)
-        logger.debug(f"Данные: {params} запрашивают операцию изменения данных расчета")
-        self.calculations_data_modify_signal.emit(params)
+        operation = params.pop("operation", None)
+        request_id = self.create_and_emit_request("calculations_data_operations", operation, **params)
+        response_data = self.wait_for_response(request_id).pop("data", None)
+        logger.debug(f"Ответ: {response_data}")
 
     def refer_to_active_file(self, params: dict):
         params["file_name"] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"

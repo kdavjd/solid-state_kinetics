@@ -36,7 +36,7 @@ def detect_decimal(func):
 
 
 class FileData(QObject):
-    file_data_signal = pyqtSignal(dict)
+    response_signal = pyqtSignal(dict)
     data_loaded_signal = pyqtSignal(pd.DataFrame)
     plot_dataframe_signal = pyqtSignal(pd.DataFrame)
 
@@ -195,7 +195,7 @@ class FileData(QObject):
             logger.error(f"Ошибка при модификации данных файла:{file_name}: {e}")
 
     @pyqtSlot(dict)
-    def file_data_request_slot(self, params: dict):
+    def request_slot(self, params: dict):
         if params["target"] != "file_data":
             return
 
@@ -221,4 +221,4 @@ class FileData(QObject):
             return
 
         params["target"], params["actor"] = params["actor"], params["target"]
-        self.file_data_signal.emit(params)
+        self.response_signal.emit(params)
