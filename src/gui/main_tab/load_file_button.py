@@ -88,6 +88,8 @@ class PreLoadDialog(QDialog):
         return self.file_path_edit.text()
 
     def columns_names(self):
+        if not self.columns_names_edit.text():
+            return self.auto_extract_columns_names()
         return self.columns_names_edit.text()
 
     def delimiter(self):
@@ -130,3 +132,12 @@ class PreLoadDialog(QDialog):
                     logger.debug(f"Определено количество пропускаемых строк: {line_number}")
                     return
         logger.error("Не удалось определить количество пропускаемых строк")
+
+    def auto_extract_columns_names(self):
+        if not os.path.isfile(self.file_path()):
+            return ""
+        with open(self.file_path(), "r") as file:
+            first_line = file.readline().strip()
+            if first_line:
+                return first_line
+        return ""

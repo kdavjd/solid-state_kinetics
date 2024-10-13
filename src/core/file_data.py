@@ -36,6 +36,7 @@ def detect_decimal(func):
 
 
 class FileData(QObject):
+    response_signal = pyqtSignal(dict)
     data_loaded_signal = pyqtSignal(pd.DataFrame)
     plot_dataframe_signal = pyqtSignal(pd.DataFrame)
 
@@ -192,3 +193,32 @@ class FileData(QObject):
 
         except Exception as e:
             logger.error(f"Ошибка при модификации данных файла:{file_name}: {e}")
+
+    @pyqtSlot(dict)
+    def request_slot(self, params: dict):
+        if params["target"] != "file_data":
+            return
+
+        logger.debug(f"В handle_request пришли данные {params}")
+        operation, file_name, func = params.get("operation"), params.get("file_name", None), params.get("function")
+
+        if operation == "differential":
+            if not self.check_operation_executed(file_name, "differential"):
+                self.modify_data(func, params)
+            else:
+                console.log("Данные уже приведены к da/dT")
+        elif operation == "check_differential":
+            params["data"] = self.check_operation_executed(file_name, "differential")
+        elif operation == "get_df_data":
+            params["data"] = self.dataframe_copies[file_name]
+        elif operation == "reset":
+            self.reset_dataframe_copy(file_name)
+            params["data"] = True
+        elif operation == "plot_dataframe":
+            self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
+            params["data"] = True
+        else:
+            return
+
+        params["target"], params["actor"] = params["actor"], params["target"]
+        self.response_signal.emit(params)

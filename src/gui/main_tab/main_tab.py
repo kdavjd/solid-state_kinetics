@@ -1,3 +1,4 @@
+from core.basic_signals import BasicSignals
 from core.logger_config import logger
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
@@ -18,13 +19,16 @@ COMPONENTS_MIN_WIDTH = (
 )
 
 
-class MainTab(QWidget):
+class MainTab(QWidget, BasicSignals):
     active_file_modify_signal = pyqtSignal(dict)
     calculations_data_modify_signal = pyqtSignal(dict)
     processing_signal = pyqtSignal(bool)
+    request_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        QWidget.__init__(self, parent)
+        BasicSignals.__init__(self, actor_name="main_tab")
+
         self.layout = QVBoxLayout(self)
         self.setMinimumHeight(MIN_HEIGHT_MAINTAB)
         self.setMinimumWidth(COMPONENTS_MIN_WIDTH + SPLITTER_WIDTH)
@@ -98,8 +102,10 @@ class MainTab(QWidget):
     def refer_to_calculations_data(self, params: dict):
         active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
         params["path_keys"].insert(0, active_file_name)
-        logger.debug(f"Данные: {params} запрашивают операцию изменения данных расчета")
-        self.calculations_data_modify_signal.emit(params)
+        operation = params.pop("operation", None)
+        request_id = self.create_and_emit_request("calculations_data_operations", operation, **params)
+        response_data = self.wait_for_response(request_id).pop("data", None)
+        logger.debug(f"Ответ: {response_data}")
 
     def refer_to_active_file(self, params: dict):
         params["file_name"] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
@@ -117,3 +123,17 @@ class MainTab(QWidget):
             if i == len(params_list) - 1:
                 self.processing_signal.emit(False)
             self.refer_to_calculations_data(params)
+
+    @pyqtSlot(dict)
+    def response_slot(self, params: dict):
+        super().response_slot(params)
+
+        if params["target"] != "main_tab":
+            return
+
+        request_id = params.get("request_id")
+
+        if request_id in self.pending_requests:
+            if params["operation"] == "add_reaction" and params["data"] is False:
+                self.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction()
+                logger.debug("Добавление реакции в таблицу не удалось. Ответ: False")
