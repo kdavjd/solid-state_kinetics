@@ -1,7 +1,8 @@
 import sys
 
-from core.calculations import Calculations, CalculationsDataOperations
+from core.calculations import Calculations
 from core.calculations_data import CalculationsData
+from core.calculations_data_operations import CalculationsDataOperations
 from core.file_data import FileData
 from core.file_operations import ActiveFileOperations
 from gui.main_window import MainWindow

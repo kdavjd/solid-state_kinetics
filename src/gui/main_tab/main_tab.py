@@ -1,4 +1,4 @@
-from core.calculations import BasicSignals
+from core.basic_signals import BasicSignals
 from core.logger_config import logger
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
