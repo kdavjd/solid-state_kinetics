@@ -50,10 +50,32 @@ class BasicSignals(QObject):
 
         loop = QEventLoop()
         self.event_loops[request_id] = loop
-        QTimer.singleShot(timeout, loop.quit)
 
-        while not self.pending_requests[request_id]["received"]:
+        timed_out = False
+
+        def on_timeout():
+            nonlocal timed_out
+            timed_out = True
+            loop.quit()
+
+        QTimer.singleShot(timeout, on_timeout)
+
+        while not self.pending_requests[request_id]["received"] and not timed_out:
             loop.exec()
 
         del self.event_loops[request_id]
+        if timed_out:
+            logger.error(f"{self.actor_name}_wait_for_response: Время ожидания ответа истекло для запроса {request_id}")
+            return None
         return self.pending_requests.pop(request_id)["data"]
+
+    def handle_response(self, request_id: str) -> Any:
+        response_data = self.wait_for_response(request_id)
+        if response_data is not None:
+            return response_data.pop("data", None)
+        else:
+            logger.error(
+                f"{self.actor_name}_handle_response: Не удалось получить ответ для запроса {request_id}\
+                    - время ожидания истекло"
+            )
+            return None
