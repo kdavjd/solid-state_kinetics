@@ -121,6 +121,7 @@ class MainTab(QWidget, BasicSignals):
                 0,
                 self.sub_sidebar.deconvolution_sub_bar.reactions_table.active_reaction,
             )
+            params["is_chain"] = True
             if i == len(params_list) - 1:
                 self.processing_signal.emit(False)
             self.refer_to_calculations_data(params)

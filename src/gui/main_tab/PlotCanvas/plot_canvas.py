@@ -192,12 +192,12 @@ class PlotCanvas(QWidget):
             updates = [
                 {
                     "path_keys": ["upper_bound_coeffs", axis],
-                    "operation": "chain_update_value",
+                    "operation": "update_value",
                     "value": positions["upper_bound"][0 if axis == "z" else 1],
                 },
                 {
                     "path_keys": ["lower_bound_coeffs", axis],
-                    "operation": "chain_update_value",
+                    "operation": "update_value",
                     "value": positions["lower_bound"][0 if axis == "z" else 1],
                 },
             ]
@@ -205,7 +205,7 @@ class PlotCanvas(QWidget):
             updates.append(
                 {
                     "path_keys": ["coeffs", axis],
-                    "operation": "chain_update_value",
+                    "operation": "update_value",
                     "value": center["center"][0 if axis == "z" else 1],
                 }
             )

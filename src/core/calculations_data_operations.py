@@ -36,7 +36,6 @@ class CalculationsDataOperations(BasicSignals):
             "remove_reaction": self.remove_reaction,
             "highlight_reaction": self.highlight_reaction,
             "update_value": self.update_value,
-            "chain_update_value": self.chain_update_value,
             "deconvolution": self.deconvolution,
         }
 
@@ -190,28 +189,16 @@ class CalculationsDataOperations(BasicSignals):
     def update_value(self, path_keys: list[str], params: dict):
         try:
             new_value = params.get("value")
+            is_chain = params.get("is_chain", None)
             request_id = self.create_and_emit_request(
                 "calculations_data", "set_value", path_keys=path_keys.copy(), value=new_value
             )
             is_ok = self.handle_response(request_id)
             if is_ok:
                 logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
-                self._update_coeffs_value(path_keys.copy(), new_value)
-                return {"operation": "update_value", "data": None}
-            else:
-                logger.error(f"Данных по пути: {path_keys} не найдено.")
-        except ValueError as e:
-            logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
-
-    def chain_update_value(self, path_keys: list[str], params: dict):
-        try:
-            new_value = params.get("value")
-            request_id = self.create_and_emit_request(
-                "calculations_data", "set_value", path_keys=path_keys.copy(), value=new_value
-            )
-            is_ok = self.handle_response(request_id)
-            if is_ok:
-                logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
+                if not is_chain:
+                    self._update_coeffs_value(path_keys.copy(), new_value)
+                    return {"operation": "update_value", "data": None}
             else:
                 logger.error(f"Данных по пути: {path_keys} не найдено.")
         except ValueError as e:
