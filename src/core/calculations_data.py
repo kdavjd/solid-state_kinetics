@@ -57,8 +57,8 @@ class CalculationsData(QObject):
         if params["target"] != "calculations_data":
             return
 
-        logger.debug(f"В calculations_data_slot пришли данные {params}")
         operation, path_keys, value = params.get("operation"), params.get("path_keys", None), params.get("value", None)
+        logger.debug(f"В calculations_data_slot пришел запрос {operation} от {params['actor']}")
 
         if operation == "get_value":
             params["data"] = self.get_value(path_keys)

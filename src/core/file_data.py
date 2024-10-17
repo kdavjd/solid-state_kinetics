@@ -207,6 +207,7 @@ class FileData(QObject):
                 self.modify_data(func, params)
             else:
                 console.log("Данные уже приведены к da/dT")
+            params["data"] = True
         elif operation == "check_differential":
             params["data"] = self.check_operation_executed(file_name, "differential")
         elif operation == "get_df_data":
@@ -217,6 +218,8 @@ class FileData(QObject):
         elif operation == "plot_dataframe":
             self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
             params["data"] = True
+        elif operation == "load_file":
+            self.load_file(file_name)
         else:
             return
 

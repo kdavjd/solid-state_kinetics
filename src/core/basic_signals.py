@@ -34,6 +34,7 @@ class BasicSignals(QObject):
             return
 
         request_id = params.get("request_id")
+        logger.debug(f"{self.actor_name}_response_slot: Ответ для запроса {request_id} получен")
 
         if request_id in self.pending_requests:
             self.pending_requests[request_id]["data"] = params
