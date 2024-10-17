@@ -20,14 +20,15 @@ def main():
 
     window.main_tab.sidebar.load_button.file_selected.connect(file_data.load_file)
     window.main_tab.sidebar.chosen_experiment_signal.connect(file_data.plot_dataframe_copy)
-    window.main_tab.active_file_modify_signal.connect(file_operations.modify_active_file)
+    window.main_tab.active_file_modify_signal.connect(file_operations.request_slot)
     window.main_tab.calculations_data_modify_signal.connect(calculations_data_operations.request_slot)
     window.main_tab.processing_signal.connect(calcultaions.calc_data_operations_in_progress)
     window.main_tab.request_signal.connect(calculations_data_operations.request_slot)
     file_data.plot_dataframe_signal.connect(window.main_tab.plot_canvas.plot_file_data_from_dataframe)
     file_data.data_loaded_signal.connect(window.main_tab.plot_canvas.plot_file_data_from_dataframe)
     file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
-    file_operations.active_file_operations_signal.connect(file_data.request_slot)
+    file_operations.request_signal.connect(file_data.request_slot)
+    file_data.response_signal.connect(file_operations.response_slot)
     file_data.response_signal.connect(calculations_data_operations.response_slot)
     calculations_data_operations.plot_reaction.connect(window.main_tab.plot_canvas.plot_reaction)
     calculations_data_operations.reaction_params_to_gui.connect(

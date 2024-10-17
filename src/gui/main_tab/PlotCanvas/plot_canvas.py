@@ -20,7 +20,6 @@ plt.style.use(["science", "no-latex", "nature", "grid"])
 
 class PlotCanvas(QWidget):
     update_value = pyqtSignal(list)
-    update_value = pyqtSignal(list)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -174,6 +173,11 @@ class PlotCanvas(QWidget):
             if self.dragging_anchor:
                 self.dragging_anchor_group = "height"
 
+    def _calculate_center(self, positions: dict[str, tuple]):
+        center_x = (positions["upper_bound"][0] + positions["lower_bound"][0]) / 2
+        center_y = (positions["upper_bound"][1] + positions["lower_bound"][1]) / 2
+        return {"center": (center_x, center_y)}
+
     def on_release(self, event):
         logger.debug(f"Событие отпуска мыши: {event}")
         if self.dragging_anchor_group:
@@ -182,33 +186,29 @@ class PlotCanvas(QWidget):
             positions = (
                 self.position_anchor_group if self.dragging_anchor_group == "position" else self.height_anchor_group
             ).get_bound_positions()
+            logger.debug(f"Позиции: {positions}")
             axis = "z" if self.dragging_anchor_group == "position" else "h"
 
             updates = [
                 {
                     "path_keys": ["upper_bound_coeffs", axis],
-                    "operation": "update_value",
+                    "operation": "chain_update_value",
                     "value": positions["upper_bound"][0 if axis == "z" else 1],
                 },
                 {
                     "path_keys": ["lower_bound_coeffs", axis],
-                    "operation": "update_value",
+                    "operation": "chain_update_value",
                     "value": positions["lower_bound"][0 if axis == "z" else 1],
                 },
             ]
-            self.update_value.emit(updates)
-            updates = [
+            center = self._calculate_center(positions)
+            updates.append(
                 {
-                    "path_keys": ["upper_bound_coeffs", axis],
-                    "operation": "update_value",
-                    "value": positions["upper_bound"][0 if axis == "z" else 1],
-                },
-                {
-                    "path_keys": ["lower_bound_coeffs", axis],
-                    "operation": "update_value",
-                    "value": positions["lower_bound"][0 if axis == "z" else 1],
-                },
-            ]
+                    "path_keys": ["coeffs", axis],
+                    "operation": "chain_update_value",
+                    "value": center["center"][0 if axis == "z" else 1],
+                }
+            )
             self.update_value.emit(updates)
 
         self.dragging_anchor = None

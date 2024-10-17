@@ -1,5 +1,6 @@
 from core.basic_signals import BasicSignals
 from core.logger_config import logger
+from core.logger_console import LoggerConsole as console
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
@@ -109,7 +110,7 @@ class MainTab(QWidget, BasicSignals):
 
     def refer_to_active_file(self, params: dict):
         params["file_name"] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
-        logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params['operation']}")
+        logger.debug(f"Активный файл: {params['file_name']} запрашивает операцию: {params["operation"]}")
         self.active_file_modify_signal.emit(params)
 
     @pyqtSlot(list)
@@ -123,6 +124,8 @@ class MainTab(QWidget, BasicSignals):
             if i == len(params_list) - 1:
                 self.processing_signal.emit(False)
             self.refer_to_calculations_data(params)
+        params["operation"] = "highlight_reaction"
+        self.refer_to_calculations_data(params)
 
     @pyqtSlot(dict)
     def response_slot(self, params: dict):
@@ -135,5 +138,9 @@ class MainTab(QWidget, BasicSignals):
 
         if request_id in self.pending_requests:
             if params["operation"] == "add_reaction" and params["data"] is False:
+                console.log(
+                    "Перед добвлением реакции необходимо привести данные к da/dT. Данные экспериментов ->\
+                     выберите эксперимент -> Привести к da/dT"
+                )
                 self.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction()
                 logger.debug("Добавление реакции в таблицу не удалось. Ответ: False")
