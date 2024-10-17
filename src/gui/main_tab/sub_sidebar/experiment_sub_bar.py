@@ -133,3 +133,6 @@ class ExperimentSubBar(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.setMaximumWidth(self.parent().width())
+
+    def delete_file(self):
+        pass
