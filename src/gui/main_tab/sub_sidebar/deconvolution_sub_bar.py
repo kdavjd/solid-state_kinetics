@@ -1,13 +1,18 @@
+import json
+import os
 from collections import defaultdict
 
+import numpy as np
+from core.basic_signals import BasicSignals
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
@@ -20,9 +25,12 @@ from PyQt6.QtWidgets import (
 )
 
 
-class FileTransferButtons(QWidget):
+class FileTransferButtons(QWidget, BasicSignals):
+    request_signal = pyqtSignal(dict)
+
     def __init__(self, parent=None):
-        super().__init__(parent)
+        QWidget.__init__(self, parent)
+        BasicSignals.__init__(self, actor_name="file_tansfer_buttons")
         self.layout = QVBoxLayout(self)
 
         self.load_reactions_button = QPushButton("Импорт")
@@ -31,6 +39,61 @@ class FileTransferButtons(QWidget):
         self.buttons_layout.addWidget(self.load_reactions_button)
         self.buttons_layout.addWidget(self.export_reactions_button)
         self.layout.addLayout(self.buttons_layout)
+
+        self.load_reactions_button.clicked.connect(self.load_reactions)
+        self.export_reactions_button.clicked.connect(self.export_reactions)
+
+    @pyqtSlot(dict)
+    def response_slot(self, params: dict):
+        super().response_slot(params)
+
+    def load_reactions(self):
+        pass
+
+    def _generate_suggested_file_name(self, file_name: str, data: dict):
+        n_reactions = len(data)
+        reaction_types = []
+        for reaction_key, reaction_data in data.items():
+            function = reaction_data.get("function", "")
+            if function == "gauss":
+                reaction_types.append("gs")
+            elif function == "fraser":
+                reaction_types.append("fr")
+            elif function == "ads":
+                reaction_types.append("ads")
+
+        reaction_codes = "_".join(reaction_types)
+        base_name = os.path.splitext(os.path.basename(file_name))[0]
+        suggested_file_name = f"{base_name}_{n_reactions}_reacts_{reaction_codes}.json"
+        return suggested_file_name
+
+    def export_reactions(self):
+        request_id = self.create_and_emit_request("main_tab", "get_file_name")
+        file_name = self.handle_response_data(request_id)
+        logger.debug(f"file_name: {file_name}")
+
+        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
+        data = self.handle_response_data(request_id)
+        logger.debug(f"data: {data}")
+
+        suggested_file_name = self._generate_suggested_file_name(file_name, data)
+
+        save_file_name, _ = QFileDialog.getSaveFileName(
+            self, "Выберите место для сохранения JSON файла", suggested_file_name, "JSON Files (*.json)"
+        )
+
+        if save_file_name:
+            with open(save_file_name, "w", encoding="utf-8") as file:
+                json.dump(data, file, ensure_ascii=False, indent=4, cls=NumpyArrayEncoder)
+                console.log(f"Данные успешно экспортированы в файл:\n\n{save_file_name}")
+                logger.info(f"Данные успешно экспортированы в файл:{save_file_name}")
+
+
+class NumpyArrayEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyArrayEncoder, self).default(obj)
 
 
 class ReactionTable(QWidget):
@@ -357,11 +420,12 @@ class CalcButtons(QWidget):
         self.start_button.show()
 
 
-class DeconvolutionSubBar(QWidget):
+class DeconvolutionSubBar(QWidget, BasicSignals):
     update_value = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        QWidget.__init__(self, parent)
+        BasicSignals.__init__(self, actor_name="deconvolution_sub_bar")
         layout = QVBoxLayout(self)
 
         self.reactions_table = ReactionTable(self)

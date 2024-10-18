@@ -70,7 +70,7 @@ class BasicSignals(QObject):
             return None
         return self.pending_requests.pop(request_id)["data"]
 
-    def handle_response(self, request_id: str) -> Any:
+    def handle_response_data(self, request_id: str) -> Any:
         response_data = self.wait_for_response(request_id)
         if response_data is not None:
             return response_data.pop("data", None)

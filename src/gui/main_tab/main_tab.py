@@ -25,6 +25,7 @@ class MainTab(QWidget, BasicSignals):
     calculations_data_modify_signal = pyqtSignal(dict)
     processing_signal = pyqtSignal(bool)
     request_signal = pyqtSignal(dict)
+    response_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
@@ -105,7 +106,7 @@ class MainTab(QWidget, BasicSignals):
         params["path_keys"].insert(0, active_file_name)
         operation = params.pop("operation", None)
         request_id = self.create_and_emit_request("calculations_data_operations", operation, **params)
-        response_data = self.wait_for_response(request_id).pop("data", None)
+        response_data = self.handle_response_data(request_id)
         logger.debug(f"Ответ: {response_data}")
 
     def refer_to_active_file(self, params: dict):
@@ -145,3 +146,22 @@ class MainTab(QWidget, BasicSignals):
                 )
                 self.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction()
                 logger.debug("Добавление реакции в таблицу не удалось. Ответ: False")
+
+    @pyqtSlot(dict)
+    def request_slot(self, params: dict):
+        if params["target"] != "main_tab":
+            return
+
+        logger.debug(f"В request_slot пришли данные {params}")
+        operation = params.pop("operation", None)
+        if not operation:
+            logger.error(f"Операция не найдена: {params}")
+            return
+
+        elif operation == "get_file_name":
+            params["data"] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else None
+        else:
+            logger.error(f"Операция не найдена: {params}")
+
+        params["target"], params["actor"] = params["actor"], params["target"]
+        self.response_signal.emit(params)
