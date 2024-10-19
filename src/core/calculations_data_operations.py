@@ -18,6 +18,7 @@ class CalculationsDataOperations(BasicSignals):
         super().__init__("calculations_data_operations")
         self.last_plot_time = 0
         self.calculations_in_progress = False
+        self.combined_keys = {}
 
     @pyqtSlot(dict)
     def request_slot(self, params: dict):
@@ -202,16 +203,17 @@ class CalculationsDataOperations(BasicSignals):
             else:
                 logger.error(f"Данных по пути: {path_keys} не найдено.")
         except ValueError as e:
-            logger.error(f"Непредусмотренная ошибка при обновлении данных по пути: {path_keys}: {str(e)}")
+            logger.error(f"Непредусмотренная ошибка при обновлении данных по пути:\n {path_keys}: {str(e)}")
 
     def deconvolution(self, path_keys: list[str], params: dict):
-        combined_keys = {}
+        reaction_variables = {}
         num_coefficients = {}
         bounds = []
         check_keys = ["h", "z", "w", "fr", "ads1", "ads2"]
         file_name = path_keys[0]
-        chosen_functions = params.get("chosen_functions")
-        if not chosen_functions:
+        reaction_chosen_functions = params.get("chosen_functions")
+        logger.info(f"Chosen functions: {reaction_chosen_functions}")
+        if not reaction_chosen_functions:
             raise ValueError("chosen_functions is None or empty")
 
         request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
@@ -220,32 +222,31 @@ class CalculationsDataOperations(BasicSignals):
         if not functions_data:
             raise ValueError(f"No functions data found for file: {file_name}")
 
-        reaction_combinations = list(product(*chosen_functions.values()))
+        reaction_combinations = list(product(*reaction_chosen_functions.values()))
 
-        for reaction_name in chosen_functions:
-            combined_keys_set = set()
+        for reaction_name in reaction_chosen_functions:
+            function_vars = set()
             reaction_params = functions_data[reaction_name]
             if not reaction_params:
                 raise ValueError(f"No reaction params found for reaction: {reaction_name}")
-            for reaction_type in chosen_functions[reaction_name]:
+            for reaction_type in reaction_chosen_functions[reaction_name]:
                 allowed_keys = cft._get_allowed_keys_for_type(reaction_type)
-                combined_keys_set.update(allowed_keys)
-            combined_keys[reaction_name] = combined_keys_set
-            lower_coeffs_tuple = reaction_params["lower_bound_coeffs"].values()
-            upper_coeffs_tuple = reaction_params["upper_bound_coeffs"].values()
+                function_vars.update(allowed_keys)
+            reaction_variables[reaction_name] = function_vars
+            lower_coeffs = reaction_params["lower_bound_coeffs"].values()
+            upper_coeffs = reaction_params["upper_bound_coeffs"].values()
             filtered_pairs = [
-                (lc, uc)
-                for lc, uc, key in zip(lower_coeffs_tuple, upper_coeffs_tuple, check_keys)
-                if key in combined_keys_set
+                (lc, uc) for lc, uc, key in zip(lower_coeffs, upper_coeffs, check_keys) if key in function_vars
             ]
             bounds.extend(filtered_pairs)
-            num_coefficients[reaction_name] = len(combined_keys_set)
+            num_coefficients[reaction_name] = len(function_vars)
 
         request_id = self.create_and_emit_request("file_data", "get_df_data", file_name=file_name)
         df = self.handle_response_data(request_id)
+        logger.info(f"На деконволюцию направлены:\n reaction_variables: {reaction_variables}")
 
         return {
-            "combined_keys": combined_keys,
+            "reaction_variables": reaction_variables,
             "bounds": bounds,
             "reaction_combinations": reaction_combinations,
             "experimental_data": df,

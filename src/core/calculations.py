@@ -86,12 +86,14 @@ class Calculations(BasicSignals):
     def run_deconvolution(self, response: dict):
         logger.debug(f"run_deconvolution: response: {response}")
         try:
-            combined_keys = response["combined_keys"]
+            reaction_variables = response["reaction_variables"]
             bounds = response["bounds"]
             reaction_combinations = response["reaction_combinations"]
             experimental_data = response["experimental_data"]
 
-            target_function = self.generate_target_function(combined_keys, reaction_combinations, experimental_data)
+            target_function = self.generate_target_function(
+                reaction_variables, reaction_combinations, experimental_data
+            )
 
             self.start_differential_evolution(bounds=bounds, target_function=target_function)
         except Exception as e:
@@ -143,7 +145,9 @@ class Calculations(BasicSignals):
                 if mse < best_mse:
                     best_mse = mse
                     best_combination = combination
-            self.new_best_result.emit({"best_mse": best_mse, "best_combination": best_combination})
+                    self.new_best_result.emit(
+                        {"best_mse": best_mse, "best_combination": best_combination, "params": params}
+                    )
             return best_mse
 
         return target_function
@@ -174,11 +178,15 @@ class Calculations(BasicSignals):
     def handle_new_best_result(self, result: dict):
         best_mse = result["best_mse"]
         best_combination = result["best_combination"]
+        params = result["params"]
         if best_mse < self.best_mse:
             self.best_mse = best_mse
             self.best_combination = best_combination
             console.log(
-                f"Новый лучший результат:\n" f"Лучшее MSE: {best_mse}\n" f"Комбинация реакций: {best_combination}\n\n"
+                f"Новый лучший результат:\n"
+                f"Лучшее MSE: {best_mse}\n"
+                f"Комбинация реакций: {best_combination}\n\n"
+                f"Параметры: {params}"
             )
 
     @pyqtSlot(bool)

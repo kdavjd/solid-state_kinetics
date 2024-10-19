@@ -30,6 +30,8 @@ class FileTransferButtons(QWidget, BasicSignals):
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
+        # После добавления сигналов при первом выборе вкладки деконволюции происходит
+        # непрусмотренное выскакивание окна на долю секунды
         BasicSignals.__init__(self, actor_name="file_tansfer_buttons")
         self.layout = QVBoxLayout(self)
 
@@ -64,7 +66,7 @@ class FileTransferButtons(QWidget, BasicSignals):
 
         reaction_codes = "_".join(reaction_types)
         base_name = os.path.splitext(os.path.basename(file_name))[0]
-        suggested_file_name = f"{base_name}_{n_reactions}_reacts_{reaction_codes}.json"
+        suggested_file_name = f"{base_name}_{n_reactions}_rcts_{reaction_codes}.json"
         return suggested_file_name
 
     def export_reactions(self):
