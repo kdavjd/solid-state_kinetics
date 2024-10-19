@@ -118,8 +118,8 @@ class PlotCanvas(QWidget):
         line_properties = self.determine_line_properties(reaction_name)
         self.add_or_update_line(reaction_name, x, y, **line_properties)
 
-        if any(bound in reaction_name for bound in ["upper_bound", "lower_bound"]):
-            self.update_fill_between()
+        # if any(bound in reaction_name for bound in ["upper_bound", "lower_bound"]):
+        #     self.update_fill_between()
 
     @pyqtSlot(dict)
     def add_anchors(self, reaction_data: dict):

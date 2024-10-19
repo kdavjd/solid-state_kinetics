@@ -65,8 +65,12 @@ class BasicSignals(QObject):
             loop.exec()
 
         del self.event_loops[request_id]
+
         if timed_out:
-            logger.error(f"{self.actor_name}_wait_for_response: Время ожидания ответа истекло для запроса {request_id}")
+            logger.error(
+                f"{self.actor_name}_wait_for_response: Время ожидания ответа истекло для запроса {request_id}\n\
+                Статус удаления ожидания: {self.event_loops.get(request_id, None) is None}"
+            )
             return None
         return self.pending_requests.pop(request_id)["data"]
 

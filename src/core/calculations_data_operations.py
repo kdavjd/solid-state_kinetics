@@ -18,7 +18,8 @@ class CalculationsDataOperations(BasicSignals):
         super().__init__("calculations_data_operations")
         self.last_plot_time = 0
         self.calculations_in_progress = False
-        self.combined_keys = {}
+        self.reaction_variables: dict = {}
+        self.reaction_chosen_functions: dict[str, list] = {}
 
     @pyqtSlot(dict)
     def request_slot(self, params: dict):
@@ -38,6 +39,7 @@ class CalculationsDataOperations(BasicSignals):
             "highlight_reaction": self.highlight_reaction,
             "update_value": self.update_value,
             "deconvolution": self.deconvolution,
+            "update_reactions_params": self.update_reactions_params,
         }
 
         if operation in operations:
@@ -74,6 +76,31 @@ class CalculationsDataOperations(BasicSignals):
         y = cft.calculate_reaction(params)
         curve_name = f"{reaction_name}_{bound_label}"
         self.plot_reaction.emit((file_name, curve_name), [x, y])
+
+    def update_reactions_params(self, path_keys: list, params: dict):
+        file_name = path_keys[0]
+        reaction_functions: tuple[str] = params.get("best_combination", None)
+        reactions_params = params.get("reactions_params", None)
+        n_reactions_coeffs = [len(self.reaction_variables[key]) for key in self.reaction_variables]
+        reactions_dict = {}
+        start = 0
+        for key, count in zip(self.reaction_variables.keys(), n_reactions_coeffs):
+            reactions_dict[key] = reactions_params[start : start + count]
+            start += count
+
+        ordered_vars = ["h", "z", "w", "fr", "ads1", "ads2"]
+        sorted_reactions = sorted(reactions_dict.keys(), key=lambda x: int(x.split("_")[1]))
+        for i, reaction in enumerate(sorted_reactions):
+            variables = self.reaction_variables[reaction]
+            values = reactions_dict[reaction]
+            function_type = reaction_functions[i]
+            allowed_keys = cft._get_allowed_keys_for_type(function_type)
+            var_list = [var for var in ordered_vars if var in variables and var in allowed_keys]
+
+            for var, value in zip(var_list, values):
+                path_keys = [file_name, reaction, "coeffs", var]
+                params = {"value": value, "is_chain": True}
+                self.update_value(path_keys, params)
 
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
@@ -211,7 +238,7 @@ class CalculationsDataOperations(BasicSignals):
         bounds = []
         check_keys = ["h", "z", "w", "fr", "ads1", "ads2"]
         file_name = path_keys[0]
-        reaction_chosen_functions = params.get("chosen_functions")
+        reaction_chosen_functions: dict = params.get("chosen_functions", {})
         logger.info(f"Chosen functions: {reaction_chosen_functions}")
         if not reaction_chosen_functions:
             raise ValueError("chosen_functions is None or empty")
@@ -243,6 +270,8 @@ class CalculationsDataOperations(BasicSignals):
 
         request_id = self.create_and_emit_request("file_data", "get_df_data", file_name=file_name)
         df = self.handle_response_data(request_id)
+        self.reaction_variables = reaction_variables.copy()
+        self.reaction_chosen_functions = reaction_chosen_functions.copy()
         logger.info(f"На деконволюцию направлены:\n reaction_variables: {reaction_variables}")
 
         return {

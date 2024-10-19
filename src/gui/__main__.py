@@ -34,12 +34,16 @@ def main():
     window.main_tab.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.request_signal.connect(
         calculations_data.request_slot
     )
+    window.main_tab.response_signal.connect(calcultaions.response_slot)
     file_data.plot_dataframe_signal.connect(window.main_tab.plot_canvas.plot_file_data_from_dataframe)
     file_data.data_loaded_signal.connect(window.main_tab.plot_canvas.plot_file_data_from_dataframe)
     file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
     file_operations.request_signal.connect(file_data.request_slot)
     file_data.response_signal.connect(file_operations.response_slot)
     file_data.response_signal.connect(calculations_data_operations.response_slot)
+    calcultaions.request_signal.connect(window.main_tab.request_slot)
+    calcultaions.request_signal.connect(calculations_data_operations.request_slot)
+    calculations_data_operations.response_signal.connect(calcultaions.response_slot)
     calculations_data.response_signal.connect(
         window.main_tab.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.response_slot
     )
