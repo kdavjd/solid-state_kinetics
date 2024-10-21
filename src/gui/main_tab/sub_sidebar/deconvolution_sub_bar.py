@@ -50,7 +50,32 @@ class FileTransferButtons(QWidget, BasicSignals):
         super().response_slot(params)
 
     def load_reactions(self):
-        pass
+        load_file_name, _ = QFileDialog.getOpenFileName(
+            self, "Выберите JSON файл для импорта данных", "", "JSON Files (*.json)"
+        )
+
+        if load_file_name:
+            with open(load_file_name, "r", encoding="utf-8") as file:
+                data = json.load(file)
+
+            for reaction_key, reaction_data in data.items():
+                if "x" in reaction_data:
+                    reaction_data["x"] = np.array(reaction_data["x"])
+
+            request_id = self.create_and_emit_request("main_tab", "get_file_name")
+            file_name = self.handle_response_data(request_id)
+            logger.debug(f"Current file_name: {file_name}")
+
+            request_id = self.create_and_emit_request(
+                "calculations_data", "set_value", path_keys=[file_name], value=data
+            )
+            self.handle_response_data(request_id)
+
+            console.log(f"Данные успешно импортированы из файла:\n\n{load_file_name}")
+            logger.info(f"Данные успешно импортированы из файла: {load_file_name}")
+
+            request_id = self.create_and_emit_request("main_tab", "update_reaction_table", reactions_data=data)
+            self.handle_response_data(request_id)
 
     def _generate_suggested_file_name(self, file_name: str, data: dict):
         n_reactions = len(data)
@@ -153,7 +178,7 @@ class ReactionTable(QWidget):
         self.reaction_function_changed.emit(data_change)
         logger.debug(f"Изменена реакция для {reaction_name}: {function}")
 
-    def add_reaction(self):
+    def add_reaction(self, checked=False, reaction_name=None, function_name=None, emit_signal=True):
         if not self.active_file:
             QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
             return
@@ -162,17 +187,32 @@ class ReactionTable(QWidget):
         row_count = table.rowCount()
         table.insertRow(row_count)
 
-        reaction_name = f"reaction_{self.reactions_counters[self.active_file]}"
+        if reaction_name is None:
+            reaction_name = f"reaction_{self.reactions_counters[self.active_file]}"
+        else:
+            try:
+                counter_value = int(reaction_name.split("_")[-1])
+                self.reactions_counters[self.active_file] = max(
+                    self.reactions_counters[self.active_file], counter_value + 1
+                )
+            except ValueError:
+                logger.error(f"Неверный формат имени реакции: {reaction_name}")
+
         combo = QComboBox()
         combo.addItems(["gauss", "fraser", "ads"])
-        combo.setCurrentText("gauss")
+        if function_name:
+            combo.setCurrentText(function_name)
+        else:
+            combo.setCurrentText("gauss")
         combo.currentIndexChanged.connect(lambda: self.function_changed(reaction_name, combo))
 
         table.setItem(row_count, 0, QTableWidgetItem(reaction_name))
         table.setCellWidget(row_count, 1, combo)
 
-        reaction_data = {"path_keys": [reaction_name], "operation": "add_reaction"}
-        self.reaction_added.emit(reaction_data)
+        if emit_signal:
+            reaction_data = {"path_keys": [reaction_name], "operation": "add_reaction"}
+            self.reaction_added.emit(reaction_data)
+
         self.reactions_counters[self.active_file] += 1
 
     def on_fail_add_reaction(self):

@@ -155,11 +155,28 @@ class MainTab(QWidget, BasicSignals):
         logger.debug(f"В request_slot пришли данные {params}")
         operation = params.pop("operation", None)
         if not operation:
-            logger.error(f"Операция не найдена: {params}")
+            logger.error(f"Операция {operation} не найдена: {params}")
             return
 
         elif operation == "get_file_name":
             params["data"] = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else None
+        elif operation == "update_reaction_table":
+            reactions_data = params.get("reactions_data", {})
+            active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else None
+            if not active_file_name:
+                logger.error("Нет активного файла для обновления UI.")
+                return
+
+            reaction_table = self.sub_sidebar.deconvolution_sub_bar.reactions_table
+            reaction_table.switch_file(active_file_name)
+            table = reaction_table.reactions_tables[active_file_name]
+            table.setRowCount(0)
+            reaction_table.reactions_counters[active_file_name] = 0
+
+            for reaction_name, reaction_info in reactions_data.items():
+                function_name = reaction_info.get("function", "gauss")
+                reaction_table.add_reaction(reaction_name=reaction_name, function_name=function_name, emit_signal=False)
+            logger.debug("UI успешно обновлен с загруженными реакциями.")
         else:
             logger.error(f"Операция не найдена: {params}")
 
