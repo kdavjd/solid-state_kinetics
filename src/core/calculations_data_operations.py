@@ -98,9 +98,10 @@ class CalculationsDataOperations(BasicSignals):
             var_list = [var for var in ordered_vars if var in variables and var in allowed_keys]
 
             for var, value in zip(var_list, values):
-                path_keys = [file_name, reaction, "coeffs", var]
-                params = {"value": value, "is_chain": True}
-                self.update_value(path_keys, params)
+                for bound in ["lower_bound_coeffs", "coeffs", "upper_bound_coeffs"]:
+                    path_keys = [file_name, reaction, bound, var]
+                    params = {"value": value, "is_chain": True}
+                    self.update_value(path_keys, params)
 
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
