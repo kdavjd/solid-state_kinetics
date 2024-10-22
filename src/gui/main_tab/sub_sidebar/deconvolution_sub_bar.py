@@ -13,9 +13,12 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
-    QFormLayout,
+    QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -23,6 +26,24 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
+    "strategy": "best1bin",
+    "maxiter": 1000,
+    "popsize": 15,
+    "tol": 0.01,
+    "mutation": (0.5, 1),
+    "recombination": 0.7,
+    "seed": None,
+    "callback": None,
+    "disp": False,
+    "polish": True,
+    "init": "latinhypercube",
+    "atol": 0,
+    "updating": "deferred",
+    "workers": 1,
+    "constraints": (),
+}
 
 
 class FileTransferButtons(QWidget, BasicSignals):
@@ -145,6 +166,7 @@ class ReactionTable(QWidget):
         self.active_file = None
         self.active_reaction = ""
         self.calculation_settings = defaultdict(dict)
+        self.deconvolution_settings = defaultdict(dict)
 
         self.settings_button = QPushButton("Настрйоки расчета")
         self.layout.addWidget(self.settings_button)
@@ -268,9 +290,10 @@ class ReactionTable(QWidget):
                 reactions[reaction_name] = combo
 
             initial_settings = self.calculation_settings[self.active_file]
-            dialog = CalculationSettingsDialog(reactions, initial_settings, self)
+            initial_deconvolution_settings = self.deconvolution_settings.get(self.active_file, {})
+            dialog = CalculationSettingsDialog(reactions, initial_settings, initial_deconvolution_settings, self)
             if dialog.exec():
-                selected_functions = dialog.get_selected_functions()
+                selected_functions, selected_method, deconvolution_parameters = dialog.get_selected_functions()
 
                 empty_keys = [key for key, value in selected_functions.items() if not value]
                 if empty_keys:
@@ -283,52 +306,155 @@ class ReactionTable(QWidget):
                     return
 
                 self.calculation_settings[self.active_file] = selected_functions
+                self.deconvolution_settings[self.active_file] = {
+                    "method": selected_method,
+                    "deconvolution_parameters": deconvolution_parameters,
+                }
                 logger.debug(f"Выбранные функции: {selected_functions}")
+                logger.debug(f"Настройки деконволюции: {self.deconvolution_settings[self.active_file]}")
 
                 formatted_functions = "\n".join([f"{key}: {value}" for key, value in selected_functions.items()])
                 message = f"    {self.active_file}\n{formatted_functions}"
 
-                QMessageBox.information(self, "Фуннкции на расчет", f"Настройки обновлены для:\n{message}")
+                QMessageBox.information(self, "Настройки расчета", f"Настройки обновлены для:\n{message}")
         else:
-            QMessageBox.warning(self, "Фуннкции на расчет", "Файл не выбран.")
+            QMessageBox.warning(self, "Настройки расчета", "Файл не выбран.")
 
 
 class CalculationSettingsDialog(QDialog):
-    def __init__(self, reactions, initial_settings, parent=None):
+    def __init__(self, reactions, initial_settings, initial_deconvolution_settings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Фуннкции на расчет")
+        self.setWindowTitle("Настройки расчета")
         self.reactions = reactions
         self.initial_settings = initial_settings
+        self.initial_deconvolution_settings = initial_deconvolution_settings
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
-
-        self.form_layout = QFormLayout()
+        main_layout = QVBoxLayout(self)
+        reactions_group_box = QGroupBox("Выбор функций реакций")
+        reactions_layout = QGridLayout()
+        reactions_group_box.setLayout(reactions_layout)
         self.checkboxes = {}
+        row = 0
         for reaction_name, combo in self.reactions.items():
             functions = [combo.itemText(i) for i in range(combo.count())]
-            checkbox_layout = QVBoxLayout()
             self.checkboxes[reaction_name] = []
+            col = 0
+            reaction_label = QLabel(reaction_name)
+            reactions_layout.addWidget(reaction_label, row, col)
+            col += 1
             for function in functions:
                 checkbox = QCheckBox(function)
                 checkbox.setChecked(function in self.initial_settings.get(reaction_name, []))
                 self.checkboxes[reaction_name].append(checkbox)
-                checkbox_layout.addWidget(checkbox)
-            self.form_layout.addRow(reaction_name, checkbox_layout)
+                reactions_layout.addWidget(checkbox, row, col)
+                col += 1
+            row += 1
 
-        layout.addLayout(self.form_layout)
+        main_layout.addWidget(reactions_group_box)
+
+        deconvolution_group_box = QGroupBox("Параметры деконволюции")
+        deconvolution_layout = QVBoxLayout()
+        deconvolution_group_box.setLayout(deconvolution_layout)
+
+        method_layout = QHBoxLayout()
+        method_label = QLabel("Метод деконволюции:")
+        self.deconvolution_method_combo = QComboBox()
+        self.deconvolution_method_combo.addItems(["differential_evolution", "another_method"])
+        method_layout.addWidget(method_label)
+        method_layout.addWidget(self.deconvolution_method_combo)
+        deconvolution_layout.addLayout(method_layout)
+
+        self.method_parameters_layout = QGridLayout()
+        deconvolution_layout.addLayout(self.method_parameters_layout)
+
+        main_layout.addWidget(deconvolution_group_box)
+
+        if self.initial_deconvolution_settings:
+            initial_method = self.initial_deconvolution_settings.get("method", "differential_evolution")
+            index = self.deconvolution_method_combo.findText(initial_method)
+            if index >= 0:
+                self.deconvolution_method_combo.setCurrentIndex(index)
+        else:
+            self.deconvolution_method_combo.setCurrentText("differential_evolution")
+
+        self.update_method_parameters()
+        self.deconvolution_method_combo.currentIndexChanged.connect(self.update_method_parameters)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        layout.addWidget(self.button_box)
+        main_layout.addWidget(self.button_box)
+
+    def update_method_parameters(self):
+        while self.method_parameters_layout.count():
+            item = self.method_parameters_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        selected_method = self.deconvolution_method_combo.currentText()
+        if selected_method == "differential_evolution":
+            self.de_parameters = {}
+            initial_params = {}
+            if (
+                self.initial_deconvolution_settings
+                and self.initial_deconvolution_settings.get("method") == selected_method
+            ):
+                initial_params = self.initial_deconvolution_settings.get("deconvolution_parameters", {})
+            row = 0
+            for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
+                label = QLabel(key)
+                if isinstance(value, bool):
+                    field = QCheckBox()
+                    field.setChecked(initial_params.get(key, value))
+                else:
+                    field = QLineEdit(str(initial_params.get(key, value)))
+                self.de_parameters[key] = field
+                self.method_parameters_layout.addWidget(label, row, 0)
+                self.method_parameters_layout.addWidget(field, row, 1)
+                row += 1
+        elif selected_method == "another_method":
+            pass
 
     def get_selected_functions(self):
         selected_functions = {}
         for reaction_name, checkboxes in self.checkboxes.items():
             selected_functions[reaction_name] = [cb.text() for cb in checkboxes if cb.isChecked()]
-        return selected_functions
+        selected_method, deconvolution_parameters = self.get_deconvolution_parameters()
+        return selected_functions, selected_method, deconvolution_parameters
+
+    def get_deconvolution_parameters(self):
+        selected_method = self.deconvolution_method_combo.currentText()
+        parameters = {}
+        if selected_method == "differential_evolution":
+            for key, field in self.de_parameters.items():
+                if isinstance(field, QCheckBox):
+                    parameters[key] = field.isChecked()
+                else:
+                    text = field.text()
+                    default_value = DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
+                    parameters[key] = self.convert_to_type(text, default_value)
+        elif selected_method == "another_method":
+            parameters = {}
+        return selected_method, parameters
+
+    def convert_to_type(self, text, default_value):
+        try:
+            if isinstance(default_value, int):
+                return int(text)
+            elif isinstance(default_value, float):
+                return float(text)
+            elif isinstance(default_value, tuple):
+                return tuple(map(float, text.strip("()").split(",")))
+            elif isinstance(default_value, str):
+                return text
+            elif default_value is None:
+                return None
+            else:
+                return text
+        except ValueError:
+            return default_value
 
 
 class CoeffsTable(QTableWidget):
@@ -437,7 +563,10 @@ class CalcButtons(QWidget):
             return
 
         settings = self.parent.reactions_table.calculation_settings.get(self.parent.reactions_table.active_file, {})
-        if not settings:
+        deconvolution_settings = self.parent.reactions_table.deconvolution_settings.get(
+            self.parent.reactions_table.active_file, {}
+        )
+        if not settings or not deconvolution_settings:
             QMessageBox.information(self, "Настройки обязательны.", "Настройки расчета не установлены.")
             self.parent.open_settings_dialog()
         else:
@@ -445,6 +574,7 @@ class CalcButtons(QWidget):
                 "path_keys": [],
                 "operation": "deconvolution",
                 "chosen_functions": settings,
+                "deconvolution_settings": deconvolution_settings,
             }
             self.calculation_started.emit(data)
             self.start_calculation()
