@@ -310,8 +310,8 @@ class ReactionTable(QWidget):
                     "method": selected_method,
                     "deconvolution_parameters": deconvolution_parameters,
                 }
-                logger.debug(f"Выбранные функции: {selected_functions}")
-                logger.debug(f"Настройки деконволюции: {self.deconvolution_settings[self.active_file]}")
+                logger.info(f"Выбранные функции: {selected_functions}")
+                logger.info(f"Настройки деконволюции: {self.deconvolution_settings[self.active_file]}")
 
                 formatted_functions = "\n".join([f"{key}: {value}" for key, value in selected_functions.items()])
                 message = f"    {self.active_file}\n{formatted_functions}"
@@ -561,8 +561,8 @@ class CalculationSettingsDialog(QDialog):
                 if value not in options:
                     return False, f"Должно быть одним из {options}."
             elif key == "workers":
-                if not isinstance(value, int) or value < 1:
-                    return False, "Должно быть целым числом >= 1."
+                if not isinstance(value, int) or value < 1 or value > 1:
+                    return False, "Должно быть целым числом = 1. Множество параллельных процессов не поддерживается"
 
             return True, ""
         except Exception as e:

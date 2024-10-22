@@ -224,7 +224,7 @@ class CalculationsDataOperations(BasicSignals):
             )
             is_ok = self.handle_response_data(request_id)
             if is_ok:
-                logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
+                logger.debug(f"Данные по пути: {path_keys} изменены на: {new_value}")
                 if not is_chain:
                     self._update_coeffs_value(path_keys.copy(), new_value)
                     return {"operation": "update_value", "data": None}
@@ -234,13 +234,13 @@ class CalculationsDataOperations(BasicSignals):
             logger.error(f"Непредусмотренная ошибка при обновлении данных по пути:\n {path_keys}: {str(e)}")
 
     def deconvolution(self, path_keys: list[str], params: dict):
+        deconvolution_settings = params.get("deconvolution_settings", {})
         reaction_variables = {}
         num_coefficients = {}
         bounds = []
         check_keys = ["h", "z", "w", "fr", "ads1", "ads2"]
         file_name = path_keys[0]
         reaction_chosen_functions: dict = params.get("chosen_functions", {})
-        logger.info(f"Chosen functions: {reaction_chosen_functions}")
         if not reaction_chosen_functions:
             raise ValueError("chosen_functions is None or empty")
 
@@ -277,6 +277,7 @@ class CalculationsDataOperations(BasicSignals):
 
         return {
             "reaction_variables": reaction_variables,
+            "deconvolution_settings": deconvolution_settings,
             "bounds": bounds,
             "reaction_combinations": reaction_combinations,
             "experimental_data": df,
