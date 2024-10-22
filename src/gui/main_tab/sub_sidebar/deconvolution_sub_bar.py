@@ -405,17 +405,68 @@ class CalculationSettingsDialog(QDialog):
             row = 0
             for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
                 label = QLabel(key)
+                tooltip = self.get_tooltip_for_parameter(key)
+                label.setToolTip(tooltip)
                 if isinstance(value, bool):
                     field = QCheckBox()
                     field.setChecked(initial_params.get(key, value))
+                    field.setToolTip(tooltip)
+                elif key in ["strategy", "init", "updating"]:
+                    field = QComboBox()
+                    options = self.get_options_for_parameter(key)
+                    field.addItems(options)
+                    field.setCurrentText(initial_params.get(key, value))
+                    field.setToolTip(tooltip)
                 else:
                     field = QLineEdit(str(initial_params.get(key, value)))
+                    field.setToolTip(tooltip)
                 self.de_parameters[key] = field
                 self.method_parameters_layout.addWidget(label, row, 0)
                 self.method_parameters_layout.addWidget(field, row, 1)
                 row += 1
         elif selected_method == "another_method":
             pass
+
+    def get_tooltip_for_parameter(self, param_name):
+        tooltips = {
+            "strategy": "Стратегия дифференциальной эволюции. Выберите один из доступных вариантов.",
+            "maxiter": "Максимальное количество итераций. Целое число >= 1.",
+            "popsize": "Размер популяции. Целое число >= 1.",
+            "tol": "Относительная точность для критериев остановки. Положительное число.",
+            "mutation": "Коэффициент мутации. Число или кортеж из двух чисел в диапазоне [0, 2].",
+            "recombination": "Коэффициент рекомбинации. Число в диапазоне [0, 1].",
+            "seed": "Зерно для генератора случайных чисел. Целое число или оставьте пустым.",
+            "callback": "Функция обратного вызова. Оставьте пустым, если не требуется.",
+            "disp": "Отображать статус при оптимизации.",
+            "polish": "Производить ли окончательную оптимизацию при завершении дифференциальной эволюции.",
+            "init": "Метод инициализации популяции.",
+            "atol": "Абсолютная точность для критериев остановки. Положительное число.",
+            "updating": "Режим обновления популяции: immediate или deferred.",
+            "workers": "Количество процессов для параллельных вычислений. Целое число >= 1.",
+            "constraints": "Ограничения для задачи оптимизации. Оставьте пустым, если не требуется.",
+        }
+        return tooltips.get(param_name, "")
+
+    def get_options_for_parameter(self, param_name):
+        options = {
+            "strategy": [
+                "best1bin",
+                "best1exp",
+                "rand1exp",
+                "randtobest1exp",
+                "currenttobest1exp",
+                "best2exp",
+                "rand2exp",
+                "randtobest1bin",
+                "currenttobest1bin",
+                "best2bin",
+                "rand2bin",
+                "rand1bin",
+            ],
+            "init": ["latinhypercube", "random"],
+            "updating": ["immediate", "deferred"],
+        }
+        return options.get(param_name, [])
 
     def get_selected_functions(self):
         selected_functions = {}
@@ -427,14 +478,26 @@ class CalculationSettingsDialog(QDialog):
     def get_deconvolution_parameters(self):
         selected_method = self.deconvolution_method_combo.currentText()
         parameters = {}
+        errors = []
         if selected_method == "differential_evolution":
             for key, field in self.de_parameters.items():
                 if isinstance(field, QCheckBox):
                     parameters[key] = field.isChecked()
+                elif isinstance(field, QComboBox):
+                    parameters[key] = field.currentText()
                 else:
                     text = field.text()
                     default_value = DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
-                    parameters[key] = self.convert_to_type(text, default_value)
+                    value = self.convert_to_type(text, default_value)
+
+                    is_valid, error_msg = self.validate_parameter(key, value)
+                    if not is_valid:
+                        errors.append(f"Параметр '{key}': {error_msg}")
+                    parameters[key] = value
+            if errors:
+                error_message = "\n".join(errors)
+                QMessageBox.warning(self, "Ошибка ввода параметров", error_message)
+                return None, None
         elif selected_method == "another_method":
             parameters = {}
         return selected_method, parameters
@@ -446,15 +509,87 @@ class CalculationSettingsDialog(QDialog):
             elif isinstance(default_value, float):
                 return float(text)
             elif isinstance(default_value, tuple):
-                return tuple(map(float, text.strip("()").split(",")))
+                values = text.strip("() ").split(",")
+                return tuple(float(v.strip()) for v in values)
             elif isinstance(default_value, str):
                 return text
             elif default_value is None:
-                return None
+                if text == "" or text.lower() == "none":
+                    return None
+                else:
+                    return text
             else:
                 return text
         except ValueError:
             return default_value
+
+    def validate_parameter(self, key, value):  # noqa: C901
+        try:
+            if key == "strategy":
+                strategies = self.get_options_for_parameter("strategy")
+                if value not in strategies:
+                    return False, f"Недопустимая стратегия. Выберите из {strategies}."
+            elif key == "maxiter":
+                if not isinstance(value, int) or value < 1:
+                    return False, "Должно быть целым числом >= 1."
+            elif key == "popsize":
+                if not isinstance(value, int) or value < 1:
+                    return False, "Должно быть целым числом >= 1."
+            elif key == "tol":
+                if not isinstance(value, (int, float)) or value < 0:
+                    return False, "Должно быть неотрицательным числом."
+            elif key == "mutation":
+                if isinstance(value, tuple):
+                    if len(value) != 2 or not all(0 <= v <= 2 for v in value):
+                        return False, "Должен быть кортежем из двух чисел в диапазоне [0, 2]."
+                elif isinstance(value, (int, float)):
+                    if not 0 <= value <= 2:
+                        return False, "Должно быть числом в диапазоне [0, 2]."
+                else:
+                    return False, "Неверный формат."
+            elif key == "recombination":
+                if not isinstance(value, (int, float)) or not 0 <= value <= 1:
+                    return False, "Должно быть числом в диапазоне [0, 1]."
+            elif key == "seed":
+                if not (isinstance(value, int) or value is None):
+                    return False, "Должно быть целым числом или пустым."
+            elif key == "atol":
+                if not isinstance(value, (int, float)) or value < 0:
+                    return False, "Должно быть неотрицательным числом."
+            elif key == "updating":
+                options = self.get_options_for_parameter("updating")
+                if value not in options:
+                    return False, f"Должно быть одним из {options}."
+            elif key == "workers":
+                if not isinstance(value, int) or value < 1:
+                    return False, "Должно быть целым числом >= 1."
+
+            return True, ""
+        except Exception as e:
+            return False, f"Ошибка при проверке параметра: {str(e)}"
+
+    def accept(self):
+        selected_functions = {}
+        for reaction_name, checkboxes in self.checkboxes.items():
+            selected = [cb.text() for cb in checkboxes if cb.isChecked()]
+            if not selected:
+                QMessageBox.warning(
+                    self, "Ошибка настроек", f"Реакция '{reaction_name}' должна иметь хотя бы одну функцию."
+                )
+                return
+            selected_functions[reaction_name] = selected
+
+        selected_method, deconvolution_parameters = self.get_deconvolution_parameters()
+        if deconvolution_parameters is None:
+            # Если произошла ошибка в параметрах, не закрываем диалог
+            return
+        self.selected_functions = selected_functions
+        self.selected_method = selected_method
+        self.deconvolution_parameters = deconvolution_parameters
+        super().accept()
+
+    def get_results(self):
+        return self.selected_functions, self.selected_method, self.deconvolution_parameters
 
 
 class CoeffsTable(QTableWidget):
