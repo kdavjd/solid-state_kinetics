@@ -2,7 +2,7 @@ from os import path
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import QTreeView, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QMessageBox, QTreeView, QVBoxLayout, QWidget
 
 from src.core.logger_config import logger
 
@@ -28,8 +28,10 @@ class SideBar(QWidget):
 
         self.experiments_data_root = QStandardItem("Данные экспериментов")
         self.add_data_item = QStandardItem("Добавить новые данные")
-        self.model.appendRow(self.experiments_data_root)
+        self.delete_data_item = QStandardItem("Удалить выбранные данные")
         self.experiments_data_root.appendRow(self.add_data_item)
+        self.experiments_data_root.appendRow(self.delete_data_item)
+        self.model.appendRow(self.experiments_data_root)
 
         self.model_free_root = QStandardItem("Безмодельный расчет")
         self.model.appendRow(self.model_free_root)
@@ -84,6 +86,8 @@ class SideBar(QWidget):
         item = self.model.itemFromIndex(index)
         if item == self.add_data_item:
             self.load_button.open_file_dialog()
+        elif item == self.delete_data_item:
+            self.delete_active_file()
         elif item.parent() == self.experiments_data_root:
             self.sub_side_bar_needed.emit(item.text())
             self.chosen_experiment_signal.emit(item.text())
@@ -103,11 +107,40 @@ class SideBar(QWidget):
 
     def add_experiment_file(self, file_info):
         new_file_item = QStandardItem(path.basename(file_info[0]))
-        self.experiments_data_root.insertRow(self.experiments_data_root.rowCount() - 1, new_file_item)
+        self.experiments_data_root.insertRow(self.experiments_data_root.rowCount() - 2, new_file_item)
         self.tree_view.expandAll()
         self.mark_as_active(new_file_item)
         self.sub_side_bar_needed.emit(new_file_item.text())
         logger.debug(f"Новый файл добавлен и выбран активным: {new_file_item.text()}")
+        self.reposition_experiments_data_items()
+
+    def delete_active_file(self):
+        if not self.active_file_item:
+            QMessageBox.warning(self, "Ошибка", "Необходимо выбрать файл для удаления.")
+            return
+
+        parent = self.active_file_item.parent()
+        if parent:
+            file_name = self.active_file_item.text()
+            parent.removeRow(self.active_file_item.row())
+            logger.debug(f"Файл удален: {file_name}")
+            self.active_file_item = None
+            self.reposition_experiments_data_items()
+        else:
+            QMessageBox.critical(self, "Ошибка", "Не удалось удалить выбранный файл.")
+
+    def reposition_experiments_data_items(self):
+        """
+        Перемещает узлы "Добавить новые данные" и "Удалить выбранные данные" в конец `experiments_data_root`.
+        """
+        self.experiments_data_root.removeRow(self.add_data_item.row())
+        self.experiments_data_root.removeRow(self.delete_data_item.row())
+
+        self.add_data_item = QStandardItem("Добавить новые данные")
+        self.delete_data_item = QStandardItem("Удалить выбранные данные")
+
+        self.experiments_data_root.appendRow(self.add_data_item)
+        self.experiments_data_root.appendRow(self.delete_data_item)
 
     def get_experiment_files_names(self) -> list[str]:
         files_names = []
