@@ -68,6 +68,10 @@ class CalculationsData(QObject):
         elif operation == "remove_value":
             params["data"] = True if self.exists(path_keys) else False
             self.remove_value(path_keys)
+        elif operation == "get_full_data":
+            params["data"] = self._data
+        else:
+            params["data"] = None
 
         params["target"], params["actor"] = params["actor"], params["target"]
         self.response_signal.emit(params)

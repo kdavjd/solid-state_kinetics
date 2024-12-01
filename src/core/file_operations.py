@@ -16,8 +16,7 @@ class ActiveFileOperations(BasicSignals):
         if operation == "differential":
             params["function"] = self.diff_function
 
-        request_id = self.create_and_emit_request("file_data", operation, **params)
-        response_data = self.handle_response_data(request_id)
+        response_data = self.handle_request_cycle("file_data", operation, **params)
 
         logger.debug(f"В операция {operation} завершилась статусом {response_data}")
 

@@ -7,7 +7,7 @@ import pandas as pd
 import scienceplots  # noqa pylint: disable=unused-import
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
-from gui.main_tab.PlotCanvas.anchor_group import HeightAnchorGroup, PositionAnchorGroup
+from gui.main_tab.plot_canvas.anchor_group import HeightAnchorGroup, PositionAnchorGroup
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure

@@ -162,17 +162,15 @@ class Calculations(BasicSignals):
                 f"Комбинация реакций: {best_combination}\n\n"
                 f"Параметры: {params}"
             )
-            request_id = self.create_and_emit_request("main_tab", "get_file_name")
-            file_name = self.handle_response_data(request_id)
+            file_name = self.handle_request_cycle("main_tab", "get_file_name")
 
-            request_id = self.create_and_emit_request(
+            _ = self.handle_request_cycle(
                 "calculations_data_operations",
                 "update_reactions_params",
                 path_keys=[file_name],
                 best_combination=best_combination,
                 reactions_params=params,
             )
-            _ = self.handle_response_data(request_id)
 
     @pyqtSlot(bool)
     def calc_data_operations_in_progress(self, in_progress: bool):
