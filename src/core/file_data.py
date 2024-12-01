@@ -4,9 +4,10 @@ from io import StringIO
 
 import chardet
 import pandas as pd
+from core.basic_signals import BasicSignals
 from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
 
 def detect_encoding(func):
@@ -35,13 +36,12 @@ def detect_decimal(func):
     return wrapper
 
 
-class FileData(QObject):
+class FileData(BasicSignals):
     response_signal = pyqtSignal(dict)
     data_loaded_signal = pyqtSignal(pd.DataFrame)
-    plot_dataframe_signal = pyqtSignal(pd.DataFrame)
 
     def __init__(self):
-        super().__init__()
+        super().__init__("file_data")
         self.data = None
         self.original_data = {}
         self.dataframe_copies = {}
@@ -159,14 +159,14 @@ class FileData(QObject):
     @pyqtSlot(str)
     def plot_dataframe_copy(self, key):
         if key in self.dataframe_copies:
-            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
+            _ = self.handle_request_cycle("main_tab", "plot_df", df=self.dataframe_copies[key])
         else:
             logger.error(f"Ключ {key} не найден в dataframe_copies.")
 
     def reset_dataframe_copy(self, key):
         if key in self.original_data:
             self.dataframe_copies[key] = self.original_data[key].copy()
-            self.plot_dataframe_signal.emit(self.dataframe_copies[key])
+            _ = self.handle_request_cycle("main_tab", "plot_df", df=self.dataframe_copies[key])
             if key in self.operations_history:
                 del self.operations_history[key]
                 logger.debug(f"История операций: {self.operations_history}")
@@ -188,7 +188,7 @@ class FileData(QObject):
                     dataframe[column] = func(dataframe[column])
 
             self.log_operation(params)
-            self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
+            _ = self.handle_request_cycle("main_tab", "plot_df", df=dataframe)
             logger.info("Данные были успешно модифицированы.")
 
         except Exception as e:
@@ -214,9 +214,6 @@ class FileData(QObject):
             params["data"] = self.dataframe_copies[file_name]
         elif operation == "reset":
             self.reset_dataframe_copy(file_name)
-            params["data"] = True
-        elif operation == "plot_dataframe":
-            self.plot_dataframe_signal.emit(self.dataframe_copies[file_name])
             params["data"] = True
         elif operation == "load_file":
             self.load_file(file_name)

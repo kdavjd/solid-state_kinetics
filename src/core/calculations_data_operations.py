@@ -66,8 +66,7 @@ class CalculationsDataOperations(BasicSignals):
             self.highlight_reaction(path_keys, params)
 
     def _extract_reaction_params(self, path_keys: list):
-        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=path_keys)
-        reaction_params = self.handle_response_data(request_id)
+        reaction_params = self.handle_request_cycle("calculations_data", "get_value", path_keys=path_keys)
         return cft.parse_reaction_params(reaction_params)
 
     def _plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
@@ -106,18 +105,14 @@ class CalculationsDataOperations(BasicSignals):
     def add_reaction(self, path_keys: list, _params: dict):
         file_name, reaction_name = path_keys
 
-        request_id = self.create_and_emit_request("file_data", "check_differential", file_name=file_name)
-        is_executed = self.handle_response_data(request_id)
+        is_executed = self.handle_request_cycle("file_data", "check_differential", file_name=file_name)
 
         if is_executed:
-            request_id = self.create_and_emit_request("file_data", "get_df_data", file_name=file_name)
-            df = self.handle_response_data(request_id)
-
+            df = self.handle_request_cycle("file_data", "get_df_data", file_name=file_name)
             data = cft.generate_default_function_data(df)
-            request_id = self.create_and_emit_request(
+            is_exist = self.handle_request_cycle(
                 "calculations_data", "set_value", path_keys=path_keys.copy(), value=data
             )
-            is_exist = self.handle_response_data(request_id)
             if is_exist:
                 logger.warning(f"Данные по пути: {path_keys.copy()} уже существуют")
 
@@ -132,8 +127,7 @@ class CalculationsDataOperations(BasicSignals):
             logger.error("Недостаточно информации в path_keys для удаления реакции")
             return
         file_name, reaction_name = path_keys
-        request_id = self.create_and_emit_request("calculations_data", "remove_value", path_keys=path_keys)
-        is_exist = self.handle_response_data(request_id)
+        is_exist = self.handle_request_cycle("calculations_data", "remove_value", path_keys=path_keys)
         if not is_exist:
             logger.warning(f"Реакция {reaction_name} не найдена в данных")
             console.log(f"Не удалось найти реакцию {reaction_name} для удаления")
@@ -142,12 +136,9 @@ class CalculationsDataOperations(BasicSignals):
 
     def highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
-        request_id = self.create_and_emit_request("file_data", "plot_dataframe", file_name=file_name)
-        if not self.handle_response_data(request_id):
-            logger.warning("Ответ от file_data не получен")
-
-        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
-        data = self.handle_response_data(request_id)
+        df_data = self.handle_request_cycle("file_data", "get_df_data", file_name=file_name)
+        _ = self.handle_request_cycle("main_tab", "plot_df", df=df_data)
+        data = self.handle_request_cycle("calculations_data", "get_value", path_keys=[file_name])
 
         reactions = data.keys()
 
@@ -201,15 +192,13 @@ class CalculationsDataOperations(BasicSignals):
                 new_keys = path_keys.copy()
                 new_keys[new_keys.index(key)] = opposite_key
 
-                request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=new_keys)
-                opposite_value = self.handle_response_data(request_id)
+                opposite_value = self.handle_request_cycle("calculations_data", "get_value", path_keys=new_keys)
 
                 average_value = (new_value + opposite_value) / 2
                 new_keys[new_keys.index(opposite_key)] = "coeffs"
-                request_id = self.create_and_emit_request(
+                is_exist = self.handle_request_cycle(
                     "calculations_data", "set_value", path_keys=new_keys, value=average_value
                 )
-                is_exist = self.handle_response_data(request_id)
                 if is_exist:
                     logger.info(f"Данные по пути: {new_keys} изменены на: {average_value}")
                 else:
@@ -219,12 +208,11 @@ class CalculationsDataOperations(BasicSignals):
         try:
             new_value = params.get("value")
             is_chain = params.get("is_chain", None)
-            request_id = self.create_and_emit_request(
+            is_ok = self.handle_request_cycle(
                 "calculations_data", "set_value", path_keys=path_keys.copy(), value=new_value
             )
-            is_ok = self.handle_response_data(request_id)
             if is_ok:
-                logger.info(f"Данные по пути: {path_keys} изменены на: {new_value}")
+                logger.debug(f"Данные по пути: {path_keys} изменены на: {new_value}")
                 if not is_chain:
                     self._update_coeffs_value(path_keys.copy(), new_value)
                     return {"operation": "update_value", "data": None}
@@ -234,18 +222,17 @@ class CalculationsDataOperations(BasicSignals):
             logger.error(f"Непредусмотренная ошибка при обновлении данных по пути:\n {path_keys}: {str(e)}")
 
     def deconvolution(self, path_keys: list[str], params: dict):
+        deconvolution_settings = params.get("deconvolution_settings", {})
         reaction_variables = {}
         num_coefficients = {}
         bounds = []
         check_keys = ["h", "z", "w", "fr", "ads1", "ads2"]
         file_name = path_keys[0]
         reaction_chosen_functions: dict = params.get("chosen_functions", {})
-        logger.info(f"Chosen functions: {reaction_chosen_functions}")
         if not reaction_chosen_functions:
             raise ValueError("chosen_functions is None or empty")
 
-        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
-        functions_data = self.handle_response_data(request_id)
+        functions_data = self.handle_request_cycle("calculations_data", "get_value", path_keys=[file_name])
 
         if not functions_data:
             raise ValueError(f"No functions data found for file: {file_name}")
@@ -269,14 +256,14 @@ class CalculationsDataOperations(BasicSignals):
             bounds.extend(filtered_pairs)
             num_coefficients[reaction_name] = len(function_vars)
 
-        request_id = self.create_and_emit_request("file_data", "get_df_data", file_name=file_name)
-        df = self.handle_response_data(request_id)
+        df = self.handle_request_cycle("file_data", "get_df_data", file_name=file_name)
         self.reaction_variables = reaction_variables.copy()
         self.reaction_chosen_functions = reaction_chosen_functions.copy()
         logger.info(f"На деконволюцию направлены:\n reaction_variables: {reaction_variables}")
 
         return {
             "reaction_variables": reaction_variables,
+            "deconvolution_settings": deconvolution_settings,
             "bounds": bounds,
             "reaction_combinations": reaction_combinations,
             "experimental_data": df,

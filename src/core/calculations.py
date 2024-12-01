@@ -1,4 +1,3 @@
-from functools import wraps
 from typing import Callable
 
 import numpy as np
@@ -10,35 +9,6 @@ from core.logger_config import logger
 from core.logger_console import LoggerConsole as console
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from scipy.optimize import OptimizeResult, differential_evolution
-
-DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
-    "strategy": "best1bin",
-    "maxiter": 1000,
-    "popsize": 15,
-    "tol": 0.01,
-    "mutation": (0.5, 1),
-    "recombination": 0.7,
-    "seed": None,
-    "callback": None,
-    "disp": False,
-    "polish": True,
-    "init": "latinhypercube",
-    "atol": 0,
-    "updating": "deferred",
-    "workers": 1,
-    "constraints": (),
-}
-
-
-def add_default_kwargs(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
-            kwargs.setdefault(key, value)
-        logger.debug(f"Calling {func.__name__} with args: {args} and kwargs: {kwargs}")
-        return func(*args, **kwargs)
-
-    return wrapper
 
 
 class Calculations(BasicSignals):
@@ -90,12 +60,19 @@ class Calculations(BasicSignals):
             bounds = response["bounds"]
             reaction_combinations = response["reaction_combinations"]
             experimental_data = response["experimental_data"]
+            deconvolution_settings: dict = response["deconvolution_settings"]
+            deconvolution_method = deconvolution_settings.pop("method", "")
+            deconvolution_parameters = deconvolution_settings.pop("deconvolution_parameters", {})
 
             target_function = self.generate_target_function(
                 reaction_variables, reaction_combinations, experimental_data
             )
-
-            self.start_differential_evolution(bounds=bounds, target_function=target_function)
+            if deconvolution_method == "differential_evolution":
+                self.start_differential_evolution(
+                    bounds=bounds, target_function=target_function, **deconvolution_parameters
+                )
+            else:
+                logger.error(f"Неизвестный метод деконволюции: {deconvolution_method}")
         except Exception as e:
             logger.error(f"Ошибка при подготовке и запуске оптимизации: {e}")
 
@@ -152,13 +129,11 @@ class Calculations(BasicSignals):
 
         return target_function
 
-    @add_default_kwargs
     def start_differential_evolution(self, bounds, *args, **kwargs):
         if "target_function" not in kwargs:
             raise ValueError("Необходимо передать 'target_function' в аргументах kwargs")
 
         target_function = kwargs.pop("target_function")
-        callback = kwargs.pop("callback", None)
 
         logger.debug(f"Начало дифференциальной эволюции с bounds: {bounds} и kwargs: {kwargs}")
 
@@ -166,7 +141,6 @@ class Calculations(BasicSignals):
             differential_evolution,
             target_function,
             bounds=bounds,
-            callback=callback,
             **kwargs,
         )
 
@@ -188,17 +162,15 @@ class Calculations(BasicSignals):
                 f"Комбинация реакций: {best_combination}\n\n"
                 f"Параметры: {params}"
             )
-            request_id = self.create_and_emit_request("main_tab", "get_file_name")
-            file_name = self.handle_response_data(request_id)
+            file_name = self.handle_request_cycle("main_tab", "get_file_name")
 
-            request_id = self.create_and_emit_request(
+            _ = self.handle_request_cycle(
                 "calculations_data_operations",
                 "update_reactions_params",
                 path_keys=[file_name],
                 best_combination=best_combination,
                 reactions_params=params,
             )
-            _ = self.handle_response_data(request_id)
 
     @pyqtSlot(bool)
     def calc_data_operations_in_progress(self, in_progress: bool):
