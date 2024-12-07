@@ -2,11 +2,12 @@ import time
 from itertools import product
 
 import numpy as np
-from core.basic_signals import BasicSignals
-from core.curve_fitting import CurveFitting as cft
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
+
+from src.core.basic_signals import BasicSignals
+from src.core.curve_fitting import CurveFitting as cft
+from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
 
 
 class CalculationsDataOperations(BasicSignals):
@@ -14,18 +15,15 @@ class CalculationsDataOperations(BasicSignals):
     plot_reaction = pyqtSignal(tuple, list)
     reaction_params_to_gui = pyqtSignal(dict)
 
-    def __init__(self):
-        super().__init__("calculations_data_operations")
+    def __init__(self, dispatcher):
+        super().__init__(actor_name="calculations_data_operations", dispatcher=dispatcher)
         self.last_plot_time = 0
         self.calculations_in_progress = False
         self.reaction_variables: dict = {}
         self.reaction_chosen_functions: dict[str, list] = {}
 
     @pyqtSlot(dict)
-    def request_slot(self, params: dict):
-        if params["target"] != "calculations_data_operations":
-            return
-        logger.debug(f"В request_slot пришли данные {params}")
+    def process_request(self, params: dict):
         path_keys = params.get("path_keys")
         operation = params.get("operation")
 
@@ -53,7 +51,7 @@ class CalculationsDataOperations(BasicSignals):
                     self.deconvolution_signal.emit(answer)
 
             params["target"], params["actor"] = params["actor"], params["target"]
-            self.response_signal.emit(params)
+            self.dispatcher.response_signal.emit(params)
         else:
             logger.warning("Неизвестная или отсутствующая операция над данными.")
 
@@ -136,8 +134,6 @@ class CalculationsDataOperations(BasicSignals):
 
     def highlight_reaction(self, path_keys: list, _params: dict):
         file_name = path_keys[0]
-        df_data = self.handle_request_cycle("file_data", "get_df_data", file_name=file_name)
-        _ = self.handle_request_cycle("main_tab", "plot_df", df=df_data)
         data = self.handle_request_cycle("calculations_data", "get_value", path_keys=[file_name])
 
         reactions = data.keys()

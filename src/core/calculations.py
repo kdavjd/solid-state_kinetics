@@ -2,20 +2,21 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from core.basic_signals import BasicSignals
-from core.calculation_thread import CalculationThread
-from core.curve_fitting import CurveFitting as cft
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from scipy.optimize import OptimizeResult, differential_evolution
+
+from src.core.basic_signals import BasicSignals
+from src.core.calculation_thread import CalculationThread
+from src.core.curve_fitting import CurveFitting as cft
+from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
 
 
 class Calculations(BasicSignals):
     new_best_result = pyqtSignal(dict)
 
-    def __init__(self):
-        super().__init__("calculations")
+    def __init__(self, dispatcher):
+        super().__init__(actor_name="calculations", dispatcher=dispatcher)
         self.thread: CalculationThread = None
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.best_combination = None
@@ -26,6 +27,10 @@ class Calculations(BasicSignals):
         self.thread = CalculationThread(func, *args, **kwargs)
         self.thread.result_ready.connect(self._calculation_finished)
         self.thread.start()
+
+    @pyqtSlot(dict)
+    def process_request(self, params: dict):
+        return
 
     @pyqtSlot(object)
     def _calculation_finished(self, result):

@@ -1,5 +1,6 @@
-from core.logger_console import LoggerConsole
 from PyQt6.QtWidgets import QTextEdit, QVBoxLayout, QWidget
+
+from src.core.logger_console import LoggerConsole
 
 
 class ConsoleWidget(QWidget):

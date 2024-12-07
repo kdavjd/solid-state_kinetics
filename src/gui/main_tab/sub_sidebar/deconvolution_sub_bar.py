@@ -3,10 +3,7 @@ import os
 from collections import defaultdict
 
 import numpy as np
-from core.basic_signals import BasicSignals
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -27,6 +24,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
+
 DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
     "strategy": "best1bin",
     "maxiter": 1000,
@@ -46,14 +46,14 @@ DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
 }
 
 
-class FileTransferButtons(QWidget, BasicSignals):
-    request_signal = pyqtSignal(dict)
+class FileTransferButtons(QWidget):
+    import_reactions_signal = pyqtSignal(dict)
+    export_reactions_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
         # После добавления сигналов при первом выборе вкладки деконволюции происходит
         # непрусмотренное выскакивание окна на долю секунды
-        BasicSignals.__init__(self, actor_name="file_tansfer_buttons")
         self.layout = QVBoxLayout(self)
 
         self.load_reactions_button = QPushButton("Импорт")
@@ -64,39 +64,15 @@ class FileTransferButtons(QWidget, BasicSignals):
         self.layout.addLayout(self.buttons_layout)
 
         self.load_reactions_button.clicked.connect(self.load_reactions)
-        self.export_reactions_button.clicked.connect(self.export_reactions)
-
-    @pyqtSlot(dict)
-    def response_slot(self, params: dict):
-        super().response_slot(params)
+        self.export_reactions_button.clicked.connect(self._export_reactions)
 
     def load_reactions(self):
-        load_file_name, _ = QFileDialog.getOpenFileName(
+        import_file_name, _ = QFileDialog.getOpenFileName(
             self, "Выберите JSON файл для импорта данных", "", "JSON Files (*.json)"
         )
 
-        if load_file_name:
-            with open(load_file_name, "r", encoding="utf-8") as file:
-                data = json.load(file)
-
-            for reaction_key, reaction_data in data.items():
-                if "x" in reaction_data:
-                    reaction_data["x"] = np.array(reaction_data["x"])
-
-            request_id = self.create_and_emit_request("main_tab", "get_file_name")
-            file_name = self.handle_response_data(request_id)
-            logger.debug(f"Current file_name: {file_name}")
-
-            request_id = self.create_and_emit_request(
-                "calculations_data", "set_value", path_keys=[file_name], value=data
-            )
-            self.handle_response_data(request_id)
-
-            console.log(f"Данные успешно импортированы из файла:\n\n{load_file_name}")
-            logger.info(f"Данные успешно импортированы из файла: {load_file_name}")
-
-            request_id = self.create_and_emit_request("main_tab", "update_reaction_table", reactions_data=data)
-            self.handle_response_data(request_id)
+        if import_file_name:
+            self.import_reactions_signal.emit({"import_file_name": import_file_name, "operation": "import_reactions"})
 
     def _generate_suggested_file_name(self, file_name: str, data: dict):
         n_reactions = len(data)
@@ -115,17 +91,12 @@ class FileTransferButtons(QWidget, BasicSignals):
         suggested_file_name = f"{base_name}_{n_reactions}_rcts_{reaction_codes}.json"
         return suggested_file_name
 
-    def export_reactions(self):
-        request_id = self.create_and_emit_request("main_tab", "get_file_name")
-        file_name = self.handle_response_data(request_id)
-        logger.debug(f"file_name: {file_name}")
+    def _export_reactions(self):
+        self.export_reactions_signal.emit(
+            {"function": self._generate_suggested_file_name, "operation": "export_reactions"}
+        )
 
-        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
-        data = self.handle_response_data(request_id)
-        logger.debug(f"data: {data}")
-
-        suggested_file_name = self._generate_suggested_file_name(file_name, data)
-
+    def export_reactions(self, data, suggested_file_name):
         save_file_name, _ = QFileDialog.getSaveFileName(
             self, "Выберите место для сохранения JSON файла", suggested_file_name, "JSON Files (*.json)"
         )
@@ -727,12 +698,11 @@ class CalcButtons(QWidget):
         self.start_button.show()
 
 
-class DeconvolutionSubBar(QWidget, BasicSignals):
+class DeconvolutionSubBar(QWidget):
     update_value = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
-        BasicSignals.__init__(self, actor_name="deconvolution_sub_bar")
         layout = QVBoxLayout(self)
 
         self.reactions_table = ReactionTable(self)

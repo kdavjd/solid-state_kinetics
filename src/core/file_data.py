@@ -4,10 +4,11 @@ from io import StringIO
 
 import chardet
 import pandas as pd
-from core.basic_signals import BasicSignals
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
+
+from src.core.basic_signals import BasicSignals
+from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
 
 
 def detect_encoding(func):
@@ -37,11 +38,10 @@ def detect_decimal(func):
 
 
 class FileData(BasicSignals):
-    response_signal = pyqtSignal(dict)
     data_loaded_signal = pyqtSignal(pd.DataFrame)
 
-    def __init__(self):
-        super().__init__("file_data")
+    def __init__(self, dispatcher):
+        super().__init__(actor_name="file_data", dispatcher=dispatcher)
         self.data = None
         self.original_data = {}
         self.dataframe_copies = {}
@@ -166,7 +166,6 @@ class FileData(BasicSignals):
     def reset_dataframe_copy(self, key):
         if key in self.original_data:
             self.dataframe_copies[key] = self.original_data[key].copy()
-            _ = self.handle_request_cycle("main_tab", "plot_df", df=self.dataframe_copies[key])
             if key in self.operations_history:
                 del self.operations_history[key]
                 logger.debug(f"История операций: {self.operations_history}")
@@ -188,19 +187,21 @@ class FileData(BasicSignals):
                     dataframe[column] = func(dataframe[column])
 
             self.log_operation(params)
-            _ = self.handle_request_cycle("main_tab", "plot_df", df=dataframe)
             logger.info("Данные были успешно модифицированы.")
 
         except Exception as e:
             logger.error(f"Ошибка при модификации данных файла:{file_name}: {e}")
 
-    @pyqtSlot(dict)
-    def request_slot(self, params: dict):
-        if params["target"] != "file_data":
-            return
+    def process_request(self, params: dict):
+        operation = params.get("operation")
+        file_name = params.get("file_name")
+        func = params.get("function")
+        actor = params.get("actor")
+        logger.debug(f"{self.actor_name} processing request '{operation}' from '{actor}'")
 
-        logger.debug(f"В handle_request пришли данные {params}")
-        operation, file_name, func = params.get("operation"), params.get("file_name", None), params.get("function")
+        if not file_name:
+            logger.error("Не указан file_name в запросе")
+            return
 
         if operation == "differential":
             if not self.check_operation_executed(file_name, "differential"):
@@ -217,8 +218,9 @@ class FileData(BasicSignals):
             params["data"] = True
         elif operation == "load_file":
             self.load_file(file_name)
+            params["data"] = True
         else:
             return
 
         params["target"], params["actor"] = params["actor"], params["target"]
-        self.response_signal.emit(params)
+        self.dispatcher.response_signal.emit(params)

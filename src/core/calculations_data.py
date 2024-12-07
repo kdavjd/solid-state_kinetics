@@ -1,50 +1,114 @@
 import json
 from functools import reduce
+from typing import Any, Dict, List
 
-from core.logger_config import logger
-from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
+import numpy as np
+from PyQt6.QtCore import pyqtSignal
+
+from src.core.basic_signals import BasicSignals
+from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
 
 
-class CalculationsData(QObject):
+class CalculationsData(BasicSignals):
+    """A class to manage and store calculations-related data.
+
+    This class extends BasicSignals to communicate with other components.
+    It provides methods to get, set, remove, and load calculation data from files.
+    """
+
     dataChanged = pyqtSignal(dict)
-    response_signal = pyqtSignal(dict)
 
-    def __init__(self, filename=None, parent=None):
-        super().__init__(parent)
-        self._filename = filename
-        self._data = {}
-        if filename:
-            self.load_data()
+    def __init__(self, dispatcher):
+        """Initialize the CalculationsData component.
 
-    def load_data(self):
+        Args:
+            dispatcher: The SignalDispatcher instance for request/response handling.
+        """
+        super().__init__(actor_name="calculations_data", dispatcher=dispatcher)
+        self._data: Dict[str, Any] = {}
+        self._filename: str = ""
+
+    def load_reactions(self, load_file_name: str, file_name: str) -> Dict[str, Any]:
+        """Load reaction data from a file.
+
+        Args:
+            load_file_name (str): The file to load data from.
+            file_name (str): The key name under which data will be stored.
+
+        Returns:
+            Dict[str, Any]: The loaded data if successful, otherwise an empty dict.
+        """
         try:
-            with open(self._filename, "r") as file:
-                self.data = json.load(file)
-        except IOError as e:
-            print(f"Ошибка загрузки данных: {e}")
+            with open(load_file_name, "r", encoding="utf-8") as file:
+                data = json.load(file)
 
-    def save_data(self):
+            for reaction_key, reaction_data in data.items():
+                if "x" in reaction_data:
+                    reaction_data["x"] = np.array(reaction_data["x"])
+
+            self.set_value([file_name], data)
+            console.log(f"Data successfully imported from file:\n\n{load_file_name}")
+            return data
+        except IOError as e:
+            logger.error(f"{e}")
+            return {}
+
+    def save_data(self) -> None:
+        """Save the current data to a file."""
         try:
             with open(self._filename, "w") as file:
-                json.dump(self.data, file, indent=4)
+                json.dump(self._data, file, indent=4)
         except IOError as e:
-            print(f"Ошибка сохранения данных: {e}")
+            logger.error(f"{e}")
 
-    def get_value(self, keys: list[str]) -> dict:
+    def get_value(self, keys: List[str]) -> Dict[str, Any]:
+        """Get a nested value from the data dictionary.
+
+        Args:
+            keys (List[str]): The list of keys representing the nested path.
+
+        Returns:
+            Dict[str, Any]: The retrieved data or an empty dict if not found.
+        """
         return reduce(lambda data, key: data.get(key, {}), keys, self._data)
 
-    def set_value(self, keys: list[str], value):
+    def set_value(self, keys: List[str], value: Any) -> None:
+        """Set a nested value in the data dictionary.
+
+        Args:
+            keys (List[str]): The list of keys to define the nested path.
+            value (Any): The value to set.
+        """
+        if not keys:
+            return
         last_key = keys.pop()
         nested_dict = reduce(lambda data, key: data.setdefault(key, {}), keys, self._data)
         nested_dict[last_key] = value
 
-    def exists(self, keys: list[str]) -> bool:
+    def exists(self, keys: List[str]) -> bool:
+        """Check if a nested key path exists in the data.
+
+        Args:
+            keys (List[str]): The list of keys representing the nested path.
+
+        Returns:
+            bool: True if the path exists, False otherwise.
+        """
         try:
-            return reduce(lambda data, key: data[key], keys, self._data) is not None
+            _ = reduce(lambda data, key: data[key], keys, self._data)
+            return True
         except KeyError:
             return False
 
-    def remove_value(self, keys: list[str]):
+    def remove_value(self, keys: List[str]) -> None:
+        """Remove a nested value from the data dictionary.
+
+        Args:
+            keys (List[str]): The list of keys representing the nested path to remove.
+        """
+        if not keys:
+            return
         if self.exists(keys):
             last_key = keys.pop()
             parent_dict = reduce(lambda data, key: data.get(key, {}), keys, self._data)
@@ -52,26 +116,64 @@ class CalculationsData(QObject):
                 del parent_dict[last_key]
                 logger.debug({"operation": "remove_reaction", "keys": keys + [last_key]})
 
-    @pyqtSlot(dict)
-    def request_slot(self, params: dict):
-        if params["target"] != "calculations_data":
-            return
+    def process_request(self, params: dict) -> None:
+        """Process incoming requests related to data operations.
 
-        operation, path_keys, value = params.get("operation"), params.get("path_keys", None), params.get("value", None)
-        logger.debug(f"В calculations_data_slot пришел запрос {operation} от {params['actor']}")
+        Args:
+            params (dict): The request parameters, must contain 'operation' and possibly 'path_keys', 'value', etc.
+        """
+        operation = params.get("operation")
+        actor = params.get("actor")
+        logger.debug(f"{self.actor_name} processing request '{operation}' from '{actor}'")
 
         if operation == "get_value":
-            params["data"] = self.get_value(path_keys)
+            path_keys = params.get("path_keys", [])
+            if not isinstance(path_keys, list) or any(not isinstance(k, str) for k in path_keys):
+                logger.error("Invalid path_keys provided for get_value.")
+                params["data"] = {}
+            else:
+                params["data"] = self.get_value(path_keys)
+
         elif operation == "set_value":
-            params["data"] = True if self.exists(path_keys) else False
-            self.set_value(path_keys, value)
+            path_keys = params.get("path_keys", [])
+            value = params.get("value")
+            if not isinstance(path_keys, list) or any(not isinstance(k, str) for k in path_keys):
+                logger.error("Invalid path_keys provided for set_value.")
+                params["data"] = False
+            else:
+                self.set_value(path_keys, value)
+                params["data"] = True
+
         elif operation == "remove_value":
-            params["data"] = True if self.exists(path_keys) else False
-            self.remove_value(path_keys)
+            path_keys = params.get("path_keys", [])
+            if not isinstance(path_keys, list) or any(not isinstance(k, str) for k in path_keys):
+                logger.error("Invalid path_keys provided for remove_value.")
+                params["data"] = False
+            else:
+                self.remove_value(path_keys)
+                params["data"] = True
+
+        elif operation == "import_reactions":
+            load_file_name = params.get("import_file_name")
+            file_name = params.get("file_name")
+            if isinstance(load_file_name, str) and isinstance(file_name, str):
+                params["data"] = self.load_reactions(load_file_name, file_name)
+            else:
+                logger.error("Invalid import file name or target file name provided.")
+                params["data"] = None
+
         elif operation == "get_full_data":
-            params["data"] = self._data
+            params["data"] = self._data.copy()
+
         else:
+            logger.debug(f"Unknown operation: {operation}")
             params["data"] = None
 
-        params["target"], params["actor"] = params["actor"], params["target"]
-        self.response_signal.emit(params)
+        response = {
+            "actor": self.actor_name,
+            "target": actor,
+            "operation": operation,
+            "request_id": params["request_id"],
+            "data": params["data"],
+        }
+        self.dispatcher.response_signal.emit(response)

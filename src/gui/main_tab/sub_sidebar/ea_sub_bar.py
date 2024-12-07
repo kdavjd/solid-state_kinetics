@@ -1,4 +1,4 @@
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 
@@ -50,13 +50,11 @@ class EaSubBar(QWidget):
         self.layout.addWidget(QPushButton("Ортега", self))
         self.layout.addWidget(QLabel("Энергия активации", self))
 
-    pyqtSlot(dict)
-
-    def open_merge_dialog(self, data):
+    def open_merge_dialog(self):
         dialog = AddSeriesDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             series_name = dialog.get_series_name()
-            if series_name:  # Ensure the name is not empty
+            if series_name:
                 self.add_series(series_name)
 
     def on_merge_dialog_button_pushed(self):
