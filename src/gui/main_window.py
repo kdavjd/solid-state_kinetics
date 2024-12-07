@@ -46,7 +46,14 @@ class MainWindow(QMainWindow):
         """
         operation = params.get("operation")
         actor = params.get("actor")
+        response = params.copy()
         logger.debug(f"{self.actor_name} обрабатывает запрос '{operation}' от '{actor}'")
+        if operation == "get_file_name":
+            response["data"] = self.main_tab.sidebar.active_file_item.text()
+        else:
+            logger.warning(f"{self.actor_name} received unknown operation '{operation}'")
+        response["target"], response["actor"] = response["actor"], response["target"]
+        self.dispatcher.response_signal.emit(response)
 
     @pyqtSlot(dict)
     def process_response(self, params: dict):
@@ -126,5 +133,6 @@ class MainWindow(QMainWindow):
         if operation == "deconvolution":
             data = self.handle_request_cycle("calculations_data_operations", operation, **params)
             logger.debug(f"{data=}")
+
         else:
             logger.error(f"{self.actor_name} не знает как обработать {operation},\n\n {params=}")

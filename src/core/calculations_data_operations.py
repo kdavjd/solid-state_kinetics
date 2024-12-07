@@ -212,7 +212,6 @@ class CalculationsDataOperations(BasicSignals):
             )
             if is_exist:
                 logger.warning(f"Data already exists at path: {path_keys.copy()} - overwriting not performed.")
-                console.log(f"Data already exists at {path_keys.copy()}. No new data was set.")
 
             # Extract reaction parameters and plot them
             reaction_params = self._extract_reaction_params(path_keys)
@@ -287,7 +286,6 @@ class CalculationsDataOperations(BasicSignals):
             if reaction_name in path_keys:
                 self.reaction_params_to_gui.emit(reaction_params)
                 logger.debug(f"Highlighting reaction: {reaction_name}")
-                console.log(f"Highlighting reaction '{reaction_name}' in file '{file_name}'.")
                 # Plot the upper and lower bound curves explicitly for the highlighted reaction
                 self._plot_reaction_curve(
                     file_name, reaction_name, "upper_bound_coeffs", reaction_params.get("upper_bound_coeffs", [])
