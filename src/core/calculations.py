@@ -68,7 +68,6 @@ class Calculations(BasicSignals):
         self.thread = CalculationThread(func, *args, **kwargs)
         self.thread.result_ready.connect(self._calculation_finished)
         self.thread.start()
-        # Removed unnecessary logs as per the request
 
     @pyqtSlot(dict)
     def process_request(self, params: dict):
@@ -131,7 +130,7 @@ class Calculations(BasicSignals):
                 - "deconvolution_settings": dict with method and parameters for the optimization.
         """
         logger.debug(f"run_deconvolution called with response: {response}")
-        # Removed unnecessary logs as per the request
+
         try:
             reaction_variables = response["reaction_variables"]
             bounds = response["bounds"]
@@ -299,9 +298,9 @@ class Calculations(BasicSignals):
             #     h: <val>
             #     z: <val>
             #     w: <val>
-            #     fr/NAN: <val or null>
-            #     ads1/NAN: <val or null>
-            #     ads2/NAN: <val or null>
+            #     fr: <val or null>
+            #     ads1: <val or null>
+            #     ads2: <val or null>
             #   r2:
             #     ...
             #
@@ -353,7 +352,6 @@ class Calculations(BasicSignals):
             console.log(f"Best MSE: {best_mse}")
             console.log(f"Reaction combination: {best_combination}")
             console.log("Reaction parameters have been updated based on the best combination found.")
-            console.log("Parameters in YAML-like format:")
             console.log(parameters_yaml.rstrip())
 
             file_name = self.handle_request_cycle("main_window", "get_file_name")
@@ -373,7 +371,6 @@ class Calculations(BasicSignals):
         Args:
             in_progress (bool): True if calculations are in progress, False otherwise.
         """
-        # Removed unnecessary logs as per the request
         if in_progress:
             logger.debug("Calculations data operations are now in progress.")
         else:
