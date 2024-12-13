@@ -68,7 +68,7 @@ class SmoothingBlock(QWidget):
         layout.addWidget(self.apply_button)
 
         self.layout().addLayout(layout)
-        logger.info("SmoothingBlock UI initialized successfully.")
+        logger.debug("SmoothingBlock UI initialized successfully.")
 
 
 class BackgroundSubtractionBlock(QWidget):
@@ -130,7 +130,7 @@ class BackgroundSubtractionBlock(QWidget):
 
         layout.addWidget(self.apply_button)
         self.layout().addLayout(layout)
-        logger.info("BackgroundSubtractionBlock UI initialized successfully.")
+        logger.debug("BackgroundSubtractionBlock UI initialized successfully.")
 
 
 class ActionButtonsBlock(QWidget):

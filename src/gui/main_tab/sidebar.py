@@ -50,6 +50,7 @@ class SideBar(QWidget):
         # Initialize model-based calculation section
         self.model_based_root = QStandardItem("model-based calculation")
         self.model.appendRow(self.model_based_root)
+        self.model_based_root.appendRow(QStandardItem("calculations"))
         self.model_based_root.appendRow(QStandardItem("add new model"))
         self.model_based_root.appendRow(QStandardItem("import model"))
 
@@ -137,6 +138,8 @@ class SideBar(QWidget):
                 self.console_show_signal.emit(False)
                 self.console_show_state.setCheckState(Qt.CheckState.Unchecked)
         elif item.parent() == self.model_free_root:
+            self.sub_side_bar_needed.emit(item.text())
+        elif item.parent() == self.model_based_root:
             self.sub_side_bar_needed.emit(item.text())
         else:
             self.sub_side_bar_needed.emit("")
