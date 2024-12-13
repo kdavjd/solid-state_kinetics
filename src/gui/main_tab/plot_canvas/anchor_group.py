@@ -1,15 +1,3 @@
-"""This module provides classes and functionalities for plotting data with interactive anchors
-to adjust certain parameters (like height and position) on a matplotlib plot canvas integrated
-into a PyQt6 GUI. It includes three main anchor group classes:
-
-- AnchorGroup: Base class for handling a trio of anchors (center, upper bound, lower bound).
-- PositionAnchorGroup: Specialized for handling horizontal position adjustments.
-- HeightAnchorGroup: Specialized for handling vertical height adjustments.
-
-Additionally, it provides the PlotCanvas class which integrates a Matplotlib figure, toolbar,
-and the anchor groups into a PyQt6 widget, allowing interactive data visualization and editing.
-"""
-
 import matplotlib.pyplot as plt
 import scienceplots  # noqa pylint: disable=unused-import
 from core.logger_config import logger

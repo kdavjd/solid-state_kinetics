@@ -1,12 +1,4 @@
-"""
-This module provides the `Calculations` class, which manages the execution of deconvolution
-calculations, including parameter optimization through methods like differential evolution.
-It integrates with other components such as the dispatcher and utilizes signals for
-asynchronous updates. The class also handles the logging of intermediate and best
-results during the optimization process.
-"""
-
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -43,40 +35,20 @@ class Calculations(BasicSignals):
     new_best_result = pyqtSignal(dict)
 
     def __init__(self, dispatcher):
-        """
-        Initialize the Calculations instance.
-
-        Args:
-            dispatcher: The dispatcher object for inter-component communication.
-        """
         super().__init__(actor_name="calculations", dispatcher=dispatcher)
-        self.thread: CalculationThread = None
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
-        self.best_combination = None
-        self.best_mse = float("inf")
+        self.thread: Optional[CalculationThread] = None
+        self.best_combination: Optional[tuple] = None
+        self.best_mse: float = float("inf")
         self.new_best_result.connect(self.handle_new_best_result)
 
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
-        """
-        Start a new calculation thread with the given function and arguments.
-
-        Args:
-            func (Callable): The function to run in the calculation thread.
-            *args: Variable positional arguments for the function.
-            **kwargs: Variable keyword arguments for the function.
-        """
         self.thread = CalculationThread(func, *args, **kwargs)
         self.thread.result_ready.connect(self._calculation_finished)
         self.thread.start()
 
     @pyqtSlot(dict)
     def process_request(self, params: dict):
-        """
-        Process incoming requests. Currently, this method is not implemented.
-
-        Args:
-            params (dict): Parameters for request handling.
-        """
         logger.debug("process_request called with no implemented logic.")
         pass
 
@@ -266,14 +238,19 @@ class Calculations(BasicSignals):
         logger.info(f"Intermediate result: xk = {xk}, convergence = {convergence}")
 
     @pyqtSlot(dict)
-    def handle_new_best_result(self, result: dict):
+    def handle_new_best_result(self, result: dict):  # noqa: C901
         """
-        Handle the signal when a new best result is found during optimization.
+        Handles the event when a new best result is found during optimization.
 
-        This method formats and logs the best MSE, combination, and parameters in a YAML-like structure.
+        This method updates the best MSE and combination if the new result is better.
+        It formats and logs the best MSE, combination, and parameters in a YAML-like structure
+        with each parameter rounded to four decimal places.
 
         Args:
-            result (dict): Contains 'best_mse', 'best_combination', and 'params'.
+            result (dict): A dictionary containing 'best_mse', 'best_combination', and 'params'.
+                        - 'best_mse' (float): The best Mean Squared Error achieved.
+                        - 'best_combination' (list[str]): The combination of reaction functions.
+                        - 'params' (list[float]): The parameters corresponding to the best combination.
         """
         best_mse = result["best_mse"]
         best_combination = result["best_combination"]
@@ -285,26 +262,16 @@ class Calculations(BasicSignals):
 
             logger.info("A new best result has been found.")
 
-            # Determine table structure based on the combination of functions
-            # Each reaction always has h, z, w. Additional parameters depend on the function type.
-            # gauss: h, z, w (3 params)
-            # fraser: h, z, w, fr (4 params)
-            # ads: h, z, w, ads1, ads2 (5 params)
-            #
-            # We will print the parameters in a YAML-like format:
-            #
-            # parameters:
-            #   r1:
-            #     h: <val>
-            #     z: <val>
-            #     w: <val>
-            #     fr: <val or null>
-            #     ads1: <val or null>
-            #     ads2: <val or null>
-            #   r2:
-            #     ...
-            #
-            def reaction_param_count(func_type):
+            def reaction_param_count(func_type: str) -> int:
+                """
+                Determines the number of parameters based on the reaction function type.
+
+                Args:
+                    func_type (str): The type of reaction function.
+
+                Returns:
+                    int: The number of parameters for the given function type.
+                """
                 if func_type == "gauss":
                     return 3
                 elif func_type == "fraser":
@@ -312,11 +279,7 @@ class Calculations(BasicSignals):
                 elif func_type == "ads":
                     return 5
                 else:
-                    return 3  # default if unknown
-
-            # # Parse parameters according to each reaction function
-            # reaction_count = len(best_combination)
-            # column_labels = ["h", "z", "w", "fr", "ads1", "ads2"]
+                    return 3  # Default to 3 if unknown
 
             idx = 0
             parameters_yaml = "parameters:\n"
@@ -325,36 +288,47 @@ class Calculations(BasicSignals):
                 reaction_params = params[idx : idx + count]
                 idx += count
 
-                # Build a dict of param_name -> value
-                # Start with h,z,w always
+                # Initialize parameter dictionary with default None values
                 param_dict = {
-                    "h": float(reaction_params[0]),
-                    "z": float(reaction_params[1]),
-                    "w": float(reaction_params[2]),
+                    "h": None,
+                    "z": None,
+                    "w": None,
                     "fr": None,
                     "ads1": None,
                     "ads2": None,
                 }
 
-                if func_type == "fraser":
-                    param_dict["fr"] = float(reaction_params[3])
-                elif func_type == "ads":
-                    param_dict["ads1"] = float(reaction_params[3])
-                    param_dict["ads2"] = float(reaction_params[4])
+                # Assign values based on function type
+                try:
+                    param_dict["h"] = round(float(reaction_params[0]), 4)
+                    param_dict["z"] = round(float(reaction_params[1]), 4)
+                    param_dict["w"] = round(float(reaction_params[2]), 4)
 
-                # Append to parameters_yaml
+                    if func_type == "fraser" and count >= 4:
+                        param_dict["fr"] = round(float(reaction_params[3]), 4)
+                    elif func_type == "ads" and count >= 5:
+                        param_dict["ads1"] = round(float(reaction_params[3]), 4)
+                        param_dict["ads2"] = round(float(reaction_params[4]), 4)
+                except (IndexError, ValueError) as e:
+                    logger.error(f"Error parsing parameters for reaction {i}: {e}")
+                    continue  # Skip to the next reaction if there's an error
+
+                # Append formatted parameters to YAML string
                 parameters_yaml += f"  r{i}:\n"
-                for k, v in param_dict.items():
-                    val_str = "null" if v is None else f"{v}"
-                    parameters_yaml += f"    {k}: {val_str}\n"
+                for key, value in param_dict.items():
+                    val_str = "null" if value is None else f"{value:.4f}"
+                    parameters_yaml += f"    {key}: {val_str}\n"
 
-            console.log("New best result found:")
-            console.log(f"Best MSE: {best_mse}")
-            console.log(f"Reaction combination: {best_combination}")
-            console.log("Reaction parameters have been updated based on the best combination found.")
+            # Log the formatted YAML parameters
+            console.log("\nNew best result found:")
+            console.log(f"\nBest MSE: {best_mse:.4f}")
+            console.log(f"\nReaction combination: {best_combination}")
+            console.log("\n\nReaction parameters have been updated based on the best combination found.")
             console.log(parameters_yaml.rstrip())
 
+            # Retrieve the current file name from the main window
             file_name = self.handle_request_cycle("main_window", "get_file_name")
+            # Update the reactions parameters in the calculations data operations
             self.handle_request_cycle(
                 "calculations_data_operations",
                 "update_reactions_params",

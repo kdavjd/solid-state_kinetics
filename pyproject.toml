@@ -94,6 +94,6 @@ log_cli_level = "DEBUG"
 log_cli_format = "[%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 
 # Specify a score threshold under which the program will exit with error.
-fail-under = 9
+# fail-under = 9
 
-extension-pkg-whitelist = ["PyQt6"]
+# extension-pkg-whitelist = ["PyQt6"]

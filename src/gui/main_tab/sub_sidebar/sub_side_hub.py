@@ -1,6 +1,5 @@
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from src.core.logger_config import logger
 from src.gui.main_tab.sub_sidebar.deconvolution_sub_bar import DeconvolutionSubBar
 from src.gui.main_tab.sub_sidebar.ea_sub_bar import EaSubBar
 from src.gui.main_tab.sub_sidebar.experiment_sub_bar import ExperimentSubBar
@@ -22,20 +21,18 @@ class SubSideHub(QWidget):
         self.current_widget = None
 
     def update_content(self, content_type):
-        logger.debug("SubSideBar контент: %s", content_type)
-
         if self.current_widget is not None:
             self.layout.removeWidget(self.current_widget)
             self.current_widget.hide()
 
-        if content_type == "Деконволюция":
+        if content_type == "deconvolution":
             self.current_widget = self.deconvolution_sub_bar
-        elif content_type == "Энергия активации":
+        elif content_type == "Ea":
             self.current_widget = self.ea_sub_bar
-        elif content_type == "Эксперимент":
+        elif content_type == "experiments":
             self.current_widget = self.experiment_sub_bar
         else:
-            self.current_widget = QLabel("Неизвестный контент", self)
+            self.current_widget = QLabel("unknown content", self)
 
         self.current_widget.show()
         self.layout.addWidget(self.current_widget)

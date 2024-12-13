@@ -89,7 +89,7 @@ class MainTab(QWidget):
     def toggle_sub_sidebar(self, content_type):
         if content_type:
             if content_type in self.sidebar.get_experiment_files_names():
-                self.sub_sidebar.update_content("Эксперимент")
+                self.sub_sidebar.update_content("experiments")
             else:
                 self.sub_sidebar.update_content(content_type)
             self.sub_sidebar.setVisible(True)
@@ -126,7 +126,7 @@ class MainTab(QWidget):
     def update_reactions_table(self, data: dict):
         active_file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else None
         if not active_file_name:
-            logger.error("Нет активного файла для обновления UI.")
+            logger.error("There is no active file to update the UI.")
             return
 
         reaction_table = self.sub_sidebar.deconvolution_sub_bar.reactions_table
@@ -138,7 +138,7 @@ class MainTab(QWidget):
         for reaction_name, reaction_info in data.items():
             function_name = reaction_info.get("function", "gauss")
             reaction_table.add_reaction(reaction_name=reaction_name, function_name=function_name, emit_signal=False)
-        logger.debug("UI успешно обновлен с загруженными реакциями.")
+        logger.debug("The UI has been successfully updated with loaded reactions.")
 
     def response_slot(self, params: dict):
-        logger.debug(f"В response_slot пришли данные {params}")
+        logger.debug(f"response_slot handle {params}")

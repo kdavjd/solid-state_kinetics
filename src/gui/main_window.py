@@ -13,7 +13,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, dispatcher: SignalDispatcher):
         super().__init__()
-        self.setWindowTitle("Кинетика твердофазных реакций")
+        self.setWindowTitle("Solid state kinetics")
 
         self.tabs = QTabWidget(self)
         self.setCentralWidget(self.tabs)
@@ -27,29 +27,29 @@ class MainWindow(QMainWindow):
         self.dispatcher = dispatcher
         self.actor_name = "main_window"
 
-        # Экземпляр BasicSignals для делегирования запросов
         self.basic_signals = BasicSignals(actor_name=self.actor_name, dispatcher=self.dispatcher)
 
-        # Регистрация методов в диспетчере
         self.dispatcher.register_component(self.actor_name, self.process_request, self.process_response)
 
-        # Подключение сигналов
         self.main_tab.to_main_window_signal.connect(self.handle_request_from_main_tab)
         self.to_main_tab_signal.connect(self.main_tab.response_slot)
 
-        logger.debug(f"{self.actor_name} инициализирован и подключен к сигналам диспетчера.")
+        logger.debug(f"{self.actor_name} init signals and slots.")
 
     @pyqtSlot(dict)
     def process_request(self, params: dict):
-        """
-        Обработка входящих запросов.
-        """
         operation = params.get("operation")
         actor = params.get("actor")
         response = params.copy()
-        logger.debug(f"{self.actor_name} обрабатывает запрос '{operation}' от '{actor}'")
+        logger.debug(f"{self.actor_name} handle request '{operation}' from '{actor}'")
         if operation == "get_file_name":
             response["data"] = self.main_tab.sidebar.active_file_item.text()
+        if operation == "plot_df":
+            df = params.get("df", None)
+            self.main_tab.plot_canvas.plot_file_data_from_dataframe(df) if df is not None else logger.error(
+                f"{self.actor_name} no df"
+            )
+            response["data"] = df is not None
         else:
             logger.warning(f"{self.actor_name} received unknown operation '{operation}'")
         response["target"], response["actor"] = response["actor"], response["target"]
@@ -57,28 +57,19 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(dict)
     def process_response(self, params: dict):
-        """
-        Обработка входящих ответов.
-        """
         logger.debug(f"{self.actor_name} received response: {params}")
         self.basic_signals.process_response(params)
 
     def handle_request_cycle(self, target: str, operation: str, **kwargs):
-        """
-        Делегирование вызова handle_request_cycle из BasicSignals.
-        """
         result = self.basic_signals.handle_request_cycle(target, operation, **kwargs)
         logger.debug(f"handle_request_cycle result for '{operation}': {result}")
         return result
 
     @pyqtSlot(dict)
     def handle_request_from_main_tab(self, params: dict):  # noqa: C901
-        """
-        Обработка запросов от main_tab и их маршрутизация через BasicSignals.
-        """
         operation = params.pop("operation")
 
-        logger.debug(f"{self.actor_name} получил запрос на '{operation}")
+        logger.debug(f"{self.actor_name} handle_request_from_main_tab '{operation}")
 
         if operation == "differential":
             params["function"] = self.handle_request_cycle("active_file_operations", operation)
@@ -87,14 +78,14 @@ class MainWindow(QMainWindow):
                 df = self.handle_request_cycle("file_data", "get_df_data", **params)
                 self.main_tab.plot_canvas.plot_file_data_from_dataframe(df)
             else:
-                logger.error(f"{self.actor_name} не получил ответ от file_data")
+                logger.error(f"{self.actor_name} no response in handle_request_from_main_tab")
 
         if operation == "add_reaction":
             is_ok = self.handle_request_cycle("calculations_data_operations", operation, **params)
             if not is_ok:
                 console.log(
-                    "Перед добвлением реакции необходимо привести данные к da/dT. Данные экспериментов ->\
-                     выберите эксперимент -> Привести к da/dT"
+                    "\n\nit is necessary to bring the data to da/dT.\
+                        \nexperiments -> your experiment -> da/dT"
                 )
                 self.main_tab.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction()
                 return
@@ -135,4 +126,4 @@ class MainWindow(QMainWindow):
             logger.debug(f"{data=}")
 
         else:
-            logger.error(f"{self.actor_name} не знает как обработать {operation},\n\n {params=}")
+            logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")

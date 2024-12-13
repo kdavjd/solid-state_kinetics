@@ -136,21 +136,6 @@ class FileData(BasicSignals):
         logger.debug(f"Updated operations history: {self.operations_history}")
 
     def check_operation_executed(self, file_name: str, operation: str) -> bool:
-        """
-        Check if a given operation has been executed on the specified file.
-
-        Parameters
-        ----------
-        file_name : str
-            The filename key.
-        operation : str
-            The operation name to check.
-
-        Returns
-        -------
-        bool
-            True if the operation was executed for the file, False otherwise.
-        """
         if file_name in self.operations_history:
             for operation_record in self.operations_history[file_name]:
                 if operation_record["params"]["operation"] == operation:
@@ -174,7 +159,7 @@ class FileData(BasicSignals):
         self.file_path, self.delimiter, self.skip_rows, columns_names = file_info
 
         if self.file_path in self.loaded_files:
-            console.log(f"The file '{self.file_path}' is already loaded.")
+            console.log(f"\n\nThe file '{self.file_path}' is already loaded.")
             return
 
         # If user provided column names as a string, split them appropriately.
@@ -200,18 +185,18 @@ class FileData(BasicSignals):
         _, file_extension = os.path.splitext(self.file_path)
 
         # Additional console output to inform user that file loading is in progress.
-        console.log(f"Attempting to load the file: {self.file_path}")
+        console.log(f"\n\nAttempting to load the file: {self.file_path}")
 
         if file_extension == ".csv":
             self.load_csv()
         elif file_extension == ".txt":
             self.load_txt()
         else:
-            console.log(f"File extension '{file_extension}' is not supported.")
+            console.log(f"\n\nFile extension '{file_extension}' is not supported.")
 
         self.loaded_files.add(self.file_path)
         # Inform user that file loading is complete.
-        console.log(f"File '{self.file_path}' has been successfully loaded.")
+        console.log(f"\n\nFile '{self.file_path}' has been successfully loaded.")
 
     @detect_encoding
     @detect_decimal
@@ -239,7 +224,7 @@ class FileData(BasicSignals):
             self._fetch_data()
         except Exception as e:
             logger.error(f"Error while loading CSV file: {e}")
-            console.log("Error: Unable to load the CSV file.")
+            console.log("\n\nError: Unable to load the CSV file.")
 
     @detect_encoding
     @detect_decimal
@@ -264,7 +249,7 @@ class FileData(BasicSignals):
             self._fetch_data()
         except Exception as e:
             logger.error(f"Error while loading TXT file: {e}")
-            console.log("Error: Unable to load the TXT file.")
+            console.log("\n\nError: Unable to load the TXT file.")
 
     def _fetch_data(self):
         """
@@ -299,7 +284,7 @@ class FileData(BasicSignals):
         buffer = StringIO()
         self.dataframe_copies[file_basename].info(buf=buffer)
         file_info = buffer.getvalue()
-        console.log(f"File loaded:\n{file_info}")
+        console.log(f"\n\nFile loaded:\n{file_info}")
 
         logger.debug(f"dataframe_copies keys: {self.dataframe_copies.keys()}")
         # Emit a signal that data is loaded.
@@ -318,8 +303,8 @@ class FileData(BasicSignals):
         if key in self.dataframe_copies:
             # Handle request to plot using the dispatcher.
             # This might involve complex logic, so we rely on another system (handle_request_cycle).
-            _ = self.handle_request_cycle("main_tab", "plot_df", df=self.dataframe_copies[key])
-            console.log(f"Plotting the DataFrame with key: {key}")
+            _ = self.handle_request_cycle("main_window", "plot_df", df=self.dataframe_copies[key])
+            console.log(f"\n\nPlotting the DataFrame with key: {key}")
         else:
             logger.error(f"Key '{key}' not found in dataframe_copies.")
 
@@ -339,7 +324,7 @@ class FileData(BasicSignals):
             if key in self.operations_history:
                 del self.operations_history[key]
             logger.debug(f"Reset data for key '{key}' and cleared operations history.")
-            console.log(f"Data reset for '{key}'. Original state restored.")
+            console.log(f"\n\nData reset for '{key}'. Original state restored.")
 
     def modify_data(self, func, params):
         """
@@ -361,12 +346,12 @@ class FileData(BasicSignals):
         file_name = params.get("file_name")
         if not callable(func):
             logger.error("The provided 'func' is not callable.")
-            console.log("Error: Provided function is not callable.")
+            console.log("\n\nError: Provided function is not callable.")
             return
 
         if file_name not in self.dataframe_copies:
             logger.error(f"Key '{file_name}' not found in dataframe_copies.")
-            console.log("Error: Cannot modify data as the file was not found in memory.")
+            console.log("\n\nError: Cannot modify data as the file was not found in memory.")
             return
 
         try:
@@ -415,7 +400,7 @@ class FileData(BasicSignals):
 
         if not file_name:
             logger.error("No 'file_name' specified in the request.")
-            console.log("Error: 'file_name' must be specified for the requested operation.")
+            console.log("\n\nError: 'file_name' must be specified for the requested operation.")
             return
 
         # Perform operation based on the request.
@@ -423,7 +408,7 @@ class FileData(BasicSignals):
             if not self.check_operation_executed(file_name, "differential"):
                 self.modify_data(func, params)
             else:
-                console.log("The data has already been transformed (differential operation).")
+                console.log("\n\nThe data has already been transformed (differential operation).")
             params["data"] = True
 
         elif operation == "check_differential":
@@ -432,7 +417,7 @@ class FileData(BasicSignals):
         elif operation == "get_df_data":
             params["data"] = self.dataframe_copies.get(file_name)
             if params["data"] is None:
-                console.log(f"No data found for file '{file_name}'.")
+                console.log(f"\n\nNo data found for file '{file_name}'.")
 
         elif operation == "reset":
             self.reset_dataframe_copy(file_name)
@@ -446,7 +431,7 @@ class FileData(BasicSignals):
             params["data"] = True
 
         else:
-            console.log(f"Unknown operation '{operation}'. No action taken.")
+            console.log(f"\n\nUnknown operation '{operation}'. No action taken.")
             return
 
         # Swap 'actor' and 'target' in params for response.
