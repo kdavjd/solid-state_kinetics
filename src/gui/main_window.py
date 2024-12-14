@@ -50,6 +50,12 @@ class MainWindow(QMainWindow):
                 f"{self.actor_name} no df"
             )
             response["data"] = df is not None
+
+        if operation == "plot_mse_line":
+            mse_data = params.get("mse_data", [])
+            self.main_tab.plot_canvas.plot_mse_history(mse_data)
+            response["data"] = True
+
         else:
             logger.warning(f"{self.actor_name} received unknown operation '{operation}'")
         response["target"], response["actor"] = response["actor"], response["target"]

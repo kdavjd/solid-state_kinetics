@@ -1,3 +1,4 @@
+import datetime
 from typing import Callable, Optional
 
 import numpy as np
@@ -41,6 +42,8 @@ class Calculations(BasicSignals):
         self.best_combination: Optional[tuple] = None
         self.best_mse: float = float("inf")
         self.new_best_result.connect(self.handle_new_best_result)
+        self.mse_history = []
+        self.calculation_active = False
 
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
         self.thread = CalculationThread(func, *args, **kwargs)
@@ -75,9 +78,8 @@ class Calculations(BasicSignals):
                     f"Success status: {success}\n"
                     f"Message: {message}"
                 )
-
-                self.best_combination = x
-                self.best_mse = fun
+                self.best_mse = float("inf")
+                self.best_combination = None
             else:
                 logger.info("Calculation finished with a non-OptimizeResult object.")
                 console.log(f"Calculation completed successfully. Result: {result}")
@@ -85,6 +87,11 @@ class Calculations(BasicSignals):
         except ValueError as e:
             logger.error(f"Error processing the result: {e}")
             console.log("An error occurred while processing the calculation result. Check logs for details.")
+
+        self.calculation_active = False
+        self.best_mse = float("inf")
+        self.best_combination = None
+        self.mse_history = []
 
     @pyqtSlot(dict)
     def run_deconvolution(self, response: dict):
@@ -259,8 +266,10 @@ class Calculations(BasicSignals):
         if best_mse < self.best_mse:
             self.best_mse = best_mse
             self.best_combination = best_combination
-
+            self.mse_history.append((datetime.datetime.now(), best_mse))
             logger.info("A new best result has been found.")
+
+            self.handle_request_cycle("main_window", "plot_mse_line", mse_data=self.mse_history)
 
             def reaction_param_count(func_type: str) -> int:
                 """
@@ -323,7 +332,6 @@ class Calculations(BasicSignals):
             console.log("\nNew best result found:")
             console.log(f"\nBest MSE: {best_mse:.4f}")
             console.log(f"\nReaction combination: {best_combination}")
-            console.log("\n\nReaction parameters have been updated based on the best combination found.")
             console.log(parameters_yaml.rstrip())
 
             # Retrieve the current file name from the main window

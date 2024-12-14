@@ -1,5 +1,6 @@
 from typing import Dict, Optional
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -136,6 +137,24 @@ class PlotCanvas(QWidget):
         else:
             logger.error("DataFrame does not contain 'temperature' column.")
             console.log("The file does not contain a 'temperature' column for X-axis.")
+
+    def plot_mse_history(self, mse_data):
+        if not mse_data:
+            return
+        times, mses = zip(*mse_data)
+
+        self.axes.clear()
+        self.lines.clear()
+
+        self.axes.set_title("MSE over time")
+        self.axes.set_xlabel("Time")
+        self.axes.set_ylabel("MSE")
+
+        self.add_or_update_line("mse_line", times, mses, color="red", marker="o", linestyle="-")
+
+        self.axes.xaxis.set_major_locator(mdates.AutoDateLocator())
+        self.axes.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
+        self.figure.autofmt_xdate()
 
     def determine_line_properties(self, reaction_name):
         """
