@@ -1,9 +1,8 @@
+from gui.main_tab.sub_sidebar.model_based.model_based import ModelBasedTab
+from gui.main_tab.sub_sidebar.model_free.deconvolution_sub_bar import DeconvolutionSubBar
+from gui.main_tab.sub_sidebar.model_free.ea_sub_bar import EaSubBar
+from gui.main_tab.sub_sidebar.model_free.experiment_sub_bar import ExperimentSubBar
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
-
-from src.gui.main_tab.sub_sidebar.deconvolution_sub_bar import DeconvolutionSubBar
-from src.gui.main_tab.sub_sidebar.ea_sub_bar import EaSubBar
-from src.gui.main_tab.sub_sidebar.experiment_sub_bar import ExperimentSubBar
-from src.gui.main_tab.sub_sidebar.model_based_calculations import CalculationsTab
 
 
 class SubSideHub(QWidget):
@@ -14,12 +13,12 @@ class SubSideHub(QWidget):
         self.deconvolution_sub_bar = DeconvolutionSubBar(self)
         self.ea_sub_bar = EaSubBar(self)
         self.experiment_sub_bar = ExperimentSubBar(self)
-        self.model_based_calculations = CalculationsTab(self)
+        self.model_based = ModelBasedTab(self)
 
         self.deconvolution_sub_bar.hide()
         self.ea_sub_bar.hide()
         self.experiment_sub_bar.hide()
-        self.model_based_calculations.hide()
+        self.model_based.hide()
 
         self.current_widget = None
 
@@ -35,7 +34,7 @@ class SubSideHub(QWidget):
         elif content_type == "experiments":
             self.current_widget = self.experiment_sub_bar
         elif content_type == "calculations":
-            self.current_widget = self.model_based_calculations
+            self.current_widget = self.model_based
         else:
             self.current_widget = QLabel("unknown content", self)
 

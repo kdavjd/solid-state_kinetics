@@ -3,10 +3,6 @@ import string
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QPen, QPolygonF
 from PyQt6.QtWidgets import (
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
     QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsTextItem,
@@ -41,17 +37,14 @@ class ReactionGraphicsRect(QGraphicsRectItem):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.RightButton:
             menu = QMenu()
-            add_child_action = menu.addAction("Add child")
-
-            # CHANGED: удаляем make_parent_action и добавляем connect_to_child_action
-            # make_parent_action = menu.addAction("Make parent")
-            connect_to_child_action = menu.addAction("Connect to child")
-            delete_action = menu.addAction("Delete reaction")
+            add_child_action = menu.addAction("add child")
+            connect_to_child_action = menu.addAction("connect to child")
+            delete_action = menu.addAction("delete component")
 
             selected_action = menu.exec(event.screenPos())
             if selected_action == add_child_action:
                 self.reaction_node.parent_widget.on_add_child(self.reaction_node.letter)
-            # CHANGED: заменяем обработку make_parent на connect_to_child
+
             elif selected_action == connect_to_child_action:
                 self.reaction_node.parent_widget.on_connect_to_child(self.reaction_node.letter)
             elif selected_action == delete_action:
@@ -87,13 +80,6 @@ class ReactionNode:
         cx = self.x + DiagramConfig.NODE_WIDTH / 2
         cy = self.y + DiagramConfig.NODE_HEIGHT / 2
         return cx, cy
-
-    def bounds(self):
-        left = self.x
-        top = self.y
-        right = self.x + DiagramConfig.NODE_WIDTH
-        bottom = self.y + DiagramConfig.NODE_HEIGHT
-        return left, top, right, bottom
 
     def remove(self):
         if self.text_item:
@@ -197,16 +183,14 @@ class ReactionArrow:
         arrow_right_x = arrow_tip_x - nx * DiagramConfig.ARROW_SIZE + perp_x * DiagramConfig.ARROW_SIZE / 2
         arrow_right_y = arrow_tip_y - ny * DiagramConfig.ARROW_SIZE + perp_y * DiagramConfig.ARROW_SIZE / 2
 
-        arrow_polygon = QPolygonF(
-            [
-                QPointF(arrow_tip_x, arrow_tip_y),
-                QPointF(arrow_left_x, arrow_left_y),
-                QPointF(arrow_right_x, arrow_right_y),
-            ]
-        )
+        arrow_polygon = [
+            QPointF(arrow_tip_x, arrow_tip_y),
+            QPointF(arrow_left_x, arrow_left_y),
+            QPointF(arrow_right_x, arrow_right_y),
+        ]
 
         self.arrow_item = self.scene.addPolygon(
-            arrow_polygon, QPen(DiagramConfig.PEN_COLOR), QBrush(DiagramConfig.ARROW_COLOR)
+            QPolygonF(arrow_polygon), QPen(DiagramConfig.PEN_COLOR), QBrush(DiagramConfig.ARROW_COLOR)
         )
 
     def remove(self):
@@ -218,28 +202,7 @@ class ReactionArrow:
             self.arrow_item = None
 
 
-class AddReactionDialog(QDialog):
-    def __init__(self, existing_reactions, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Add New Reaction")
-        self.parent_combo = QComboBox()
-        self.parent_combo.addItems(existing_reactions)
-
-        layout = QFormLayout()
-        layout.addRow("Parent Reaction:", self.parent_combo)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-        self.setLayout(layout)
-
-    def get_parent(self):
-        return self.parent_combo.currentText()
-
-
-class CalculationsTab(QWidget):
+class ModelsScheme(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -339,20 +302,15 @@ class CalculationsTab(QWidget):
             self, "Connect to child", "Choose a reaction to become a child:", existing, 0, False
         )
         if ok and child:
-            # Проверка, что 'A' не становится ребёнком
             if child == "A":
                 QMessageBox.warning(self, "Error", "Node 'A' cannot have a parent.")
                 return
 
-            # Проверка на цикличность
             if self.is_cyclic(parent_letter, child):
                 QMessageBox.warning(self, "Error", "Cannot connect because it would create a cycle.")
                 return
 
-            # Добавляем child к родителю
             self.children_map.setdefault(parent_letter, []).append(child)
-
-            # Перерисовываем
             self.update_scene()
 
     def get_subtree(self, root_letter):
@@ -388,21 +346,15 @@ class CalculationsTab(QWidget):
                 to_visit.extend(self.children_map[current])
         return False
 
-    def remove_arrows(self, child_letter):
-        arrows_to_remove = [arrow for arrow in self.arrows if arrow.child_node.letter == child_letter]
-        for arrow in arrows_to_remove:
-            arrow.remove()
-            self.arrows.remove(arrow)
-
     def on_delete_reaction_context(self, letter):
         if letter == "A":
-            QMessageBox.warning(self, "Error", "Reaction 'A' cannot be deleted.")
+            QMessageBox.warning(self, "Error", "Component 'A' cannot be deleted.")
             return
 
         reply = QMessageBox.question(
             self,
             "Confirm Deletion",
-            f"Are you sure you want to delete reaction '{letter}' and all its descendants?",
+            f"Are you sure you want to delete component '{letter}' and all its descendants?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -411,7 +363,7 @@ class CalculationsTab(QWidget):
 
     def remove_reaction(self, letter):  # noqa: C901
         if letter == "A":
-            QMessageBox.warning(self, "Error", "Reaction 'A' cannot be deleted.")
+            QMessageBox.warning(self, "Error", "Component 'A' cannot be deleted.")
             return
 
         if letter in self.children_map:
