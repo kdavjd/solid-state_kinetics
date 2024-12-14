@@ -793,6 +793,7 @@ class CoeffsTable(QTableWidget):
 
 class CalcButtons(QWidget):
     calculation_started = pyqtSignal(dict)
+    calculation_stopped = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -805,6 +806,13 @@ class CalcButtons(QWidget):
         self.stop_button.clicked.connect(self.stop_calculation)
         self.is_calculating = False
         self.parent = parent
+
+    def revert_to_default(self):
+        if self.is_calculating:
+            self.is_calculating = False
+            self.layout.replaceWidget(self.stop_button, self.start_button)
+            self.stop_button.hide()
+            self.start_button.show()
 
     def check_and_start_calculation(self):
         """
@@ -842,13 +850,12 @@ class CalcButtons(QWidget):
         self.stop_button.show()
 
     def stop_calculation(self):
-        """
-        Stop the calculation and revert the button states.
-        """
-        self.is_calculating = False
-        self.layout.replaceWidget(self.stop_button, self.start_button)
-        self.stop_button.hide()
-        self.start_button.show()
+        if self.is_calculating:
+            self.calculation_stopped.emit({"operation": "stop_calculation"})
+            self.is_calculating = False
+            self.layout.replaceWidget(self.stop_button, self.start_button)
+            self.stop_button.hide()
+            self.start_button.show()
 
 
 class DeconvolutionSubBar(QWidget):

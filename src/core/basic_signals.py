@@ -164,7 +164,7 @@ class BasicSignals(QObject):
         """
         if params.get("target") != self.actor_name:
             return
-        logger.info(f"{self.actor_name} will process response:\n{params=}")
+        logger.debug(f"{self.actor_name} will process response:\n{params=}")
         request_id = params.get("request_id")
         operation = params.get("operation")
         if request_id in self.pending_requests:

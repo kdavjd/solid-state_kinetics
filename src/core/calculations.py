@@ -46,14 +46,28 @@ class Calculations(BasicSignals):
         self.calculation_active = False
 
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
+        self.calculation_active = True
         self.thread = CalculationThread(func, *args, **kwargs)
         self.thread.result_ready.connect(self._calculation_finished)
         self.thread.start()
 
     @pyqtSlot(dict)
     def process_request(self, params: dict):
-        logger.debug("process_request called with no implemented logic.")
-        pass
+        operation = params.get("operation")
+        response = params.copy()
+        if operation == "stop_calculation":
+            response["data"] = self.stop_calculation()
+
+        response["target"], response["actor"] = response["actor"], response["target"]
+        self.dispatcher.response_signal.emit(response)
+
+    def stop_calculation(self):
+        if self.thread and self.thread.isRunning():
+            logger.info("Stopping current calculation...")
+            self.calculation_active = False
+            self.thread.requestInterruption()
+            return True
+        return False
 
     @pyqtSlot(object)
     def _calculation_finished(self, result):
@@ -92,6 +106,7 @@ class Calculations(BasicSignals):
         self.best_mse = float("inf")
         self.best_combination = None
         self.mse_history = []
+        self.handle_request_cycle("main_window", "calculation_finished")
 
     @pyqtSlot(dict)
     def run_deconvolution(self, response: dict):
@@ -158,6 +173,9 @@ class Calculations(BasicSignals):
         """
 
         def target_function(params):
+            if not self.calculation_active:
+                return float("inf")
+
             best_mse = float("inf")
             best_combination = None
 

@@ -56,6 +56,10 @@ class MainWindow(QMainWindow):
             self.main_tab.plot_canvas.plot_mse_history(mse_data)
             response["data"] = True
 
+        if operation == "calculation_finished":
+            self.main_tab.sub_sidebar.deconvolution_sub_bar.calc_buttons.revert_to_default()
+            response["data"] = True
+
         else:
             logger.warning(f"{self.actor_name} received unknown operation '{operation}'")
         response["target"], response["actor"] = response["actor"], response["target"]
@@ -130,6 +134,9 @@ class MainWindow(QMainWindow):
         if operation == "deconvolution":
             data = self.handle_request_cycle("calculations_data_operations", operation, **params)
             logger.debug(f"{data=}")
+
+        if operation == "stop_calculation":
+            _ = self.handle_request_cycle("calculations", "stop_calculation")
 
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")

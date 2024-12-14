@@ -68,6 +68,7 @@ class MainTab(QWidget):
         self.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.export_reactions_signal.connect(
             self.to_main_window
         )
+        self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_stopped.connect(self.to_main_window)
 
     def initialize_sizes(self):
         total_width = self.width()
