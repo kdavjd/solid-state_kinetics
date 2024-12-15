@@ -10,19 +10,19 @@ import time
 from itertools import product
 
 import numpy as np
+from core.base_signals import BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
-from src.core.basic_signals import BasicSignals
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
 
 
-class CalculationsDataOperations(BasicSignals):
+class CalculationsDataOperations(BaseSlots):
     """
     Handles calculations and data operations for reaction parameters and related actions.
 
-    This class processes requests from a dispatcher, such as adding or removing reactions,
+    This class processes requests such as adding or removing reactions,
     updating values, performing deconvolution, and updating reaction parameters. It also
     emits signals for GUI updates, including reaction plots and parameter emissions.
 
@@ -40,14 +40,8 @@ class CalculationsDataOperations(BasicSignals):
     plot_reaction = pyqtSignal(tuple, list)
     reaction_params_to_gui = pyqtSignal(dict)
 
-    def __init__(self, dispatcher):
-        """
-        Initialize the class instance.
-
-        Args:
-            dispatcher: The dispatcher object for inter-component communication.
-        """
-        super().__init__(actor_name="calculations_data_operations", dispatcher=dispatcher)
+    def __init__(self, signals):
+        super().__init__(actor_name="calculations_data_operations", signals=signals)
         self.last_plot_time = 0
         self.calculations_in_progress = False
         self.reaction_variables: dict = {}
@@ -91,7 +85,7 @@ class CalculationsDataOperations(BasicSignals):
 
             # Swap target and actor before emitting the response
             params["target"], params["actor"] = params["actor"], params["target"]
-            self.dispatcher.response_signal.emit(params)
+            self.signals.response_signal.emit(params)
         else:
             logger.warning("Unknown or missing data operation.")
 

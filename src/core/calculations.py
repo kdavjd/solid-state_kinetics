@@ -3,17 +3,17 @@ from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
+from core.base_signals import BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from scipy.optimize import OptimizeResult, differential_evolution
 
-from src.core.basic_signals import BasicSignals
 from src.core.calculation_thread import CalculationThread
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
 
 
-class Calculations(BasicSignals):
+class Calculations(BaseSlots):
     """
     Manages the calculation processes for reaction parameter deconvolution and optimization.
 
@@ -35,8 +35,8 @@ class Calculations(BasicSignals):
 
     new_best_result = pyqtSignal(dict)
 
-    def __init__(self, dispatcher):
-        super().__init__(actor_name="calculations", dispatcher=dispatcher)
+    def __init__(self, signals):
+        super().__init__(actor_name="calculations", signals=signals)
         self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.thread: Optional[CalculationThread] = None
         self.best_combination: Optional[tuple] = None
@@ -59,7 +59,7 @@ class Calculations(BasicSignals):
             response["data"] = self.stop_calculation()
 
         response["target"], response["actor"] = response["actor"], response["target"]
-        self.dispatcher.response_signal.emit(response)
+        self.signals.response_signal.emit(response)
 
     def stop_calculation(self):
         if self.thread and self.thread.isRunning():

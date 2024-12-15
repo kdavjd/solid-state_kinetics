@@ -3,9 +3,9 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
+from core.base_signals import BaseSignals
 from PyQt6.QtWidgets import QApplication
 
-from src.core.basic_signals import SignalDispatcher
 from src.core.calculations import Calculations
 from src.core.calculations_data import CalculationsData
 from src.core.calculations_data_operations import CalculationsDataOperations
@@ -16,13 +16,13 @@ from src.gui.main_window import MainWindow
 
 def main():
     app = QApplication(sys.argv)
-    dispatcher = SignalDispatcher()
-    window = MainWindow(dispatcher=dispatcher)
-    file_data = FileData(dispatcher=dispatcher)
-    calculations_data = CalculationsData(dispatcher=dispatcher)  # noqa: F841
-    calculations = Calculations(dispatcher=dispatcher)
-    calculations_data_operations = CalculationsDataOperations(dispatcher=dispatcher)
-    file_operations = ActiveFileOperations(dispatcher=dispatcher)  # noqa: F841
+    signals = BaseSignals()
+    window = MainWindow(signals=signals)
+    file_data = FileData(signals=signals)
+    calculations_data = CalculationsData(signals=signals)  # noqa: F841
+    calculations = Calculations(signals=signals)
+    calculations_data_operations = CalculationsDataOperations(signals=signals)
+    file_operations = ActiveFileOperations(signals=signals)  # noqa: F841
 
     window.main_tab.sidebar.load_button.file_selected.connect(file_data.load_file)
     window.main_tab.sidebar.chosen_experiment_signal.connect(file_data.plot_dataframe_copy)

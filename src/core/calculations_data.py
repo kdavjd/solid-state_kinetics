@@ -3,29 +3,18 @@ from functools import reduce
 from typing import Any, Dict, List
 
 import numpy as np
+from core.base_signals import BaseSlots
 from PyQt6.QtCore import pyqtSignal
 
-from src.core.basic_signals import BasicSignals
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
 
 
-class CalculationsData(BasicSignals):
-    """A class to manage and store calculations-related data.
-
-    This class extends BasicSignals to communicate with other components.
-    It provides methods to get, set, remove, and load calculation data from files.
-    """
-
+class CalculationsData(BaseSlots):
     dataChanged = pyqtSignal(dict)
 
-    def __init__(self, dispatcher):
-        """Initialize the CalculationsData component.
-
-        Args:
-            dispatcher: The SignalDispatcher instance for request/response handling.
-        """
-        super().__init__(actor_name="calculations_data", dispatcher=dispatcher)
+    def __init__(self, signals):
+        super().__init__(actor_name="calculations_data", signals=signals)
         self._data: Dict[str, Any] = {}
         self._filename: str = ""
 
@@ -176,4 +165,4 @@ class CalculationsData(BasicSignals):
             "request_id": params["request_id"],
             "data": params["data"],
         }
-        self.dispatcher.response_signal.emit(response)
+        self.signals.response_signal.emit(response)

@@ -6,7 +6,7 @@ from PyQt6.QtCore import QEventLoop, QObject, QTimer, pyqtSignal, pyqtSlot
 from src.core.logger_config import logger
 
 
-class SignalDispatcher(QObject):
+class BaseSignals(QObject):
     """A dispatcher that routes requests and responses between components.
 
     This class defines a simple mechanism for connecting components (actors)
@@ -19,7 +19,6 @@ class SignalDispatcher(QObject):
     response_signal = pyqtSignal(dict)
 
     def __init__(self):
-        """Initialize the SignalDispatcher."""
         super().__init__()
         self.components: Dict[str, (Callable[[dict], None], Callable[[dict], None])] = {}
         self.request_signal.connect(self.dispatch_request)
@@ -31,8 +30,7 @@ class SignalDispatcher(QObject):
         process_request_method: Callable[[dict], None],
         process_response_method: Callable[[dict], None],
     ) -> None:
-        """Register a component with the dispatcher.
-
+        """
         Args:
             component_name (str): The name of the component.
             process_request_method (Callable[[dict], None]): A method for handling requests.
@@ -44,7 +42,6 @@ class SignalDispatcher(QObject):
     @pyqtSlot(dict)
     def dispatch_request(self, params: dict) -> None:
         """Dispatch a request to the appropriate component.
-
         Args:
             params (dict): The parameters of the request, must include 'target' to identify the component.
         """
@@ -58,7 +55,6 @@ class SignalDispatcher(QObject):
     @pyqtSlot(dict)
     def dispatch_response(self, params: dict) -> None:
         """Dispatch a response to the appropriate component.
-
         Args:
             params (dict): The parameters of the response, must include 'target' to identify the component.
         """
@@ -70,7 +66,7 @@ class SignalDispatcher(QObject):
             logger.error(f"No component found for target '{target}'")
 
 
-class BasicSignals(QObject):
+class BaseSlots(QObject):
     """A base class providing a request/response mechanism via signals and an event loop.
 
     This class serves as a basic abstraction for sending requests to other
@@ -78,30 +74,20 @@ class BasicSignals(QObject):
     block until a response is received or until a timeout occurs.
     """
 
-    def __init__(self, actor_name: str, dispatcher: SignalDispatcher):
-        """Initialize BasicSignals.
-
-        Args:
-            actor_name (str): The name of the actor (component).
-            dispatcher (SignalDispatcher): The dispatcher used to send requests and receive responses.
-
-        Raises:
-            ValueError: If actor_name is not provided.
-        """
+    def __init__(self, actor_name: str, signals: BaseSignals):
         super().__init__()
         if not actor_name:
-            raise ValueError("actor_name must be provided for BasicSignals.")
+            raise ValueError("actor_name must be provided for BaseSignals.")
         self.actor_name = actor_name
-        self.dispatcher = dispatcher
+        self.signals = signals
         self.pending_requests: Dict[str, Dict[str, Any]] = {}
         self.event_loops: Dict[str, QEventLoop] = {}
-        self.dispatcher.register_component(self.actor_name, self.process_request, self.process_response)
+        self.signals.register_component(self.actor_name, self.process_request, self.process_response)
 
     def connect_to_dispatcher(self) -> None:
-        """Connects to the dispatcher signals for handling requests and responses."""
-        self.dispatcher.request_signal.connect(self.process_request)
-        self.dispatcher.response_signal.connect(self.process_response)
-        logger.debug(f"{self.actor_name} connected to dispatcher signals.")
+        self.signals.request_signal.connect(self.process_request)
+        self.signals.response_signal.connect(self.process_response)
+        logger.debug(f"{self.actor_name} connected to signals.")
 
     def handle_request_cycle(self, target: str, operation: str, **kwargs) -> Any:
         """Create a request, send it, and wait for the response.
@@ -143,7 +129,7 @@ class BasicSignals(QObject):
             **kwargs,
         }
         logger.debug(f"{self.actor_name} is emitting request: {request}")
-        self.dispatcher.request_signal.emit(request)
+        self.signals.request_signal.emit(request)
         return request_id
 
     def process_request(self, params: dict) -> None:

@@ -4,9 +4,9 @@ from io import StringIO
 
 import chardet
 import pandas as pd
+from core.base_signals import BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
-from src.core.basic_signals import BasicSignals
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
 
@@ -72,16 +72,10 @@ def detect_decimal(func):
     return wrapper
 
 
-class FileData(BasicSignals):
+class FileData(BaseSlots):
     """
     The FileData class provides methods to load, store, and manipulate
-    data from CSV and TXT files. It also integrates with a dispatcher
-    to handle requests and emits signals when data is loaded.
-
-    Parameters
-    ----------
-    dispatcher : object
-        The dispatcher instance for request-response communication.
+    data from CSV and TXT files.
 
     Attributes
     ----------
@@ -107,8 +101,8 @@ class FileData(BasicSignals):
 
     data_loaded_signal = pyqtSignal(pd.DataFrame)
 
-    def __init__(self, dispatcher):
-        super().__init__(actor_name="file_data", dispatcher=dispatcher)
+    def __init__(self, signals):
+        super().__init__(actor_name="file_data", signals=signals)
         self.data = None
         self.original_data = {}
         self.dataframe_copies = {}
@@ -389,7 +383,7 @@ class FileData(BasicSignals):
 
         After processing, 'params' is modified to include 'data' key
         with the operation result and the roles of 'actor' and 'target'
-        are swapped. Finally, the dispatcher.response_signal is emitted.
+        are swapped. Finally, the signals.response_signal is emitted.
         """
         operation = params.get("operation")
         file_name = params.get("file_name")
@@ -434,8 +428,6 @@ class FileData(BasicSignals):
             console.log(f"\n\nUnknown operation '{operation}'. No action taken.")
             return
 
-        # Swap 'actor' and 'target' in params for response.
         params["target"], params["actor"] = params.get("actor"), params.get("target")
 
-        # Emit response signal through the dispatcher.
-        self.dispatcher.response_signal.emit(params)
+        self.signals.response_signal.emit(params)

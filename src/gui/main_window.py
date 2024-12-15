@@ -1,7 +1,7 @@
+from core.base_signals import BaseSignals, BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 
-from src.core.basic_signals import BasicSignals, SignalDispatcher
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
 from src.gui.main_tab.main_tab import MainTab
@@ -11,7 +11,7 @@ from src.gui.table_tab.table_tab import TableTab
 class MainWindow(QMainWindow):
     to_main_tab_signal = pyqtSignal(dict)
 
-    def __init__(self, dispatcher: SignalDispatcher):
+    def __init__(self, signals: BaseSignals):
         super().__init__()
         self.setWindowTitle("Solid state kinetics")
 
@@ -24,12 +24,12 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.main_tab, "Main")
         self.tabs.addTab(self.table_tab, "Table")
 
-        self.dispatcher = dispatcher
+        self.signals = signals
         self.actor_name = "main_window"
 
-        self.basic_signals = BasicSignals(actor_name=self.actor_name, dispatcher=self.dispatcher)
+        self.basic_signals = BaseSlots(actor_name=self.actor_name, signals=self.signals)
 
-        self.dispatcher.register_component(self.actor_name, self.process_request, self.process_response)
+        self.signals.register_component(self.actor_name, self.process_request, self.process_response)
 
         self.main_tab.to_main_window_signal.connect(self.handle_request_from_main_tab)
         self.to_main_tab_signal.connect(self.main_tab.response_slot)
@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):
         else:
             logger.warning(f"{self.actor_name} received unknown operation '{operation}'")
         response["target"], response["actor"] = response["actor"], response["target"]
-        self.dispatcher.response_signal.emit(response)
+        self.signals.response_signal.emit(response)
 
     @pyqtSlot(dict)
     def process_response(self, params: dict):
