@@ -420,3 +420,16 @@ class ModelsScheme(QWidget):
         self.view.setScene(self.scene)
         self.view.setRenderHint(self.view.renderHints() | self.view.renderHints().Antialiasing)
         self.scene.update()
+
+    def get_reaction_scheme_as_json(self):
+        nodes = []
+        for letter, node in self.reactions.items():
+            nodes.append({"id": letter, "x": node.x, "y": node.y})
+
+        edges = []
+        for parent, children in self.children_map.items():
+            for child in children:
+                edges.append({"from": parent, "to": child})
+
+        scheme = {"nodes": nodes, "edges": edges}
+        return scheme
