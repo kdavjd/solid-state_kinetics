@@ -413,6 +413,9 @@ class FileData(BaseSlots):
             if params["data"] is None:
                 console.log(f"\n\nNo data found for file '{file_name}'.")
 
+        elif operation == "get_all_data":
+            params["data"] = self.dataframe_copies
+
         elif operation == "reset":
             self.reset_dataframe_copy(file_name)
             params["data"] = True

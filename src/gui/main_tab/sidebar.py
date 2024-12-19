@@ -22,7 +22,6 @@ class SideBar(QWidget):
     console_show_signal = pyqtSignal(bool)
     active_file_selected = pyqtSignal(str)
     to_main_window_signal = pyqtSignal(dict)
-    files_selected_for_series = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -175,8 +174,8 @@ class SideBar(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_files = dialog.get_selected_files()
             if selected_files:
-                self.files_selected_for_series.emit(selected_files)
                 logger.debug(f"Selected files for series: {selected_files}")
+                return selected_files
             else:
                 logger.info("No files selected for series.")
 

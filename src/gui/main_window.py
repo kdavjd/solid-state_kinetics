@@ -1,3 +1,6 @@
+from functools import reduce
+
+import pandas as pd
 from core.base_signals import BaseSignals, BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
@@ -32,6 +35,7 @@ class MainWindow(QMainWindow):
         self.signals.register_component(self.actor_name, self.process_request, self.process_response)
 
         self.main_tab.to_main_window_signal.connect(self.handle_request_from_main_tab)
+        self.main_tab.sidebar.to_main_window_signal.connect(self.handle_request_from_main_tab)
         self.to_main_tab_signal.connect(self.main_tab.response_slot)
 
         logger.debug(f"{self.actor_name} init signals and slots.")
@@ -137,6 +141,19 @@ class MainWindow(QMainWindow):
 
         if operation == "stop_calculation":
             _ = self.handle_request_cycle("calculations", "stop_calculation")
+
+        if operation == "add_new_series":
+            df_copies = self.handle_request_cycle("file_data", "get_all_data", file_name="all_files")
+            selected_files = self.main_tab.sidebar.open_select_files_dialog(df_copies)
+            if not selected_files:
+                logger.warning(f"{self.actor_name} no files selected for adding new series.")
+                return
+            merged_df = reduce(
+                lambda left, right: pd.merge(left, right, on="temperature", how="outer"), df_copies.values()
+            )
+            merged_df.sort_values(by="temperature", inplace=True)
+            merged_df.interpolate(method="linear", inplace=True)
+            logger.info(f"{merged_df=}")
 
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")

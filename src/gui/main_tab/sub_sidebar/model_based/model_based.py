@@ -1,6 +1,16 @@
 import json
 
-from PyQt6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.core.logger_config import logger
 from src.gui.main_tab.sub_sidebar.model_based.models_scheme import ModelsScheme
@@ -107,3 +117,48 @@ class ModelBasedTab(QWidget):
             equations.append(eq)
 
         return equations
+
+
+class SelectFileDataDialog(QDialog):
+    def __init__(self, df_copies, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Files for Series")
+        self.selected_files = []
+
+        layout = QVBoxLayout()
+
+        label = QLabel("Select files to include in the series:")
+        layout.addWidget(label)
+
+        # Scroll area to accommodate many files
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout()
+
+        self.checkboxes = []
+        for file_name in df_copies.keys():
+            checkbox = QCheckBox(file_name)
+            self.checkboxes.append(checkbox)
+            scroll_layout.addWidget(checkbox)
+
+        scroll_content.setLayout(scroll_layout)
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
+
+        # Buttons
+        button_box = QHBoxLayout()
+        self.ok_button = QPushButton("OK")
+        self.cancel_button = QPushButton("Cancel")
+        button_box.addWidget(self.ok_button)
+        button_box.addWidget(self.cancel_button)
+        layout.addLayout(button_box)
+
+        self.setLayout(layout)
+
+        # Connect buttons
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+
+    def get_selected_files(self):
+        return [cb.text() for cb in self.checkboxes if cb.isChecked()]
