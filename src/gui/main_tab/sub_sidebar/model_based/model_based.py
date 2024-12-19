@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -124,6 +125,8 @@ class SelectFileDataDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Select Files for Series")
         self.selected_files = []
+        self.checkboxes = []
+        self.line_edits = []
 
         layout = QVBoxLayout()
 
@@ -136,11 +139,19 @@ class SelectFileDataDialog(QDialog):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout()
 
-        self.checkboxes = []
         for file_name in df_copies.keys():
+            file_layout = QHBoxLayout()
+
             checkbox = QCheckBox(file_name)
+            line_edit = QLineEdit()
+            line_edit.setPlaceholderText("Enter heating rate")
+
+            file_layout.addWidget(checkbox)
+            file_layout.addWidget(line_edit)
+            scroll_layout.addLayout(file_layout)
+
             self.checkboxes.append(checkbox)
-            scroll_layout.addWidget(checkbox)
+            self.line_edits.append(line_edit)
 
         scroll_content.setLayout(scroll_layout)
         scroll.setWidget(scroll_content)
@@ -161,4 +172,15 @@ class SelectFileDataDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
 
     def get_selected_files(self):
-        return [cb.text() for cb in self.checkboxes if cb.isChecked()]
+        selected_files = []
+        for checkbox, line_edit in zip(self.checkboxes, self.line_edits):
+            if checkbox.isChecked():
+                try:
+                    heating_rate = int(line_edit.text())
+                    selected_files.append((checkbox.text(), heating_rate))
+                except ValueError:
+                    QMessageBox.warning(
+                        self, "Invalid Input", f"Please enter a valid heating rate for '{checkbox.text()}'"
+                    )
+                    return []
+        return selected_files

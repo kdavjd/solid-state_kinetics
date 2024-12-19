@@ -148,8 +148,28 @@ class MainWindow(QMainWindow):
             if not selected_files:
                 logger.warning(f"{self.actor_name} no files selected for adding new series.")
                 return
+            df_with_rates = {}
+
+            for file_name, heating_rate in selected_files:
+                df = df_copies[file_name].copy()
+
+                other_col = None
+                for col in df.columns:
+                    if col.lower() != "temperature":
+                        other_col = col
+
+                rate_col_name = str(heating_rate)
+                if rate_col_name in df_with_rates:
+                    logger.error(f"Duplicate heating rate '{heating_rate}' for file '{file_name}'.\
+                        Each heating rate must be unique.")
+                    continue
+
+                df.rename(columns={other_col: rate_col_name}, inplace=True)
+
+                df_with_rates[file_name] = df
+
             merged_df = reduce(
-                lambda left, right: pd.merge(left, right, on="temperature", how="outer"), df_copies.values()
+                lambda left, right: pd.merge(left, right, on="temperature", how="outer"), df_with_rates.values()
             )
             merged_df.sort_values(by="temperature", inplace=True)
             merged_df.interpolate(method="linear", inplace=True)

@@ -165,7 +165,7 @@ class SideBar(QWidget):
 
     def open_select_files_dialog(self, df_copies):
         """
-        Opens a dialog to allow the user to select files for the new series.
+        Opens a dialog to allow the user to select files for the new series along with heating rates.
 
         Args:
             df_copies (dict): A dictionary of file names to their corresponding dataframes.
@@ -174,10 +174,11 @@ class SideBar(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_files = dialog.get_selected_files()
             if selected_files:
-                logger.debug(f"Selected files for series: {selected_files}")
+                logger.debug(f"Selected files and heating rates for series: {selected_files}")
                 return selected_files
             else:
                 logger.info("No files selected for series.")
+        return []
 
     def import_series(self):
         """
