@@ -2,11 +2,11 @@ from os import path
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import QMessageBox, QTreeView, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeView, QVBoxLayout, QWidget
 
 from src.core.logger_config import logger
-
-from .load_file_button import LoadButton
+from src.gui.main_tab.load_file_button import LoadButton
+from src.gui.main_tab.sub_sidebar.model_based.model_based import SelectFileDataDialog
 
 
 class SideBar(QWidget):
@@ -21,6 +21,8 @@ class SideBar(QWidget):
     chosen_experiment_signal = pyqtSignal(str)
     console_show_signal = pyqtSignal(bool)
     active_file_selected = pyqtSignal(str)
+    to_main_window_signal = pyqtSignal(dict)
+    files_selected_for_series = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,7 +42,7 @@ class SideBar(QWidget):
         self.experiments_data_root.appendRow(self.delete_data_item)
         self.model.appendRow(self.experiments_data_root)
 
-        # Initialize free model calculation section
+        # Initialize model-free calculation section
         self.model_free_root = QStandardItem("model-free calculation")
         self.model.appendRow(self.model_free_root)
         self.model_free_root.appendRow(QStandardItem("deconvolution"))
@@ -50,9 +52,12 @@ class SideBar(QWidget):
         # Initialize model-based calculation section
         self.model_based_root = QStandardItem("model-based calculation")
         self.model.appendRow(self.model_based_root)
-        self.model_based_root.appendRow(QStandardItem("calculations"))
-        self.model_based_root.appendRow(QStandardItem("add new model"))
-        self.model_based_root.appendRow(QStandardItem("import model"))
+        self.add_new_series_item = QStandardItem("add new series")
+        self.import_series_item = QStandardItem("import series")
+        self.delete_series_item = QStandardItem("delete series")
+        self.model_based_root.appendRow(self.add_new_series_item)
+        self.model_based_root.appendRow(self.import_series_item)
+        self.model_based_root.appendRow(self.delete_series_item)
 
         # Initialize settings section
         self.settings_root = QStandardItem("settings")
@@ -112,7 +117,7 @@ class SideBar(QWidget):
         font.setBold(False)
         item.setFont(font)
 
-    def on_item_clicked(self, index):
+    def on_item_clicked(self, index):  # noqa: C901
         """
         Handles the item click event in the tree view. Performs different actions
         based on which item is clicked.
@@ -125,6 +130,12 @@ class SideBar(QWidget):
             self.load_button.open_file_dialog()
         elif item == self.delete_data_item:
             self.delete_active_file()
+        elif item == self.add_new_series_item:
+            self.add_new_series()
+        elif item == self.import_series_item:
+            self.import_series()
+        elif item == self.delete_series_item:
+            self.delete_series()
         elif item.parent() == self.experiments_data_root:
             self.sub_side_bar_needed.emit(item.text())
             self.chosen_experiment_signal.emit(item.text())
@@ -143,6 +154,68 @@ class SideBar(QWidget):
             self.sub_side_bar_needed.emit(item.text())
         else:
             self.sub_side_bar_needed.emit("")
+
+    def add_new_series(self):
+        """
+        Handles the 'add new series' action:
+        - Sends a request to get all data keys.
+        """
+        logger.debug("Add New Series clicked.")
+        request = {"operation": "add_new_series"}
+        self.to_main_window_signal.emit(request)
+
+    def open_select_files_dialog(self, df_copies):
+        """
+        Opens a dialog to allow the user to select files for the new series.
+
+        Args:
+            df_copies (dict): A dictionary of file names to their corresponding dataframes.
+        """
+        dialog = SelectFileDataDialog(df_copies, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            selected_files = dialog.get_selected_files()
+            if selected_files:
+                self.files_selected_for_series.emit(selected_files)
+                logger.debug(f"Selected files for series: {selected_files}")
+            else:
+                logger.info("No files selected for series.")
+
+    def import_series(self):
+        """
+        Handles the 'import series' action.
+        This method should be implemented based on specific requirements.
+        """
+        QMessageBox.information(self, "Import Series", "Import Series functionality is not yet implemented.")
+        logger.debug("Import Series clicked. Functionality not implemented.")
+
+    def delete_series(self):
+        """
+        Handles the 'delete series' action:
+        - Deletes the selected series from the tree view.
+        - Logs the deletion.
+        """
+        index = self.tree_view.currentIndex()
+        item = self.model.itemFromIndex(index)
+
+        if item and item.parent() == self.model_based_root:
+            series_name = item.text()
+            reply = QMessageBox.question(
+                self,
+                "Delete Series",
+                f"Are you sure you want to delete the series '{series_name}'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.model_based_root.removeRow(item.row())
+                logger.info(f"Series deleted: {series_name}")
+        else:
+            QMessageBox.warning(
+                self,
+                "Deletion Error",
+                "Please select a valid series to delete.",
+            )
+            logger.warning("Delete Series clicked, but no valid series was selected.")
 
     def add_experiment_file(self, file_info):
         """
