@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
             response["data"] = self.main_tab.sidebar.active_file_item.text()
         if operation == "plot_df":
             df = params.get("df", None)
-            self.main_tab.plot_canvas.plot_file_data_from_dataframe(df) if df is not None else logger.error(
+            self.main_tab.plot_canvas.plot_data_from_dataframe(df) if df is not None else logger.error(
                 f"{self.actor_name} no df"
             )
             response["data"] = df is not None
@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
             is_modifyed = self.handle_request_cycle("file_data", operation, **params)
             if is_modifyed:
                 df = self.handle_request_cycle("file_data", "get_df_data", **params)
-                self.main_tab.plot_canvas.plot_file_data_from_dataframe(df)
+                self.main_tab.plot_canvas.plot_data_from_dataframe(df)
             else:
                 logger.error(f"{self.actor_name} no response in handle_request_from_main_tab")
 
@@ -106,7 +106,7 @@ class MainWindow(QMainWindow):
 
         if operation == "highlight_reaction":
             df = self.handle_request_cycle("file_data", "get_df_data", **params)
-            self.main_tab.plot_canvas.plot_file_data_from_dataframe(df)
+            self.main_tab.plot_canvas.plot_data_from_dataframe(df)
             is_ok = self.handle_request_cycle("calculations_data_operations", operation, **params)
             logger.debug(f"{operation=} {is_ok=}")
 
@@ -118,10 +118,10 @@ class MainWindow(QMainWindow):
             is_ok = self.handle_request_cycle("calculations_data_operations", operation, **params)
             logger.debug(f"{operation=} {is_ok=}")
 
-        if operation == "reset":
+        if operation == "reset_file_data":
             is_ok = self.handle_request_cycle("file_data", operation, **params)
             df = self.handle_request_cycle("file_data", "get_df_data", **params)
-            self.main_tab.plot_canvas.plot_file_data_from_dataframe(df)
+            self.main_tab.plot_canvas.plot_data_from_dataframe(df)
             logger.debug(f"{operation=} {is_ok=}")
 
         if operation == "import_reactions":
@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
 
         if operation == "add_new_series":
             df_copies = self.handle_request_cycle("file_data", "get_all_data", file_name="all_files")
-            selected_files = self.main_tab.sidebar.open_select_files_dialog(df_copies)
+            series_name, selected_files = self.main_tab.sidebar.open_add_series_dialog(df_copies)
             if not selected_files:
                 logger.warning(f"{self.actor_name} no files selected for adding new series.")
                 return
@@ -173,7 +173,16 @@ class MainWindow(QMainWindow):
             )
             merged_df.sort_values(by="temperature", inplace=True)
             merged_df.interpolate(method="linear", inplace=True)
-            logger.info(f"{merged_df=}")
+            self.main_tab.plot_canvas.plot_data_from_dataframe(merged_df)
+            is_ok = self.handle_request_cycle("series_data", "add_series", data=merged_df, name=series_name)
+            if is_ok:
+                self.main_tab.sidebar.add_series(series_name)
+            else:
+                logger.error(f"Не удалось добавить серию: {series_name}")
+
+        if operation == "delete_series":
+            is_ok = self.handle_request_cycle("series_data", operation, **params)
+            logger.debug(f"{operation=} {is_ok=}")
 
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")

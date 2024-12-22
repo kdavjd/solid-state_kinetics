@@ -133,7 +133,10 @@ class SelectFileDataDialog(QDialog):
         label = QLabel("Select files to include in the series:")
         layout.addWidget(label)
 
-        # Scroll area to accommodate many files
+        self.series_name_line_edit = QLineEdit()
+        self.series_name_line_edit.setPlaceholderText("Enter series name")
+        layout.addWidget(self.series_name_line_edit)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll_content = QWidget()
@@ -172,6 +175,11 @@ class SelectFileDataDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
 
     def get_selected_files(self):
+        series_name = self.series_name_line_edit.text().strip()
+        if not series_name:
+            QMessageBox.warning(self, "Invalid Input", "Please enter a series name.")
+            return []
+
         selected_files = []
         for checkbox, line_edit in zip(self.checkboxes, self.line_edits):
             if checkbox.isChecked():
@@ -183,4 +191,4 @@ class SelectFileDataDialog(QDialog):
                         self, "Invalid Input", f"Please enter a valid heating rate for '{checkbox.text()}'"
                     )
                     return []
-        return selected_files
+        return series_name, selected_files

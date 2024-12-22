@@ -79,20 +79,31 @@ class SideBar(QWidget):
         self.load_button.file_selected.connect(self.add_experiment_file)
 
         self.active_file_item = None
+        self.active_series_item = None
 
-    def mark_as_active(self, item):
+    def mark_as_active(self, item, is_series=False):
         """
         Marks the provided item as active by making its font bold.
+        Differentiates between experiments and series.
 
         Args:
             item: The item to mark as active.
+            is_series (bool): Whether the item is a series.
         """
-        if self.active_file_item:
-            self.unmark_active_state(self.active_file_item)
-        self.mark_active_state(item)
-        self.active_file_item = item
-        self.active_file_selected.emit(item.text())
-        logger.debug(f"Active file: {item.text()}")
+        if is_series:
+            if self.active_series_item:
+                self.unmark_active_state(self.active_series_item)
+            self.mark_active_state(item)
+            self.active_series_item = item
+            self.active_file_selected.emit(item.text())  # Emitting series name
+            logger.debug(f"Active series: {item.text()}")
+        else:
+            if self.active_file_item:
+                self.unmark_active_state(self.active_file_item)
+            self.mark_active_state(item)
+            self.active_file_item = item
+            self.active_file_selected.emit(item.text())
+            logger.debug(f"Active file: {item.text()}")
 
     def mark_active_state(self, item):
         """
@@ -125,20 +136,25 @@ class SideBar(QWidget):
             index: The index of the clicked item.
         """
         item = self.model.itemFromIndex(index)
+
+        # Handle actions for the "experiments" section
         if item == self.add_data_item:
             self.load_button.open_file_dialog()
         elif item == self.delete_data_item:
             self.delete_active_file()
+        # Handle actions for the "model-based calculation" section
         elif item == self.add_new_series_item:
             self.add_new_series()
         elif item == self.import_series_item:
             self.import_series()
         elif item == self.delete_series_item:
             self.delete_series()
+        # If an item under "experiments" is selected
         elif item.parent() == self.experiments_data_root:
-            self.sub_side_bar_needed.emit(item.text())
+            self.sub_side_bar_needed.emit("experiments")
             self.chosen_experiment_signal.emit(item.text())
             self.mark_as_active(item)
+        # Handle console show/hide actions
         elif item == self.console_show_state:
             if item.checkState() == Qt.CheckState.Checked:
                 self.console_show_signal.emit(True)
@@ -147,10 +163,21 @@ class SideBar(QWidget):
             if item.checkState() == Qt.CheckState.Checked:
                 self.console_show_signal.emit(False)
                 self.console_show_state.setCheckState(Qt.CheckState.Unchecked)
+        # Handle items under "model-free calculation"
         elif item.parent() == self.model_free_root:
             self.sub_side_bar_needed.emit(item.text())
+        # Handle items under "model-based calculation"
         elif item.parent() == self.model_based_root:
-            self.sub_side_bar_needed.emit(item.text())
+            # Define action items to distinguish from series names
+            action_items = {"add new series", "import series", "delete series"}
+            if item.text() in action_items:
+                # Action items are already handled above
+                pass
+            else:
+                # If the item is a series name, emit "model_based" content type
+                self.sub_side_bar_needed.emit("model_based")
+                self.mark_as_active(item, is_series=True)
+                logger.debug(f"Selected series: {item.text()}")
         else:
             self.sub_side_bar_needed.emit("")
 
@@ -163,7 +190,7 @@ class SideBar(QWidget):
         request = {"operation": "add_new_series"}
         self.to_main_window_signal.emit(request)
 
-    def open_select_files_dialog(self, df_copies):
+    def open_add_series_dialog(self, df_copies):
         """
         Opens a dialog to allow the user to select files for the new series along with heating rates.
 
@@ -190,15 +217,10 @@ class SideBar(QWidget):
 
     def delete_series(self):
         """
-        Handles the 'delete series' action:
-        - Deletes the selected series from the tree view.
-        - Logs the deletion.
+        Deletes the active series if it exists. If no active series is selected, notifies the user.
         """
-        index = self.tree_view.currentIndex()
-        item = self.model.itemFromIndex(index)
-
-        if item and item.parent() == self.model_based_root:
-            series_name = item.text()
+        if self.active_series_item:
+            series_name = self.active_series_item.text()
             reply = QMessageBox.question(
                 self,
                 "Delete Series",
@@ -207,15 +229,17 @@ class SideBar(QWidget):
                 QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
-                self.model_based_root.removeRow(item.row())
+                self.model_based_root.removeRow(self.active_series_item.row())
+                self.to_main_window_signal.emit({"operation": "delete_series", "name": series_name})
                 logger.info(f"Series deleted: {series_name}")
+                self.active_series_item = None
         else:
             QMessageBox.warning(
                 self,
                 "Deletion Error",
-                "Please select a valid series to delete.",
+                "No active series selected to delete.",
             )
-            logger.warning("Delete Series clicked, but no valid series was selected.")
+            logger.warning("Delete Series clicked, but no active series is selected.")
 
     def add_experiment_file(self, file_info):
         """
@@ -278,3 +302,39 @@ class SideBar(QWidget):
             if item is not None:
                 files_names.append(item.text())
         return files_names
+
+    def get_series_names(self) -> list[str]:
+        """
+        Returns a list of names of all series currently listed in the sidebar.
+
+        Returns:
+            A list of strings representing the names of series.
+        """
+        series_names = []
+        for row in range(self.model_based_root.rowCount()):
+            item = self.model_based_root.child(row)
+            if item and item.text() not in {"add new series", "import series", "delete series"}:
+                series_names.append(item.text())
+        return series_names
+
+    def add_series(self, series_name: str):
+        if not series_name:
+            logger.warning("An empty series name will not be added.")
+            return
+
+        for row in range(self.model_based_root.rowCount()):
+            item = self.model_based_root.child(row)
+            if item.text() == series_name:
+                logger.warning(f"Серия с именем '{series_name}' уже существует.")
+                QMessageBox.warning(
+                    self,
+                    "Duplicate series",
+                    f"A series with the name '{series_name}' already exists.",
+                )
+                return
+
+        new_series_item = QStandardItem(series_name)
+        new_series_item.setEditable(False)
+        self.model_based_root.appendRow(new_series_item)
+        self.tree_view.expandAll()
+        logger.info(f"New series added to model-based tree: {series_name}")

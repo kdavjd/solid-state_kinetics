@@ -416,7 +416,7 @@ class FileData(BaseSlots):
         elif operation == "get_all_data":
             params["data"] = self.dataframe_copies
 
-        elif operation == "reset":
+        elif operation == "reset_file_data":
             self.reset_dataframe_copy(file_name)
             params["data"] = True
 

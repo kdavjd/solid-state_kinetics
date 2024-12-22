@@ -89,7 +89,9 @@ class MainTab(QWidget):
 
     def toggle_sub_sidebar(self, content_type):
         if content_type:
-            if content_type in self.sidebar.get_experiment_files_names():
+            if content_type in self.sidebar.get_series_names():
+                self.sub_sidebar.update_content("model_based")
+            elif content_type in self.sidebar.get_experiment_files_names():
                 self.sub_sidebar.update_content("experiments")
             else:
                 self.sub_sidebar.update_content(content_type)

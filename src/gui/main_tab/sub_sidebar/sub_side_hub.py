@@ -33,7 +33,7 @@ class SubSideHub(QWidget):
             self.current_widget = self.ea_sub_bar
         elif content_type == "experiments":
             self.current_widget = self.experiment_sub_bar
-        elif content_type == "calculations":
+        elif content_type == "model_based":
             self.current_widget = self.model_based
         else:
             self.current_widget = QLabel("unknown content", self)

@@ -167,7 +167,7 @@ class ActionButtonsBlock(QWidget):
         Emit the cancel_changes_clicked signal with the reset operation.
         """
         logger.debug("Cancel Changes button clicked. Emitting cancel_changes_clicked signal.")
-        self.cancel_changes_clicked.emit({"operation": "reset"})
+        self.cancel_changes_clicked.emit({"operation": "reset_file_data"})
 
     def emit_derivative_signal(self):
         """

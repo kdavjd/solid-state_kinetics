@@ -116,7 +116,7 @@ class PlotCanvas(QWidget):
         self.canvas.draw_idle()
         self.figure.tight_layout()
 
-    def plot_file_data_from_dataframe(self, data: pd.DataFrame):
+    def plot_data_from_dataframe(self, data: pd.DataFrame):
         """
         Plot data from a Pandas DataFrame. The DataFrame is expected to contain
         a 'temperature' column for the x-axis, and one or more other columns
