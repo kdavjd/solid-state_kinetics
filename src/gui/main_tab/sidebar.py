@@ -254,7 +254,6 @@ class SideBar(QWidget):
         self.mark_as_active(new_file_item)
         self.sub_side_bar_needed.emit(new_file_item.text())
         logger.debug(f"New file added and set as active: {new_file_item.text()}")
-        self.reposition_experiments_data_items()
 
     def delete_active_file(self):
         """
@@ -271,23 +270,8 @@ class SideBar(QWidget):
             parent.removeRow(self.active_file_item.row())
             logger.debug(f"File deleted: {file_name}")
             self.active_file_item = None
-            self.reposition_experiments_data_items()
         else:
             QMessageBox.critical(self, "Error", "Failed to delete the selected file.")
-
-    def reposition_experiments_data_items(self):
-        """
-        Repositions the 'Add New Data' and 'Delete Selected Data' items to the end of the `experiments_data_root` node.
-        This ensures that they are always at the bottom of the experiment data section.
-        """
-        self.experiments_data_root.removeRow(self.add_data_item.row())
-        self.experiments_data_root.removeRow(self.delete_data_item.row())
-
-        self.add_data_item = QStandardItem("add file data")
-        self.delete_data_item = QStandardItem("delete selected")
-
-        self.experiments_data_root.appendRow(self.add_data_item)
-        self.experiments_data_root.appendRow(self.delete_data_item)
 
     def get_experiment_files_names(self) -> list[str]:
         """
@@ -325,7 +309,7 @@ class SideBar(QWidget):
         for row in range(self.model_based_root.rowCount()):
             item = self.model_based_root.child(row)
             if item.text() == series_name:
-                logger.warning(f"Серия с именем '{series_name}' уже существует.")
+                logger.warning(f"Series '{series_name}' already exists.")
                 QMessageBox.warning(
                     self,
                     "Duplicate series",
@@ -335,6 +319,6 @@ class SideBar(QWidget):
 
         new_series_item = QStandardItem(series_name)
         new_series_item.setEditable(False)
-        self.model_based_root.appendRow(new_series_item)
+        self.model_based_root.insertRow(0, new_series_item)
         self.tree_view.expandAll()
         logger.info(f"New series added to model-based tree: {series_name}")
