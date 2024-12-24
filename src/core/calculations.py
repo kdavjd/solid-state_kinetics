@@ -134,7 +134,7 @@ class Calculations(BaseSlots):
             deconvolution_method = deconvolution_settings.pop("method", "")
             deconvolution_parameters = deconvolution_settings.pop("deconvolution_parameters", {})
 
-            target_function = self.generate_target_function(
+            target_function = self.generate_deconvolution_target_function(
                 reaction_variables, reaction_combinations, experimental_data
             )
 
@@ -151,7 +151,7 @@ class Calculations(BaseSlots):
             logger.error(f"Error preparing and starting optimization: {e}")
             console.log("Error preparing and starting optimization. Check logs for details.")
 
-    def generate_target_function(
+    def generate_deconvolution_target_function(
         self,
         combined_keys: dict,
         reaction_combinations: list[tuple],
