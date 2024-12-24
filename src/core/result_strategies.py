@@ -91,7 +91,7 @@ class DeconvolutionStrategy(BestResultStrategy):
             )
 
 
-class ModelCalculationStrategy(BestResultStrategy):
+class ModelBasedCalculationStrategy(BestResultStrategy):
     def __init__(self, calculations_instance):
         self.calculations = calculations_instance
 

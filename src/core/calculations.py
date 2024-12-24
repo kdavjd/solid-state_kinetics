@@ -10,7 +10,7 @@ from src.core.calculation_thread import CalculationThread
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.result_strategies import BestResultStrategy, DeconvolutionStrategy, ModelCalculationStrategy
+from src.core.result_strategies import BestResultStrategy, DeconvolutionStrategy, ModelBasedCalculationStrategy
 
 
 class Calculations(BaseSlots):
@@ -27,8 +27,6 @@ class Calculations(BaseSlots):
         new_best_result (pyqtSignal): Emitted when a new best result is found
             (dict containing 'best_mse', 'best_combination', 'params').
         thread (CalculationThread): The currently running calculation thread, if any.
-        differential_evolution_results (list[tuple[np.ndarray, float]]):
-            Stores intermediate results from differential evolution.
         best_combination (tuple): The best combination of reaction functions found so far.
         best_mse (float): The best (lowest) mean squared error found so far.
         strategy (BestResultStrategy): The current strategy for processing the best results.
@@ -38,7 +36,6 @@ class Calculations(BaseSlots):
 
     def __init__(self, signals):
         super().__init__(actor_name="calculations", signals=signals)
-        self.differential_evolution_results: list[tuple[np.ndarray, float]] = []
         self.thread: Optional[CalculationThread] = None
         self.best_combination: Optional[tuple] = None
         self.best_mse: float = float("inf")
@@ -47,7 +44,7 @@ class Calculations(BaseSlots):
         self.calculation_active = False
 
         self.deconvolution_strategy = DeconvolutionStrategy(self)
-        self.model_calculation_strategy = ModelCalculationStrategy(self)
+        self.model_based_calculation_strategy = ModelBasedCalculationStrategy(self)
         self.strategy: Optional[BestResultStrategy] = None
 
     def set_strategy(self, strategy_type: str):
@@ -55,13 +52,13 @@ class Calculations(BaseSlots):
         Sets the current strategy for processing the best results.
 
         Args:
-            strategy_type (str): for now ('deconvolution' or 'model_calculation').
+            strategy_type (str): for now ('deconvolution' or 'model_based_calculation').
         """
         if strategy_type == "deconvolution":
             self.strategy = self.deconvolution_strategy
             logger.debug("Deconvolution strategy set.")
-        elif strategy_type == "model_calculation":
-            self.strategy = self.model_calculation_strategy
+        elif strategy_type == "model_based_calculation":
+            self.strategy = self.model_based_calculation_strategy
             logger.debug("Model calculation strategy set.")
         else:
             raise ValueError(f"Unknown strategy type: {strategy_type}")
@@ -176,23 +173,23 @@ class Calculations(BaseSlots):
             console.log("Error preparing and starting optimization. Check logs for details.")
 
     @pyqtSlot(dict)
-    def run_model_based_calculation(self, response: dict):
+    def run_model_based_calculation(self, params: dict):
         """
         Prepare and execute the model calculation process.
 
         Args:
-            response (dict): Parameters for model calculation.
+            params (dict): Parameters for model calculation.
         """
-        logger.debug(f"run_model_calculation called with response: {response}")
+        logger.debug(f"run_model_based_calculation called with response: {params}")
 
         try:
-            target_function = self.generate_model_based_target_function(response)
+            target_function = self.generate_model_based_target_function(params)
 
-            bounds = response.get("bounds", [])
-            optimization_parameters = response.get("optimization_parameters", {})
+            bounds = params.get("bounds", [])
+            optimization_parameters = params.get("optimization_parameters", {})
 
             logger.info("Starting model based calculation optimization.")
-            self.set_strategy("model_calculation")
+            self.set_strategy("model_based_calculation")
             self.start_differential_evolution(bounds=bounds, target_function=target_function, **optimization_parameters)
 
         except Exception as e:
@@ -302,30 +299,8 @@ class Calculations(BaseSlots):
             **kwargs,
         )
 
-    def _save_intermediate_result(self, xk, convergence):
-        """
-        Save intermediate optimization results from differential evolution.
-
-        Args:
-            xk (np.ndarray): Current parameter vector.
-            convergence (float): Convergence measure from differential evolution.
-        """
-        self.differential_evolution_results.append((xk, convergence))
-        logger.info(f"Intermediate result: xk = {xk}, convergence = {convergence}")
-
     @pyqtSlot(dict)
     def handle_new_best_result(self, result: dict):
-        """
-        Handles the event when a new best result is found during optimization.
-
-        Delegates the handling to the current strategy.
-
-        Args:
-            result (dict): A dictionary containing 'best_mse', 'best_combination', and 'params'.
-                        - 'best_mse' (float): The best Mean Squared Error achieved.
-                        - 'best_combination' (list[str]): The combination of reaction functions.
-                        - 'params' (list[float]): The parameters corresponding to the best combination.
-        """
         if self.strategy:
             self.strategy.handle(result)
         else:
