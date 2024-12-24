@@ -230,7 +230,7 @@ class SideBar(QWidget):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.model_based_root.removeRow(self.active_series_item.row())
-                self.to_main_window_signal.emit({"operation": "delete_series", "name": series_name})
+                self.to_main_window_signal.emit({"operation": "delete_series", "series_name": series_name})
                 logger.info(f"Series deleted: {series_name}")
                 self.active_series_item = None
         else:

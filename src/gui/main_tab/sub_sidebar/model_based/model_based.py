@@ -1,5 +1,4 @@
-import json
-
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -13,11 +12,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.core.logger_config import logger
 from src.gui.main_tab.sub_sidebar.model_based.models_scheme import ModelsScheme
 
 
 class ModelBasedTab(QWidget):
+    simulation_started = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -46,20 +46,8 @@ class ModelBasedTab(QWidget):
         start_button.clicked.connect(self.start_simulation)
 
     def start_simulation(self):
-        # Получаем схему в формате JSON
         scheme = self.models_scene.get_reaction_scheme_as_json()
-
-        # Выводим схему в логи
-        logger.info(f"Reaction scheme: {json.dumps(scheme, indent=2)}")
-
-        # Теперь предположим, что на основе этого JSON мы хотим составить ОДУ.
-        # Для демонстрации возьмём json из scheme и покажем построение ур-ний.
-        # На практике, вы можете после этого кода уже использовать полученные уравнения
-        # в solver'ах типа solve_ivp.
-
-        ode_equations = self.generate_ode_system(scheme)
-        for eq in ode_equations:
-            logger.info(eq)
+        self.simulation_started.emit({"operation": "model_based_calculation", "scheme": scheme})
 
     def generate_ode_system(self, scheme):
         """

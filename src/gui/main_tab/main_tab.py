@@ -19,7 +19,6 @@ COMPONENTS_MIN_WIDTH = (
 
 
 class MainTab(QWidget):
-    processing_signal = pyqtSignal(bool)
     to_main_window_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
@@ -69,6 +68,7 @@ class MainTab(QWidget):
             self.to_main_window
         )
         self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_stopped.connect(self.to_main_window)
+        self.sub_sidebar.model_based.simulation_started.connect(self.to_main_window)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -107,21 +107,20 @@ class MainTab(QWidget):
     @pyqtSlot(dict)
     def to_main_window(self, params: dict):
         file_name = self.sidebar.active_file_item.text() if self.sidebar.active_file_item else "no_file"
+        series_name = self.sidebar.active_series_item.text() if self.sidebar.active_series_item else "no_series"
         params["file_name"] = file_name
+        params["series_name"] = series_name
         params.setdefault("path_keys", []).insert(0, file_name)
         self.to_main_window_signal.emit(params)
 
     @pyqtSlot(list)
     def update_anchors_slot(self, params_list: list):
-        self.processing_signal.emit(True)
         for i, params in enumerate(params_list):
             params["path_keys"].insert(
                 0,
                 self.sub_sidebar.deconvolution_sub_bar.reactions_table.active_reaction,
             )
             params["is_chain"] = True
-            if i == len(params_list) - 1:
-                self.processing_signal.emit(False)
             self.to_main_window(params)
         params["operation"] = "highlight_reaction"
         self.to_main_window(params)

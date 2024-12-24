@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 
 from core.base_signals import BaseSlots
+from pandas import DataFrame
 
 from src.core.logger_config import logger
 
@@ -8,7 +9,7 @@ from src.core.logger_config import logger
 class SeriesData(BaseSlots):
     def __init__(self, actor_name: str = "series_data", signals=None):
         super().__init__(actor_name=actor_name, signals=signals)
-        self.series: Dict[str, Any] = {}
+        self.series: Dict[str, DataFrame] = {}
         self.default_name_counter: int = 1
 
     def process_request(self, params: dict) -> None:
@@ -47,14 +48,14 @@ class SeriesData(BaseSlots):
 
         elif operation == "delete_series":
             name = params.get("name")
-            success = self.delete_series(name=name)
+            success = self.delete_series(series_name=name)
             if success:
                 response["data"] = True
 
         elif operation == "rename_series":
             old_name = params.get("old_name")
             new_name = params.get("new_name")
-            success = self.rename_series(old_name=old_name, new_name=new_name)
+            success = self.rename_series(old_series_name=old_name, new_series_name=new_name)
             if success:
                 response["data"] = True
 
@@ -63,8 +64,8 @@ class SeriesData(BaseSlots):
             response["data"] = all_series
 
         elif operation == "get_series":
-            name = params.get("name")
-            series_data = self.get_series(name=name)
+            series_name = params.get("series_name")
+            series_data = self.get_series(series_name=series_name)
             if series_data is not None:
                 response["data"] = True
 
@@ -87,30 +88,30 @@ class SeriesData(BaseSlots):
         logger.info(f"Added series: {name}")
         return True, name
 
-    def delete_series(self, name: str) -> bool:
-        if name in self.series:
-            del self.series[name]
-            logger.info(f"Deleted series: {name}")
+    def delete_series(self, series_name: str) -> bool:
+        if series_name in self.series:
+            del self.series[series_name]
+            logger.info(f"Deleted series: {series_name}")
             return True
         else:
-            logger.error(f"Series with name '{name}' not found.")
+            logger.error(f"Series with name '{series_name}' not found.")
             return False
 
-    def rename_series(self, old_name: str, new_name: str) -> bool:
-        if old_name not in self.series:
-            logger.error(f"Series with name '{old_name}' not found.")
+    def rename_series(self, old_series_name: str, new_series_name: str) -> bool:
+        if old_series_name not in self.series:
+            logger.error(f"Series with name '{old_series_name}' not found.")
             return False
 
-        if new_name in self.series:
-            logger.error(f"Series with name '{new_name}' already exists.")
+        if new_series_name in self.series:
+            logger.error(f"Series with name '{new_series_name}' already exists.")
             return False
 
-        self.series[new_name] = self.series.pop(old_name)
-        logger.info(f"Renamed series from '{old_name}' to '{new_name}'")
+        self.series[new_series_name] = self.series.pop(old_series_name)
+        logger.info(f"Renamed series from '{old_series_name}' to '{new_series_name}'")
         return True
 
-    def get_series(self, name: str) -> Optional[Any]:
-        return self.series.get(name)
+    def get_series(self, series_name: str) -> DataFrame:
+        return self.series.get(series_name)
 
-    def get_all_series(self) -> Dict[str, Any]:
+    def get_all_series(self) -> Dict[str, DataFrame]:
         return self.series.copy()

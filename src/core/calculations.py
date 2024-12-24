@@ -1,4 +1,3 @@
-import datetime
 from typing import Callable, Optional
 
 import numpy as np
@@ -11,6 +10,7 @@ from src.core.calculation_thread import CalculationThread
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.result_strategies import BestResultStrategy, DeconvolutionStrategy, ModelCalculationStrategy
 
 
 class Calculations(BaseSlots):
@@ -24,13 +24,14 @@ class Calculations(BaseSlots):
     - Formatting and logging the results of parameter optimization.
 
     Attributes:
-        new_best_result (pyqtSignal): Emitted when a new best result is found\
+        new_best_result (pyqtSignal): Emitted when a new best result is found
             (dict containing 'best_mse', 'best_combination', 'params').
         thread (CalculationThread): The currently running calculation thread, if any.
-        differential_evolution_results (list[tuple[np.ndarray, float]]):\
+        differential_evolution_results (list[tuple[np.ndarray, float]]):
             Stores intermediate results from differential evolution.
         best_combination (tuple): The best combination of reaction functions found so far.
         best_mse (float): The best (lowest) mean squared error found so far.
+        strategy (BestResultStrategy): The current strategy for processing the best results.
     """
 
     new_best_result = pyqtSignal(dict)
@@ -44,6 +45,26 @@ class Calculations(BaseSlots):
         self.new_best_result.connect(self.handle_new_best_result)
         self.mse_history = []
         self.calculation_active = False
+
+        self.deconvolution_strategy = DeconvolutionStrategy(self)
+        self.model_calculation_strategy = ModelCalculationStrategy(self)
+        self.strategy: Optional[BestResultStrategy] = None
+
+    def set_strategy(self, strategy_type: str):
+        """
+        Sets the current strategy for processing the best results.
+
+        Args:
+            strategy_type (str): for now ('deconvolution' or 'model_calculation').
+        """
+        if strategy_type == "deconvolution":
+            self.strategy = self.deconvolution_strategy
+            logger.debug("Deconvolution strategy set.")
+        elif strategy_type == "model_calculation":
+            self.strategy = self.model_calculation_strategy
+            logger.debug("Model calculation strategy set.")
+        else:
+            raise ValueError(f"Unknown strategy type: {strategy_type}")
 
     def start_calculation_thread(self, func: Callable, *args, **kwargs) -> None:
         self.calculation_active = True
@@ -65,6 +86,7 @@ class Calculations(BaseSlots):
         if self.thread and self.thread.isRunning():
             logger.info("Stopping current calculation...")
             self.calculation_active = False
+            self.strategy = None
             self.thread.requestInterruption()
             return True
         return False
@@ -103,6 +125,7 @@ class Calculations(BaseSlots):
             console.log("An error occurred while processing the calculation result. Check logs for details.")
 
         self.calculation_active = False
+        self.strategy = None
         self.best_mse = float("inf")
         self.best_combination = None
         self.mse_history = []
@@ -140,6 +163,7 @@ class Calculations(BaseSlots):
 
             if deconvolution_method == "differential_evolution":
                 logger.info("Starting differential evolution optimization.")
+                self.set_strategy("deconvolution")
                 self.start_differential_evolution(
                     bounds=bounds, target_function=target_function, **deconvolution_parameters
                 )
@@ -150,6 +174,33 @@ class Calculations(BaseSlots):
         except Exception as e:
             logger.error(f"Error preparing and starting optimization: {e}")
             console.log("Error preparing and starting optimization. Check logs for details.")
+
+    @pyqtSlot(dict)
+    def run_model_based_calculation(self, response: dict):
+        """
+        Prepare and execute the model calculation process.
+
+        Args:
+            response (dict): Parameters for model calculation.
+        """
+        logger.debug(f"run_model_calculation called with response: {response}")
+
+        try:
+            target_function = self.generate_model_based_target_function(response)
+
+            bounds = response.get("bounds", [])
+            optimization_parameters = response.get("optimization_parameters", {})
+
+            logger.info("Starting model based calculation optimization.")
+            self.set_strategy("model_calculation")
+            self.start_differential_evolution(bounds=bounds, target_function=target_function, **optimization_parameters)
+
+        except Exception as e:
+            logger.error(f"Error preparing and starting model calculation: {e}")
+            console.log("Error preparing and starting model calculation. Check logs for details.")
+
+    def generate_model_based_target_function(self, params):
+        pass
 
     def generate_deconvolution_target_function(
         self,
@@ -263,13 +314,11 @@ class Calculations(BaseSlots):
         logger.info(f"Intermediate result: xk = {xk}, convergence = {convergence}")
 
     @pyqtSlot(dict)
-    def handle_new_best_result(self, result: dict):  # noqa: C901
+    def handle_new_best_result(self, result: dict):
         """
         Handles the event when a new best result is found during optimization.
 
-        This method updates the best MSE and combination if the new result is better.
-        It formats and logs the best MSE, combination, and parameters in a YAML-like structure
-        with each parameter rounded to four decimal places.
+        Delegates the handling to the current strategy.
 
         Args:
             result (dict): A dictionary containing 'best_mse', 'best_combination', and 'params'.
@@ -277,101 +326,7 @@ class Calculations(BaseSlots):
                         - 'best_combination' (list[str]): The combination of reaction functions.
                         - 'params' (list[float]): The parameters corresponding to the best combination.
         """
-        best_mse = result["best_mse"]
-        best_combination = result["best_combination"]
-        params = result["params"]
-
-        if best_mse < self.best_mse:
-            self.best_mse = best_mse
-            self.best_combination = best_combination
-            self.mse_history.append((datetime.datetime.now(), best_mse))
-            logger.info("A new best result has been found.")
-
-            self.handle_request_cycle("main_window", "plot_mse_line", mse_data=self.mse_history)
-
-            def reaction_param_count(func_type: str) -> int:
-                """
-                Determines the number of parameters based on the reaction function type.
-
-                Args:
-                    func_type (str): The type of reaction function.
-
-                Returns:
-                    int: The number of parameters for the given function type.
-                """
-                if func_type == "gauss":
-                    return 3
-                elif func_type == "fraser":
-                    return 4
-                elif func_type == "ads":
-                    return 5
-                else:
-                    return 3  # Default to 3 if unknown
-
-            idx = 0
-            parameters_yaml = "parameters:\n"
-            for i, func_type in enumerate(best_combination, start=1):
-                count = reaction_param_count(func_type)
-                reaction_params = params[idx : idx + count]
-                idx += count
-
-                # Initialize parameter dictionary with default None values
-                param_dict = {
-                    "h": None,
-                    "z": None,
-                    "w": None,
-                    "fr": None,
-                    "ads1": None,
-                    "ads2": None,
-                }
-
-                # Assign values based on function type
-                try:
-                    param_dict["h"] = round(float(reaction_params[0]), 4)
-                    param_dict["z"] = round(float(reaction_params[1]), 4)
-                    param_dict["w"] = round(float(reaction_params[2]), 4)
-
-                    if func_type == "fraser" and count >= 4:
-                        param_dict["fr"] = round(float(reaction_params[3]), 4)
-                    elif func_type == "ads" and count >= 5:
-                        param_dict["ads1"] = round(float(reaction_params[3]), 4)
-                        param_dict["ads2"] = round(float(reaction_params[4]), 4)
-                except (IndexError, ValueError) as e:
-                    logger.error(f"Error parsing parameters for reaction {i}: {e}")
-                    continue  # Skip to the next reaction if there's an error
-
-                # Append formatted parameters to YAML string
-                parameters_yaml += f"  r{i}:\n"
-                for key, value in param_dict.items():
-                    val_str = "null" if value is None else f"{value:.4f}"
-                    parameters_yaml += f"    {key}: {val_str}\n"
-
-            # Log the formatted YAML parameters
-            console.log("\nNew best result found:")
-            console.log(f"\nBest MSE: {best_mse:.4f}")
-            console.log(f"\nReaction combination: {best_combination}")
-            console.log(parameters_yaml.rstrip())
-
-            # Retrieve the current file name from the main window
-            file_name = self.handle_request_cycle("main_window", "get_file_name")
-            # Update the reactions parameters in the calculations data operations
-            self.handle_request_cycle(
-                "calculations_data_operations",
-                "update_reactions_params",
-                path_keys=[file_name],
-                best_combination=best_combination,
-                reactions_params=params,
-            )
-
-    @pyqtSlot(bool)
-    def calc_data_operations_in_progress(self, in_progress: bool):
-        """
-        Slot to handle when calculations_data_operations are in progress.
-
-        Args:
-            in_progress (bool): True if calculations are in progress, False otherwise.
-        """
-        if in_progress:
-            logger.debug("Calculations data operations are now in progress.")
+        if self.strategy:
+            self.strategy.handle(result)
         else:
-            logger.debug("Calculations data operations have completed.")
+            logger.warning("No strategy set. Best result will not be handled.")
