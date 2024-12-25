@@ -3,12 +3,12 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
-from core.base_signals import BaseSignals
 from PyQt6.QtWidgets import QApplication
 
-from src.core.calculations import Calculations
-from src.core.calculations_data import CalculationsData
-from src.core.calculations_data_operations import CalculationsDataOperations
+from src.core.base_signals import BaseSignals
+from src.core.calculation import Calculations
+from src.core.calculation_data import CalculationsData
+from src.core.calculation_data_operations import CalculationsDataOperations
 from src.core.file_data import FileData
 from src.core.file_operations import ActiveFileOperations
 from src.core.series_data import SeriesData
@@ -32,10 +32,11 @@ def main():
     calculations_data_operations.reaction_params_to_gui.connect(window.main_tab.plot_canvas.add_anchors)
     file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
     calculations_data_operations.plot_reaction.connect(window.main_tab.plot_canvas.plot_reaction)
-    calculations_data_operations.deconvolution_signal.connect(calculations.run_deconvolution)
+    calculations_data_operations.deconvolution_signal.connect(calculations.run_calculation_scenario)
     calculations_data_operations.reaction_params_to_gui.connect(
         window.main_tab.sub_sidebar.deconvolution_sub_bar.coeffs_table.fill_table
     )
+    window.model_based_calculation_signal.connect(calculations.run_calculation_scenario)
 
     window.show()
     sys.exit(app.exec())

@@ -17,9 +17,9 @@ class DeconvolutionStrategy(BestResultStrategy):
         self.calculations = calculations_instance
 
     def handle(self, result: Dict):  # noqa: C901
-        best_mse = result["best_mse"]
-        best_combination = result["best_combination"]
-        params = result["params"]
+        best_mse = result.get("best_mse")
+        best_combination = result.get("best_combination")
+        params = result.get("params")
 
         if best_mse < self.calculations.best_mse:
             self.calculations.best_mse = best_mse
@@ -96,9 +96,9 @@ class ModelBasedCalculationStrategy(BestResultStrategy):
         self.calculations = calculations_instance
 
     def handle(self, result: Dict):
-        best_mse = result["best_mse"]
-        best_combination = result["best_combination"]
-        params = result["params"]
+        best_mse = result.get("best_mse")
+        best_combination = result.get("best_combination")
+        params = result.get("params")
 
         if best_mse < self.calculations.best_mse:
             self.calculations.best_mse = best_mse

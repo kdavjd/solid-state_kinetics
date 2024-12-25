@@ -348,7 +348,7 @@ class ReactionTable(QWidget):
                 self.calculation_settings[self.active_file] = selected_functions
                 self.deconvolution_settings[self.active_file] = {
                     "method": selected_method,
-                    "deconvolution_parameters": deconvolution_parameters,
+                    "method_parameters": deconvolution_parameters,
                 }
                 logger.info(f"Selected functions: {selected_functions}")
                 logger.info(f"Deconvolution settings: {self.deconvolution_settings[self.active_file]}")

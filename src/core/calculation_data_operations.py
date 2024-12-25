@@ -421,8 +421,9 @@ class CalculationsDataOperations(BaseSlots):
 
         return {
             "reaction_variables": reaction_variables,
-            "deconvolution_settings": deconvolution_settings,
+            "calculation_settings": deconvolution_settings,
             "bounds": bounds,
             "reaction_combinations": reaction_combinations,
             "experimental_data": df,
+            "calculation_scenario": "deconvolution",
         }

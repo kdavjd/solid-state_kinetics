@@ -13,6 +13,7 @@ from src.gui.table_tab.table_tab import TableTab
 
 class MainWindow(QMainWindow):
     to_main_tab_signal = pyqtSignal(dict)
+    model_based_calculation_signal = pyqtSignal(dict)
 
     def __init__(self, signals: BaseSignals):
         super().__init__()
@@ -183,6 +184,11 @@ class MainWindow(QMainWindow):
         if operation == "delete_series":
             is_ok = self.handle_request_cycle("series_data", operation, **params)
             logger.debug(f"{operation=} {is_ok=}")
+
+        if operation == "model_based_calculation":
+            # scheme = params.get("scheme")
+            series_name = params.get("series_name")
+            # series_df = self.handle_request_cycle("series_data", "get_series", **params)
 
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")

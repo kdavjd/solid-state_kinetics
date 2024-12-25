@@ -85,7 +85,7 @@ class SeriesData(BaseSlots):
             return False, None
 
         self.series[name] = data
-        logger.info(f"Added series: {name}")
+        logger.info(f"Added series: {name}, {data=}")
         return True, name
 
     def delete_series(self, series_name: str) -> bool:
