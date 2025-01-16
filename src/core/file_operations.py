@@ -16,6 +16,8 @@ class ActiveFileOperations(BaseSlots):
 
         if operation == "differential":
             response["data"] = self.diff_function
+        if operation == "load":
+            pass
         else:
             logger.warning(f"{self.actor_name} received unknown operation '{operation}'")
 

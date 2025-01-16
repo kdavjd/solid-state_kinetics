@@ -13,23 +13,21 @@ class BestResultStrategy(ABC):
 
 
 class DeconvolutionStrategy(BestResultStrategy):
-    def __init__(self, calculations_instance):
-        self.calculations = calculations_instance
+    def __init__(self, calculation_instance):
+        self.calculation = calculation_instance
 
     def handle(self, result: Dict):  # noqa: C901
         best_mse = result.get("best_mse")
         best_combination = result.get("best_combination")
         params = result.get("params")
 
-        if best_mse < self.calculations.best_mse:
-            self.calculations.best_mse = best_mse
-            self.calculations.best_combination = best_combination
-            self.calculations.mse_history.append((datetime.datetime.now(), best_mse))
+        if best_mse < self.calculation.best_mse:
+            self.calculation.best_mse = best_mse
+            self.calculation.best_combination = best_combination
+            self.calculation.mse_history.append((datetime.datetime.now(), best_mse))
             logger.info("A new best MSE has been found.")
 
-            self.calculations.handle_request_cycle(
-                "main_window", "plot_mse_line", mse_data=self.calculations.mse_history
-            )
+            self.calculation.handle_request_cycle("main_window", "plot_mse_line", mse_data=self.calculation.mse_history)
 
             def reaction_param_count(func_type: str) -> int:
                 if func_type == "gauss":
@@ -81,8 +79,8 @@ class DeconvolutionStrategy(BestResultStrategy):
             console.log(f"\nReaction combination: {best_combination}")
             console.log(parameters_yaml.rstrip())
 
-            file_name = self.calculations.handle_request_cycle("main_window", "get_file_name")
-            self.calculations.handle_request_cycle(
+            file_name = self.calculation.handle_request_cycle("main_window", "get_file_name")
+            self.calculation.handle_request_cycle(
                 "calculations_data_operations",
                 "update_reactions_params",
                 path_keys=[file_name],
@@ -92,23 +90,21 @@ class DeconvolutionStrategy(BestResultStrategy):
 
 
 class ModelBasedCalculationStrategy(BestResultStrategy):
-    def __init__(self, calculations_instance):
-        self.calculations = calculations_instance
+    def __init__(self, calculation_instance):
+        self.calculation = calculation_instance
 
     def handle(self, result: Dict):
         best_mse = result.get("best_mse")
         best_combination = result.get("best_combination")
         params = result.get("params")
 
-        if best_mse < self.calculations.best_mse:
-            self.calculations.best_mse = best_mse
-            self.calculations.best_combination = best_combination
-            self.calculations.mse_history.append((datetime.datetime.now(), best_mse))
+        if best_mse < self.calculation.best_mse:
+            self.calculation.best_mse = best_mse
+            self.calculation.best_combination = best_combination
+            self.calculation.mse_history.append((datetime.datetime.now(), best_mse))
             logger.info("A new best MSE has been found in model calculation.")
 
-            self.calculations.handle_request_cycle(
-                "main_window", "plot_mse_line", mse_data=self.calculations.mse_history
-            )
+            self.calculation.handle_request_cycle("main_window", "plot_mse_line", mse_data=self.calculation.mse_history)
 
             console.log("\nNew best result found in model calculation:")
             console.log(f"Best MSE: {best_mse:.4f}")

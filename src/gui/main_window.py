@@ -146,8 +146,8 @@ class MainWindow(QMainWindow):
         if operation == "add_new_series":
             df_copies = self.handle_request_cycle("file_data", "get_all_data", file_name="all_files")
             series_name, selected_files = self.main_tab.sidebar.open_add_series_dialog(df_copies)
-            if not selected_files:
-                logger.warning(f"{self.actor_name} no files selected for adding new series.")
+            if not series_name or not selected_files:
+                logger.warning(f"{self.actor_name} user canceled or gave invalid input for new series.")
                 return
             df_with_rates = {}
 

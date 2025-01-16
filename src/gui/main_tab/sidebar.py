@@ -197,15 +197,17 @@ class SideBar(QWidget):
         Args:
             df_copies (dict): A dictionary of file names to their corresponding dataframes.
         """
-        dialog = SelectFileDataDialog(df_copies, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            selected_files = dialog.get_selected_files()
-            if selected_files:
-                logger.debug(f"Selected files and heating rates for series: {selected_files}")
-                return selected_files
-            else:
-                logger.info("No files selected for series.")
-        return []
+        while True:
+            dialog = SelectFileDataDialog(df_copies, self)
+            result = dialog.exec()
+
+            if result == QDialog.DialogCode.Rejected:
+                return None, []
+
+            series_name, selected_files = dialog.get_selected_files()
+
+            if series_name and selected_files:
+                return series_name, selected_files
 
     def import_series(self):
         """

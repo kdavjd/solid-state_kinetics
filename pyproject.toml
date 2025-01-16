@@ -24,6 +24,8 @@ scienceplots = "^2.1.1"
 chardet = "^5.2.0"
 scipy = "^1.13.1"
 pyinstaller = "^6.7.0"
+joblib = "^1.4.2"
+optuna = "^4.1.0"
 
 [tool.poetry.dev-dependencies]
 pre-commit = "^3.6.2"
@@ -31,6 +33,9 @@ pytest = "^8.0.2"
 mypy = "^1.8.0"
 ruff = "^0.5.1"
 black = "^24.8.0"
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
 
 [tool.ruff]
 target-version = "py312"

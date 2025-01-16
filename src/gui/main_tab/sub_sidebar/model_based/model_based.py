@@ -166,17 +166,27 @@ class SelectFileDataDialog(QDialog):
         series_name = self.series_name_line_edit.text().strip()
         if not series_name:
             QMessageBox.warning(self, "Invalid Input", "Please enter a series name.")
-            return []
+            return None, []
 
         selected_files = []
         for checkbox, line_edit in zip(self.checkboxes, self.line_edits):
             if checkbox.isChecked():
+                rate_text = line_edit.text().strip()
+
+                if not rate_text:
+                    QMessageBox.warning(self, "Invalid Input", f"Please enter a heating rate for '{checkbox.text()}'")
+                    return None, []
+
                 try:
-                    heating_rate = int(line_edit.text())
-                    selected_files.append((checkbox.text(), heating_rate))
+                    heating_rate = int(rate_text)
                 except ValueError:
                     QMessageBox.warning(
-                        self, "Invalid Input", f"Please enter a valid heating rate for '{checkbox.text()}'"
+                        self,
+                        "Invalid Input",
+                        f"Please enter a valid integer heating rate for '{checkbox.text()}'",
                     )
-                    return []
+                    return None, []
+                else:
+                    selected_files.append((checkbox.text(), heating_rate))
+
         return series_name, selected_files

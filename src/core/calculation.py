@@ -87,9 +87,7 @@ class Calculations(BaseSlots):
             self.set_result_strategy(strategy_type)
 
             if optimization_method == "differential_evolution":
-                calc_params = params.get("calculation_settings", {}).pop("method_parameters")
-                calc_params.pop("method", None)
-                logger.debug(f"{calc_params=}")
+                calc_params = params.get("calculation_settings", {}).get("method_parameters", {}).copy()
 
                 self.start_differential_evolution(bounds=bounds, target_function=target_function, **calc_params)
             else:
