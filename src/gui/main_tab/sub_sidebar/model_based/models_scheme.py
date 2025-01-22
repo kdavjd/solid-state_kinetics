@@ -316,14 +316,16 @@ class ModelsScheme(QWidget):
         if letter in self.reactions:
             node = self.reactions[letter]
             gen = self.generation_map[letter]
-            node_y_start = node.x
+            node_y_start = node.y
             node_y_end = node.y + DiagramConfig.NODE_HEIGHT
+
             if gen in self.occupied_positions:
                 self.occupied_positions[gen] = [
                     (s, e) for (s, e) in self.occupied_positions[gen] if not (s == node_y_start and e == node_y_end)
                 ]
                 if not self.occupied_positions[gen]:
                     del self.occupied_positions[gen]
+
             node.remove()
             del self.reactions[letter]
             del self.generation_map[letter]
@@ -335,6 +337,7 @@ class ModelsScheme(QWidget):
             for arrow in arrows_to_remove:
                 arrow.remove()
                 self.arrows.remove(arrow)
+
         for p, ch_list in list(self.children_map.items()):
             if letter in ch_list:
                 ch_list.remove(letter)
