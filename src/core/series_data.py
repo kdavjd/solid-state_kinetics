@@ -1,7 +1,6 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from core.base_signals import BaseSlots
-from pandas import DataFrame
 
 from src.core.logger_config import logger
 
@@ -9,7 +8,7 @@ from src.core.logger_config import logger
 class SeriesData(BaseSlots):
     def __init__(self, actor_name: str = "series_data", signals=None):
         super().__init__(actor_name=actor_name, signals=signals)
-        self.series: Dict[str, DataFrame] = {}
+        self.series = {}
         self.default_name_counter: int = 1
 
     def process_request(self, params: dict) -> None:
@@ -110,8 +109,8 @@ class SeriesData(BaseSlots):
         logger.info(f"Renamed series from '{old_series_name}' to '{new_series_name}'")
         return True
 
-    def get_series(self, series_name: str) -> DataFrame:
+    def get_series(self, series_name: str):
         return self.series.get(series_name)
 
-    def get_all_series(self) -> Dict[str, DataFrame]:
+    def get_all_series(self):
         return self.series.copy()

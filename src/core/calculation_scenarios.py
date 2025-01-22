@@ -1,6 +1,8 @@
 from typing import Callable, Dict
 
 import numpy as np
+from scipy.integrate import solve_ivp
+from scipy.optimize import NonlinearConstraint
 
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
@@ -94,172 +96,202 @@ class DeconvolutionScenario(BaseCalculationScenario):
         return target_function
 
 
-# class ModelBasedScenario(BaseCalculationScenario):
-#     """
-#     Сценарий "модельного расчёта".
-#     Переносим сюда:
-#       - generate_ode_system
-#       - create_model_based_target_function
-#     """
+class ModelBasedScenario(BaseCalculationScenario):
+    def get_result_strategy_type(self) -> str:
+        return "model_based_calculation"
 
-#     def get_result_strategy_type(self) -> str:
-#         return "model_based_calculation"
+    def get_optimization_method(self) -> str:
+        return self.params.get("model_based_settings", {}).get("method", "differential_evolution")
 
-#     def get_optimization_method(self) -> str:
-#         return self.params.get("model_based_settings", {}).get("method", "differential_evolution")
+    def get_bounds(self) -> list[tuple]:
+        scheme = self.params.get("scheme")
+        if not scheme:
+            raise ValueError("No 'scheme' provided for ModelBasedScenario.")
 
-#     def get_bounds(self) -> list[tuple]:
-#         """
-#         Раньше это было в run_model_based_calculation:
-#           - считаем num_reactions = len(ode_system)
-#           - формируем bounds (A, Ea, n)
-#         """
-#         scheme = self.params.get("scheme")
-#         if not scheme:
-#             raise ValueError("No 'scheme' provided for ModelBasedScenario.")
+        # Генерация системы ОДУ для определения количества реакций
+        ode_system = self._generate_ode_system(scheme)
+        reaction_pairs = self._extract_reactions_from_ode_system(ode_system)
+        num_reactions = len(reaction_pairs)
 
-#         # Генерируем систему ОДУ, чтобы узнать, сколько реакций
-#         ode_system = self._generate_ode_system(scheme)
-#         num_reactions = len(ode_system)
+        # Извлечение Beta из series_df
+        series_df = self.params.get("series_df")
+        beta_series = [float(beta) for beta in series_df.columns if beta != "temperature"]
+        num_experiments = len(beta_series)  # noqa: F841
 
-#         # Примерно как было в вашем коде
-#         bounds = (
-#             [(0.01, 15.0) for _ in range(num_reactions)]
-#             + [(40000.0, 200000.0) for _ in range(num_reactions)]
-#             + [(0.01, 4.0) for _ in range(num_reactions)]
-#         )
-#         return bounds
+        # Количество Contributions равно количеству реакций
+        num_contributions = num_reactions
 
-#     def get_target_function(self) -> Callable:
-#         scheme = self.params.get("scheme")
-#         series_df = self.params.get("series_df")
+        # Границы для A, Ea, n
+        bounds = (
+            [(0.01, 15.0) for _ in range(num_reactions)]  # A
+            + [(40000.0, 200000.0) for _ in range(num_reactions)]  # Ea
+            + [(0.01, 4.0) for _ in range(num_reactions)]  # n
+        )
 
-#         if not scheme or series_df is None:
-#             raise ValueError("Missing 'scheme' or 'series_df' in params")
+        # Границы для Contributions (от 0 до 1)
+        bounds += [(0.0, 1.0) for _ in range(num_contributions)]
 
-#         # Генерируем систему ОДУ
-#         ode_system = self._generate_ode_system(scheme)
+        return bounds
 
-#         def target_function(parameters: np.ndarray) -> float:
-#             try:
-#                 # Логика как в вашем create_model_based_target_function
-#                 temperature = series_df["temperature"].to_numpy()
-#                 experimental_data = series_df.drop(columns=["temperature"]).to_numpy()
+    def get_constraints(self):
+        scheme = self.params.get("scheme")
+        ode_system = self._generate_ode_system(scheme)
+        reaction_pairs = self._extract_reactions_from_ode_system(ode_system)
+        num_reactions = len(reaction_pairs)
+        num_contributions = num_reactions
 
-#                 num_reactions = len(ode_system)
-#                 A = 10 ** parameters[:num_reactions]  # К примеру, если так
-#                 Ea = parameters[num_reactions : 2 * num_reactions]
-#                 n = parameters[2 * num_reactions : 3 * num_reactions]
+        # Индексы для Contributions в параметрах
+        contributions_start = 3 * num_reactions
+        contributions_end = contributions_start + num_contributions
 
-#                 R = 8.3144598
+        # Функция для ограничения суммы Contributions
+        def constraint_func(x):
+            return np.sum(x[contributions_start:contributions_end]) - 1
 
-#                 # Считаем константы скорости
-#                 rate_constants = A[:, np.newaxis] * np.exp(-Ea[:, np.newaxis] / (R * temperature))
+        return NonlinearConstraint(constraint_func, 0, 0)
 
-#                 # Допустим, у нас num_species = len(ode_system.keys())
-#                 species = list(ode_system.keys())
-#                 num_species = len(species)
+    def get_target_function(self) -> Callable:
+        scheme = self.params.get("scheme")
+        series_df = self.params.get("series_df")
 
-#                 # Задаём начальные концентрации (пример)
-#                 X0 = np.zeros(num_species)
-#                 X0[0] = 1.0
+        if not scheme or series_df is None:
+            raise ValueError("Missing 'scheme' or 'series_df' in params")
 
-#                 # Для упрощения сделаем: reaction_matrix[r, from_idx, from_idx] -= 1
-#                 # Вычислим его по ode_system
-#                 reaction_matrix = np.zeros((num_reactions, num_species, num_species))
+        # Генерация системы ОДУ и извлечение реакций
+        ode_system = self._generate_ode_system(scheme)
+        reaction_pairs = self._extract_reactions_from_ode_system(ode_system)
+        num_reactions = len(reaction_pairs)
+        species = list(ode_system.keys())
+        num_species = len(species)
 
-#                 # ode_system — dict {species_name: expression_str}
-#                 # Но чтобы упростить, сделаем вид, что у нас есть список reaction_pairs
-#                 # (from_s, to_s)
-#                 reaction_pairs = self._extract_reactions_from_ode_system(ode_system)
-#                 species_index = {s: i for i, s in enumerate(species)}
+        # Извлечение Beta из series_df
+        beta_series = [float(beta) for beta in series_df.columns if beta != "temperature"]
+        # num_experiments = len(beta_series)
 
-#                 for r, (from_s, to_s) in enumerate(reaction_pairs):
-#                     from_idx = species_index[from_s]
-#                     to_idx = species_index[to_s]
-#                     reaction_matrix[r, from_idx, from_idx] -= 1
-#                     reaction_matrix[r, to_idx, to_idx] += 1
+        # Индексы реакций
+        # reaction_indices = {pair: idx for idx, pair in enumerate(reaction_pairs)}
 
-#                 # Функция для solve_ivp
-#                 def ode_func(t, X):
-#                     idx = np.argmin(np.abs(temperature - t))
-#                     k = rate_constants[:, idx]
-#                     # пример некой модели, зависящей от X
-#                     dXdt = np.sum(reaction_matrix * k[:, np.newaxis, np.newaxis] * X, axis=0).sum(axis=1)
-#                     return dXdt
+        def target_function(parameters: np.ndarray) -> float:
+            try:
+                # Извлечение параметров
+                A = 10 ** parameters[:num_reactions]
+                Ea = parameters[num_reactions : 2 * num_reactions]
+                n = parameters[2 * num_reactions : 3 * num_reactions]
+                Contributions = parameters[3 * num_reactions : 4 * num_reactions]
 
-#                 sol = solve_ivp(ode_func, [temperature[0], temperature[-1]], X0, t_eval=temperature, method="RK45")
+                R = 8.3144598
 
-#                 if not sol.success:
-#                     logger.warning(f"ODE solver failed: {sol.message}")
-#                     return np.inf
+                # Проверка суммы Contributions
+                if not np.isclose(np.sum(Contributions), 1.0):
+                    return np.inf
 
-#                 # sol.y shape = (num_species, len(temperature))
-#                 # а experimental_data той же размерности?
-#                 mse = np.mean((sol.y.T - experimental_data) ** 2)
-#                 return mse
+                total_mse = 0.0
 
-#             except Exception as e:
-#                 logger.error(f"Error in model-based target function: {e}")
-#                 return np.inf
+                for i, beta in enumerate(beta_series):
+                    temperature = series_df["temperature"].to_numpy()
+                    experimental_data = series_df.iloc[:, i + 1].to_numpy()
 
-#         return target_function
+                    # Расчёт констант скорости с учётом Beta
+                    k = A * np.exp(-Ea / (R * temperature)) / (beta / 60)  # Перевод Beta в секунды
 
-#     def _generate_ode_system(self, scheme: dict) -> dict:
-#         """
-#         Раньше было в calculations.generate_ode_system
-#         Теперь — сугубо для данного сценария,
-#         поэтому мы переносим её внутрь ModelBasedScenario как вспомогательный метод.
-#         """
-#         nodes = [node["id"] for node in scheme["nodes"]]
+                    # Задание начальных концентраций
+                    X0 = np.zeros(num_species)
+                    X0[0] = 1.0  # Начальная концентрация вида A
 
-#         outgoing = {node: [] for node in nodes}
-#         incoming = {node: [] for node in nodes}
+                    # Инициализация массива для хранения интегралов d(r)/dt
+                    integral_dr_dt = np.zeros(num_reactions)
 
-#         for edge in scheme["edges"]:
-#             source = edge["from"]
-#             target = edge["to"]
-#             outgoing[source].append(target)
-#             incoming[target].append(source)
+                    # Определение функции ОДУ
+                    def ode_func(t, X):
+                        # Интерполяция текущей температуры
+                        idx = np.argmin(np.abs(temperature - t))
+                        current_k = k[idx]
 
-#         equations = {}
-#         for node in nodes:
-#             consumption_terms = [f"k_{node}_{to} * [{node}]" for to in outgoing[node]]
-#             formation_terms = [f"k_{source}_to_{node} * [{source}]" for source in incoming[node]]
+                        dXdt = np.zeros(num_species)
 
-#             formation = " + ".join(formation_terms) if formation_terms else "0"
-#             consumption = " + ".join(consumption_terms) if consumption_terms else "0"
-#             equation = f"{formation} - ({consumption})"
-#             equations[node] = equation
+                        # Построение системы уравнений на основе схемы реакций
+                        for r_idx, (from_s, to_s) in enumerate(reaction_pairs):
+                            # Найти индексы реагентов и продуктов
+                            from_idx = species.index(from_s)
+                            to_idx = species.index(to_s)
 
-#         logger.debug(f"Generated ODE system: {equations}")
-#         return equations
+                            # Рассчитать скорость реакции
+                            rate = current_k[r_idx] * X[from_idx] ** n[r_idx]
 
-#     def _extract_reactions_from_ode_system(self, ode_system: dict) -> list[tuple[str, str]]:
-#         """
-#         Примерный метод, вычленяющий (from_s, to_s) из уравнений:
-#         Например, если в equation: "k_A_B * [A]" => реакция (A, B).
-#         Это упрощённый парсер, зависит от формата ваших уравнений.
-#         """
-#         reaction_pairs = []
-#         for species_name, expr in ode_system.items():
-#             # expr может быть вида: "k_A_B * [A] + k_C_D * [C] - (k_E_F * [E])"
-#             # Разбиваем и ищем substr "k_X_Y"
-#             # Супер-простой парсер:
-#             tokens = expr.replace("(", "").replace(")", "").replace("-", "+").split("+")
-#             for token in tokens:
-#                 token = token.strip()
-#                 if "k_" in token:
-#                     # вычленяем "k_A_B"
-#                     k_part = token.split("*")[0].strip()
-#                     # k_part = "k_A_B" или "k_C_D" ...
-#                     # делим по '_'
-#                     _, from_s, to_s = k_part.split("_")
-#                     reaction_pairs.append((from_s, to_s))
-#         return list(set(reaction_pairs))
+                            # Изменение концентраций
+                            dXdt[from_idx] -= rate
+                            dXdt[to_idx] += rate
+
+                            # Накопление интеграла d(r)/dt
+                            # Предполагаем равномерное распределение времени между точками
+                            dt = temperature[1] - temperature[0]  # Предположим равномерный шаг
+                            integral_dr_dt[r_idx] += rate * dt
+
+                        return dXdt
+
+                    # Решение ОДУ
+                    sol = solve_ivp(ode_func, [temperature[0], temperature[-1]], X0, t_eval=temperature, method="RK45")
+
+                    if not sol.success:
+                        return np.inf
+
+                    # Расчёт теоретической массы
+                    mass_change = np.dot(Contributions, integral_dr_dt)
+                    initial_mass = 100.0  # Предположим начальную массу
+                    mass_theoretical = initial_mass - mass_change
+
+                    # Расчёт MSE
+                    mse = np.mean((mass_theoretical - experimental_data) ** 2)
+                    total_mse += mse
+
+                return total_mse
+
+            except Exception as e:
+                logger.error(f"Error in model-based target function: {e}")
+                return np.inf
+
+        return target_function
+
+    def _generate_ode_system(self, scheme: dict) -> dict:
+        nodes = [node["id"] for node in scheme["nodes"]]
+
+        outgoing = {node: [] for node in nodes}
+        incoming = {node: [] for node in nodes}
+
+        for edge in scheme["edges"]:
+            source = edge["from"]
+            target = edge["to"]
+            outgoing[source].append(target)
+            incoming[target].append(source)
+
+        equations = {}
+        for node in nodes:
+            consumption_terms = [f"k_{node}_{to} * [{node}]" for to in outgoing[node]]
+            formation_terms = [f"k_{source}_to_{node} * [{source}]" for source in incoming[node]]
+
+            formation = " + ".join(formation_terms) if formation_terms else "0"
+            consumption = " + ".join(consumption_terms) if consumption_terms else "0"
+            equation = f"{formation} - ({consumption})"
+            equations[node] = equation
+
+        logger.debug(f"Generated ODE system: {equations}")
+        return equations
+
+    def _extract_reactions_from_ode_system(self, ode_system: dict) -> list[tuple[str, str]]:
+        reaction_pairs = []
+        for species_name, expr in ode_system.items():
+            tokens = expr.replace("(", "").replace(")", "").replace("-", "+").split("+")
+            for token in tokens:
+                token = token.strip()
+                if "k_" in token:
+                    parts = token.split("*")[0].strip().split("_")
+                    if len(parts) >= 3:
+                        _, from_s, to_s = parts[:3]
+                        reaction_pairs.append((from_s, to_s))
+        return list(set(reaction_pairs))
 
 
 SCENARIO_REGISTRY = {
     "deconvolution": DeconvolutionScenario,
-    # "model_based_calculation": ModelBasedScenario,
+    "model_based_calculation": ModelBasedScenario,
 }
