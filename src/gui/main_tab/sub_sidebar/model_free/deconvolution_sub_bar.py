@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
 
 DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
     "strategy": "best1bin",
@@ -79,7 +80,9 @@ class FileTransferButtons(QWidget):
         )
 
         if import_file_name:
-            self.import_reactions_signal.emit({"import_file_name": import_file_name, "operation": "import_reactions"})
+            self.import_reactions_signal.emit(
+                {"import_file_name": import_file_name, "operation": OperationType.IMPORT_REACTIONS}
+            )
 
     def _generate_suggested_file_name(self, file_name: str, data: dict):
         """
@@ -110,7 +113,7 @@ class FileTransferButtons(QWidget):
 
     def _export_reactions(self):
         self.export_reactions_signal.emit(
-            {"function": self._generate_suggested_file_name, "operation": "export_reactions"}
+            {"function": self._generate_suggested_file_name, "operation": OperationType.EXPORT_REACTIONS}
         )
 
     def export_reactions(self, data, suggested_file_name):
@@ -205,7 +208,7 @@ class ReactionTable(QWidget):
         function = combo.currentText()
         data_change = {
             "path_keys": [reaction_name, "function"],
-            "operation": "update_value",
+            "operation": OperationType.UPDATE_VALUE,
             "value": function,
         }
         self.reaction_function_changed.emit(data_change)
@@ -254,7 +257,7 @@ class ReactionTable(QWidget):
         table.setCellWidget(row_count, 1, combo)
 
         if emit_signal:
-            reaction_data = {"path_keys": [reaction_name], "operation": "add_reaction"}
+            reaction_data = {"path_keys": [reaction_name], "operation": OperationType.ADD_REACTION}
             self.reaction_added.emit(reaction_data)
 
         self.reactions_counters[self.active_file] += 1
@@ -294,7 +297,7 @@ class ReactionTable(QWidget):
 
                 reaction_data = {
                     "path_keys": [reaction_name],
-                    "operation": "remove_reaction",
+                    "operation": OperationType.REMOVE_REACTION,
                 }
                 self.reaction_removed.emit(reaction_data)
             else:
@@ -314,7 +317,7 @@ class ReactionTable(QWidget):
         reaction_name = self.reactions_tables[self.active_file].item(row, 0).text()
         self.active_reaction = reaction_name
         logger.debug(f"Active reaction: {reaction_name}")
-        self.reaction_chosed.emit({"path_keys": [reaction_name], "operation": "highlight_reaction"})
+        self.reaction_chosed.emit({"path_keys": [reaction_name], "operation": OperationType.HIGHLIGHT_REACTION})
 
     def open_settings(self):
         """
@@ -779,7 +782,7 @@ class CoeffsTable(QTableWidget):
                 path_keys = [self.column_to_bound(column_label), row_label]
                 data_change = {
                     "path_keys": path_keys,
-                    "operation": "update_value",
+                    "operation": OperationType.UPDATE_VALUE,
                     "value": value,
                 }
                 self.update_value.emit(data_change)
@@ -833,7 +836,7 @@ class CalcButtons(QWidget):
         else:
             data = {
                 "path_keys": [],
-                "operation": "deconvolution",
+                "operation": OperationType.DECONVOLUTION,
                 "chosen_functions": settings,
                 "deconvolution_settings": deconvolution_settings,
             }
@@ -851,7 +854,7 @@ class CalcButtons(QWidget):
 
     def stop_calculation(self):
         if self.is_calculating:
-            self.calculation_stopped.emit({"operation": "stop_calculation"})
+            self.calculation_stopped.emit({"operation": OperationType.STOP_CALCULATION})
             self.is_calculating = False
             self.layout.replaceWidget(self.stop_button, self.start_button)
             self.stop_button.hide()

@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QMainWindow, QTabWidget
 
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
 from src.gui.main_tab.main_tab import MainTab
 from src.gui.table_tab.table_tab import TableTab
 
@@ -47,21 +48,22 @@ class MainWindow(QMainWindow):
         actor = params.get("actor")
         response = params.copy()
         logger.debug(f"{self.actor_name} handle request '{operation}' from '{actor}'")
-        if operation == "get_file_name":
+        if operation == OperationType.GET_FILE_NAME:
             response["data"] = self.main_tab.sidebar.active_file_item.text()
-        if operation == "plot_df":
+
+        if operation == OperationType.PLOT_DF:
             df = params.get("df", None)
             self.main_tab.plot_canvas.plot_data_from_dataframe(df) if df is not None else logger.error(
                 f"{self.actor_name} no df"
             )
             response["data"] = df is not None
 
-        if operation == "plot_mse_line":
+        if operation == OperationType.PLOT_MSE_LINE:
             mse_data = params.get("mse_data", [])
             self.main_tab.plot_canvas.plot_mse_history(mse_data)
             response["data"] = True
 
-        if operation == "calculation_finished":
+        if operation == OperationType.CALCULATION_FINISHED:
             self.main_tab.sub_sidebar.deconvolution_sub_bar.calc_buttons.revert_to_default()
             response["data"] = True
 
@@ -86,16 +88,16 @@ class MainWindow(QMainWindow):
 
         logger.debug(f"{self.actor_name} handle_request_from_main_tab '{operation}")
 
-        if operation == "differential":
+        if operation == OperationType.DIFFERENTIAL:
             params["function"] = self.handle_request_cycle("active_file_operations", operation)
             is_modifyed = self.handle_request_cycle("file_data", operation, **params)
             if is_modifyed:
-                df = self.handle_request_cycle("file_data", "get_df_data", **params)
+                df = self.handle_request_cycle("file_data", OperationType.GET_DF_DATA, **params)
                 self.main_tab.plot_canvas.plot_data_from_dataframe(df)
             else:
                 logger.error(f"{self.actor_name} no response in handle_request_from_main_tab")
 
-        if operation == "add_reaction":
+        if operation == OperationType.ADD_REACTION:
             is_ok = self.handle_request_cycle("calculations_data_operations", operation, **params)
             if not is_ok:
                 console.log(
@@ -105,52 +107,53 @@ class MainWindow(QMainWindow):
                 self.main_tab.sub_sidebar.deconvolution_sub_bar.reactions_table.on_fail_add_reaction()
                 return
 
-        if operation == "highlight_reaction":
-            df = self.handle_request_cycle("file_data", "get_df_data", **params)
+        if operation == OperationType.HIGHLIGHT_REACTION:
+            df = self.handle_request_cycle("file_data", OperationType.GET_DF_DATA, **params)
             self.main_tab.plot_canvas.plot_data_from_dataframe(df)
             is_ok = self.handle_request_cycle("calculations_data_operations", operation, **params)
             logger.debug(f"{operation=} {is_ok=}")
 
-        if operation == "remove_reaction":
+        if operation == OperationType.REMOVE_REACTION:
             is_ok = self.handle_request_cycle("calculations_data_operations", operation, **params)
             logger.debug(f"{operation=} {is_ok=}")
 
-        if operation == "update_value":
-            is_ok = self.handle_request_cycle("calculations_data_operations", operation, **params)
+        if operation == OperationType.UPDATE_VALUE:
+            target = params.pop("target", "calculations_data_operations")
+            is_ok = self.handle_request_cycle(target, operation, **params)
             logger.debug(f"{operation=} {is_ok=}")
 
-        if operation == "reset_file_data":
+        if operation == OperationType.RESET_FILE_DATA:
             is_ok = self.handle_request_cycle("file_data", operation, **params)
-            df = self.handle_request_cycle("file_data", "get_df_data", **params)
+            df = self.handle_request_cycle("file_data", OperationType.GET_DF_DATA, **params)
             self.main_tab.plot_canvas.plot_data_from_dataframe(df)
             logger.debug(f"{operation=} {is_ok=}")
 
-        if operation == "import_reactions":
+        if operation == OperationType.IMPORT_REACTIONS:
             data = self.handle_request_cycle("calculations_data", operation, **params)
             self.main_tab.update_reactions_table(data)
 
-        if operation == "export_reactions":
-            data = self.handle_request_cycle("calculations_data", "get_value", **params)
+        if operation == OperationType.EXPORT_REACTIONS:
+            data = self.handle_request_cycle("calculations_data", OperationType.GET_VALUE, **params)
             suggested_file_name = params["function"](params["file_name"], data)
             self.main_tab.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.export_reactions(
                 data, suggested_file_name
             )
 
-        if operation == "deconvolution":
+        if operation == OperationType.DECONVOLUTION:
             data = self.handle_request_cycle("calculations_data_operations", operation, **params)
             logger.debug(f"{data=}")
 
-        if operation == "stop_calculation":
-            _ = self.handle_request_cycle("calculations", "stop_calculation")
+        if operation == OperationType.STOP_CALCULATION:
+            _ = self.handle_request_cycle("calculations", operation)
 
-        if operation == "add_new_series":
-            df_copies = self.handle_request_cycle("file_data", "get_all_data", file_name="all_files")
+        if operation == OperationType.ADD_NEW_SERIES:
+            df_copies = self.handle_request_cycle("file_data", OperationType.GET_ALL_DATA, file_name="all_files")
             series_name, selected_files = self.main_tab.sidebar.open_add_series_dialog(df_copies)
             if not series_name or not selected_files:
                 logger.warning(f"{self.actor_name} user canceled or gave invalid input for new series.")
                 return
-            df_with_rates = {}
 
+            df_with_rates = {}
             for file_name, heating_rate in selected_files:
                 df = df_copies[file_name].copy()
 
@@ -166,7 +169,6 @@ class MainWindow(QMainWindow):
                     continue
 
                 df.rename(columns={other_col: rate_col_name}, inplace=True)
-
                 df_with_rates[file_name] = df
 
             merged_df = reduce(
@@ -174,18 +176,25 @@ class MainWindow(QMainWindow):
             )
             merged_df.sort_values(by="temperature", inplace=True)
             merged_df.interpolate(method="linear", inplace=True)
+
             self.main_tab.plot_canvas.plot_data_from_dataframe(merged_df)
-            is_ok = self.handle_request_cycle("series_data", "add_series", data=merged_df, name=series_name)
+
+            series_data = {"experimental_data": merged_df, "reaction_scheme": None}
+
+            is_ok = self.handle_request_cycle(
+                "calculations_data", OperationType.SET_VALUE, path_keys=["series", series_name], value=series_data
+            )
+
             if is_ok:
                 self.main_tab.sidebar.add_series(series_name)
             else:
                 logger.error(f"Не удалось добавить серию: {series_name}")
 
-        if operation == "delete_series":
+        if operation == OperationType.DELETE_SERIES:
             is_ok = self.handle_request_cycle("series_data", operation, **params)
             logger.debug(f"{operation=} {is_ok=}")
 
-        if operation == "model_based_calculation":
+        if operation == OperationType.MODEL_BASED_CALCULATION:
             # scheme = params.get("scheme")
             series_name = params.get("series_name")
             # series_df = self.handle_request_cycle("series_data", "get_series", **params)

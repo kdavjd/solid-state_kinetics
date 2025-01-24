@@ -73,7 +73,7 @@ class SeriesData(BaseSlots):
                     "from": "A",
                     "to": "B",
                     "reaction_type": "F1",
-                    "activation_energy": 120000,
+                    "Ea": 120000,
                     "log_A": 8,
                     "contribution": 0.5,
                     "Ea_min": 1000,

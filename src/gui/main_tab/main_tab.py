@@ -2,6 +2,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
 from src.core.logger_config import logger
+from src.core.operation_enums import OperationType
 from src.gui.console_widget import ConsoleWidget
 from src.gui.main_tab.plot_canvas.plot_canvas import PlotCanvas
 from src.gui.main_tab.sidebar import SideBar
@@ -91,7 +92,9 @@ class MainTab(QWidget):
         if content_type:
             if content_type in self.sidebar.get_series_names():
                 self.sub_sidebar.update_content("model_based")
-                self.to_main_window_signal.emit({"operation": "get_series_data", "series_name": content_type})
+                self.to_main_window_signal.emit(
+                    {"operation": OperationType.GET_SERIES_DATA, "series_name": content_type}
+                )
             elif content_type in self.sidebar.get_experiment_files_names():
                 self.sub_sidebar.update_content("experiments")
             else:
@@ -123,7 +126,7 @@ class MainTab(QWidget):
             )
             params["is_chain"] = True
             self.to_main_window(params)
-        params["operation"] = "highlight_reaction"
+        params["operation"] = OperationType.HIGHLIGHT_REACTION
         self.to_main_window(params)
 
     def update_reactions_table(self, data: dict):

@@ -6,15 +6,17 @@ import pandas as pd
 
 # see: https://pypi.org/project/SciencePlots/
 import scienceplots  # noqa pylint: disable=unused-import
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
-from gui.main_tab.plot_canvas.anchor_group import HeightAnchorGroup, PositionAnchorGroup
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
+
+from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
+from src.gui.main_tab.plot_canvas.anchor_group import HeightAnchorGroup, PositionAnchorGroup
 
 plt.style.use(["science", "no-latex", "nature", "grid"])
 
@@ -344,12 +346,12 @@ class PlotCanvas(QWidget):
             updates = [
                 {
                     "path_keys": ["upper_bound_coeffs", axis],
-                    "operation": "update_value",
+                    "operation": OperationType.UPDATE_VALUE,
                     "value": positions["upper_bound"][0 if axis == "z" else 1],
                 },
                 {
                     "path_keys": ["lower_bound_coeffs", axis],
-                    "operation": "update_value",
+                    "operation": OperationType.UPDATE_VALUE,
                     "value": positions["lower_bound"][0 if axis == "z" else 1],
                 },
             ]
@@ -357,7 +359,7 @@ class PlotCanvas(QWidget):
             updates.append(
                 {
                     "path_keys": ["coeffs", axis],
-                    "operation": "update_value",
+                    "operation": OperationType.UPDATE_VALUE,
                     "value": center["center"][0 if axis == "z" else 1],
                 }
             )

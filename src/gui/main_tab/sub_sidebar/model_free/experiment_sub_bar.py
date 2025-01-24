@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.core.logger_config import logger
+from src.core.operation_enums import OperationType
 
 
 class SmoothingBlock(QWidget):
@@ -167,14 +168,14 @@ class ActionButtonsBlock(QWidget):
         Emit the cancel_changes_clicked signal with the reset operation.
         """
         logger.debug("Cancel Changes button clicked. Emitting cancel_changes_clicked signal.")
-        self.cancel_changes_clicked.emit({"operation": "reset_file_data"})
+        self.cancel_changes_clicked.emit({"operation": OperationType.RESET_FILE_DATA})
 
     def emit_derivative_signal(self):
         """
         Emit the derivative_clicked signal with the differential operation.
         """
         logger.debug("Derivative button clicked. Emitting derivative_clicked signal.")
-        self.derivative_clicked.emit({"operation": "differential"})
+        self.derivative_clicked.emit({"operation": OperationType.DIFFERENTIAL})
 
 
 class ExperimentSubBar(QWidget):

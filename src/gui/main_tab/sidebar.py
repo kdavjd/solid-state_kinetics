@@ -5,6 +5,7 @@ from PyQt6.QtGui import QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeView, QVBoxLayout, QWidget
 
 from src.core.logger_config import logger
+from src.core.operation_enums import OperationType
 from src.gui.main_tab.load_file_button import LoadButton
 from src.gui.main_tab.sub_sidebar.model_based.model_based import SelectFileDataDialog
 
@@ -187,7 +188,7 @@ class SideBar(QWidget):
         - Sends a request to get all data keys.
         """
         logger.debug("Add New Series clicked.")
-        request = {"operation": "add_new_series"}
+        request = {"operation": OperationType.ADD_NEW_SERIES}
         self.to_main_window_signal.emit(request)
 
     def open_add_series_dialog(self, df_copies):
@@ -232,7 +233,7 @@ class SideBar(QWidget):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.model_based_root.removeRow(self.active_series_item.row())
-                self.to_main_window_signal.emit({"operation": "delete_series", "series_name": series_name})
+                self.to_main_window_signal.emit({"operation": OperationType.DELETE_SERIES, "series_name": series_name})
                 logger.info(f"Series deleted: {series_name}")
                 self.active_series_item = None
         else:

@@ -1,6 +1,8 @@
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
+from src.core.operation_enums import OperationType
+
 
 class AddSeriesDialog(QDialog):
     """Dialog for adding a new series name."""
@@ -58,7 +60,7 @@ class EaSubBar(QWidget):
                 self.add_series(series_name)
 
     def on_merge_dialog_button_pushed(self):
-        request = {"target": "calculations_data", "operation": "get_full_data"}
+        request = {"target": "calculations_data", "operation": OperationType.GET_FULL_DATA}
         self.create_series_signal.emit(request)
 
     def add_series(self, series_name):

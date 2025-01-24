@@ -8,6 +8,7 @@ from PyQt6.QtCore import pyqtSignal
 
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
 
 
 class CalculationsData(BaseSlots):
@@ -115,7 +116,7 @@ class CalculationsData(BaseSlots):
         actor = params.get("actor")
         logger.debug(f"{self.actor_name} processing request '{operation}' from '{actor}'")
 
-        if operation == "get_value":
+        if operation == OperationType.GET_VALUE:
             path_keys = params.get("path_keys", [])
             if not isinstance(path_keys, list) or any(not isinstance(k, str) for k in path_keys):
                 logger.error("Invalid path_keys provided for get_value.")
@@ -123,7 +124,7 @@ class CalculationsData(BaseSlots):
             else:
                 params["data"] = self.get_value(path_keys)
 
-        elif operation == "set_value":
+        elif operation == OperationType.SET_VALUE:
             path_keys = params.get("path_keys", [])
             value = params.get("value")
             if not isinstance(path_keys, list) or any(not isinstance(k, str) for k in path_keys):
@@ -133,7 +134,7 @@ class CalculationsData(BaseSlots):
                 self.set_value(path_keys, value)
                 params["data"] = True
 
-        elif operation == "remove_value":
+        elif operation == OperationType.REMOVE_VALUE:
             path_keys = params.get("path_keys", [])
             if not isinstance(path_keys, list) or any(not isinstance(k, str) for k in path_keys):
                 logger.error("Invalid path_keys provided for remove_value.")
@@ -142,7 +143,7 @@ class CalculationsData(BaseSlots):
                 self.remove_value(path_keys)
                 params["data"] = True
 
-        elif operation == "import_reactions":
+        elif operation == OperationType.IMPORT_REACTIONS:
             load_file_name = params.get("import_file_name")
             file_name = params.get("file_name")
             if isinstance(load_file_name, str) and isinstance(file_name, str):
@@ -151,7 +152,7 @@ class CalculationsData(BaseSlots):
                 logger.error("Invalid import file name or target file name provided.")
                 params["data"] = None
 
-        elif operation == "get_full_data":
+        elif operation == OperationType.GET_FULL_DATA:
             params["data"] = self._data.copy()
 
         else:

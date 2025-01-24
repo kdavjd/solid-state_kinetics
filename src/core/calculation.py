@@ -13,6 +13,7 @@ from src.core.calculation_scenarios import SCENARIO_REGISTRY
 from src.core.calculation_thread import CalculationThread
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
 
 
 class Calculations(BaseSlots):
@@ -58,7 +59,7 @@ class Calculations(BaseSlots):
     def process_request(self, params: dict):
         operation = params.get("operation")
         response = params.copy()
-        if operation == "stop_calculation":
+        if operation == OperationType.STOP_CALCULATION:
             response["data"] = self.stop_calculation()
 
         response["target"], response["actor"] = response["actor"], response["target"]
@@ -128,7 +129,7 @@ class Calculations(BaseSlots):
         self.best_mse = float("inf")
         self.best_combination = None
         self.mse_history = []
-        self.handle_request_cycle("main_window", "calculation_finished")
+        self.handle_request_cycle("main_window", OperationType.CALCULATION_FINISHED)
 
     @pyqtSlot(dict)
     def handle_new_best_result(self, result: dict):

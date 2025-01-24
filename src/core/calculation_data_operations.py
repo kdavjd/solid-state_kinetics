@@ -10,12 +10,13 @@ import time
 from itertools import product
 
 import numpy as np
-from core.base_signals import BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
+from src.core.base_signals import BaseSlots
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
 
 
 class CalculationsDataOperations(BaseSlots):
@@ -63,12 +64,12 @@ class CalculationsDataOperations(BaseSlots):
             return
 
         operations = {
-            "add_reaction": self.add_reaction,
-            "remove_reaction": self.remove_reaction,
-            "highlight_reaction": self.highlight_reaction,
-            "update_value": self.update_value,
-            "deconvolution": self.deconvolution,
-            "update_reactions_params": self.update_reactions_params,
+            OperationType.ADD_REACTION: self.add_reaction,
+            OperationType.REMOVE_REACTION: self.remove_reaction,
+            OperationType.HIGHLIGHT_REACTION: self.highlight_reaction,
+            OperationType.UPDATE_VALUE: self.update_value,
+            OperationType.DECONVOLUTION: self.deconvolution,
+            OperationType.UPDATE_REACTIONS_PARAMS: self.update_reactions_params,
         }
 
         if operation in operations:
@@ -76,11 +77,10 @@ class CalculationsDataOperations(BaseSlots):
             logger.debug(f"Processing operation '{operation}' with path_keys: {path_keys}")
             answer = operations[operation](path_keys, params)
 
-            # Perform additional actions after the main operation if needed
             if answer:
-                if operation == "update_value":
+                if operation == OperationType.UPDATE_VALUE:
                     self._protected_plot_update_curves(path_keys, params)
-                if operation == "deconvolution":
+                if operation == OperationType.DECONVOLUTION:
                     self.deconvolution_signal.emit(answer)
 
             # Swap target and actor before emitting the response
@@ -119,7 +119,7 @@ class CalculationsDataOperations(BaseSlots):
         Returns:
             dict: Parsed reaction parameters from the given path keys.
         """
-        reaction_params = self.handle_request_cycle("calculations_data", "get_value", path_keys=path_keys)
+        reaction_params = self.handle_request_cycle("calculations_data", OperationType.GET_VALUE, path_keys=path_keys)
         return cft.parse_reaction_params(reaction_params)
 
     def _plot_reaction_curve(self, file_name, reaction_name, bound_label, params):
@@ -196,13 +196,13 @@ class CalculationsDataOperations(BaseSlots):
         file_name, reaction_name = path_keys
 
         # Check if differential data is available before adding the reaction
-        is_executed = self.handle_request_cycle("file_data", "check_differential", file_name=file_name)
+        is_executed = self.handle_request_cycle("file_data", OperationType.CHECK_DIFFERENTIAL, file_name=file_name)
 
         if is_executed:
-            df = self.handle_request_cycle("file_data", "get_df_data", file_name=file_name)
+            df = self.handle_request_cycle("file_data", OperationType.GET_DF_DATA, file_name=file_name)
             data = cft.generate_default_function_data(df)
             is_exist = self.handle_request_cycle(
-                "calculations_data", "set_value", path_keys=path_keys.copy(), value=data
+                "calculations_data", OperationType.SET_VALUE, path_keys=path_keys.copy(), value=data
             )
             if is_exist:
                 logger.warning(f"Data already exists at path: {path_keys.copy()} - overwriting not performed.")
@@ -229,7 +229,7 @@ class CalculationsDataOperations(BaseSlots):
             logger.error("Insufficient path_keys information to remove reaction.")
             return
         file_name, reaction_name = path_keys
-        is_exist = self.handle_request_cycle("calculations_data", "remove_value", path_keys=path_keys)
+        is_exist = self.handle_request_cycle("calculations_data", OperationType.REMOVE_VALUE, path_keys=path_keys)
         if not is_exist:
             logger.warning(f"Reaction {reaction_name} not found in data.")
             console.log(f"Reaction '{reaction_name}' could not be found for removal.")
@@ -246,7 +246,7 @@ class CalculationsDataOperations(BaseSlots):
             _params (dict): Additional parameters (unused directly).
         """
         file_name = path_keys[0]
-        data = self.handle_request_cycle("calculations_data", "get_value", path_keys=[file_name])
+        data = self.handle_request_cycle("calculations_data", OperationType.GET_VALUE, path_keys=[file_name])
 
         if not data:
             logger.warning(f"No data found for file '{file_name}' when highlighting reaction.")
@@ -316,7 +316,9 @@ class CalculationsDataOperations(BaseSlots):
                 new_keys[new_keys.index(key)] = opposite_key
 
                 # Retrieve the opposite bound's value to compute the average
-                opposite_value = self.handle_request_cycle("calculations_data", "get_value", path_keys=new_keys)
+                opposite_value = self.handle_request_cycle(
+                    "calculations_data", OperationType.GET_VALUE, path_keys=new_keys
+                )
 
                 # Handle potential None or missing data gracefully
                 if opposite_value is None:
@@ -327,7 +329,7 @@ class CalculationsDataOperations(BaseSlots):
                 # Now update to 'coeffs'
                 new_keys[new_keys.index(opposite_key)] = "coeffs"
                 is_exist = self.handle_request_cycle(
-                    "calculations_data", "set_value", path_keys=new_keys, value=average_value
+                    "calculations_data", OperationType.SET_VALUE, path_keys=new_keys, value=average_value
                 )
                 if is_exist:
                     logger.info(f"Data at {new_keys} updated to {average_value}.")
@@ -349,14 +351,14 @@ class CalculationsDataOperations(BaseSlots):
             new_value = params.get("value")
             is_chain = params.get("is_chain", None)
             is_ok = self.handle_request_cycle(
-                "calculations_data", "set_value", path_keys=path_keys.copy(), value=new_value
+                "calculations_data", OperationType.SET_VALUE, path_keys=path_keys.copy(), value=new_value
             )
             if is_ok:
                 logger.debug(f"Data at {path_keys} updated to {new_value}.")
                 if not is_chain:
                     # Update coeffs to keep consistency if bounds changed
                     self._update_coeffs_value(path_keys.copy(), new_value)
-                    return {"operation": "update_value", "data": None}
+                    return {"operation": OperationType.UPDATE_VALUE, "data": None}
             else:
                 logger.error(f"No data found at {path_keys} for updating.")
         except ValueError as e:
@@ -385,7 +387,7 @@ class CalculationsDataOperations(BaseSlots):
         if not reaction_chosen_functions:
             raise ValueError("chosen_functions is None or empty")
 
-        functions_data = self.handle_request_cycle("calculations_data", "get_value", path_keys=[file_name])
+        functions_data = self.handle_request_cycle("calculations_data", OperationType.GET_VALUE, path_keys=[file_name])
         if not functions_data:
             raise ValueError(f"No functions data found for file: {file_name}")
 
@@ -412,7 +414,7 @@ class CalculationsDataOperations(BaseSlots):
             bounds.extend(filtered_pairs)
             num_coefficients[reaction_name] = len(function_vars)
 
-        df = self.handle_request_cycle("file_data", "get_df_data", file_name=file_name)
+        df = self.handle_request_cycle("file_data", OperationType.GET_DF_DATA, file_name=file_name)
         self.reaction_variables = reaction_variables.copy()
         self.reaction_chosen_functions = reaction_chosen_functions.copy()
 

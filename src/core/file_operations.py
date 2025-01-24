@@ -2,6 +2,7 @@ import pandas as pd
 from core.base_signals import BaseSlots
 
 from src.core.logger_config import logger
+from src.core.operation_enums import OperationType
 
 
 class ActiveFileOperations(BaseSlots):
@@ -14,7 +15,7 @@ class ActiveFileOperations(BaseSlots):
         logger.debug(f"{self.actor_name} processing request '{operation}' from '{actor}'")
         response = params.copy()
 
-        if operation == "differential":
+        if operation == OperationType.DIFFERENTIAL:
             response["data"] = self.diff_function
         if operation == "load":
             pass

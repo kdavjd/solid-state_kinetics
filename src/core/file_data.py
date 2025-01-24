@@ -1,3 +1,4 @@
+import enum
 import os
 from functools import wraps
 from io import StringIO
@@ -9,6 +10,7 @@ from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
 
 
 def detect_encoding(func):
@@ -129,7 +131,7 @@ class FileData(BaseSlots):
         self.operations_history[file_name].append({"params": params})
         logger.debug(f"Updated operations history: {self.operations_history}")
 
-    def check_operation_executed(self, file_name: str, operation: str) -> bool:
+    def check_operation_executed(self, file_name: str, operation: enum) -> bool:
         if file_name in self.operations_history:
             for operation_record in self.operations_history[file_name]:
                 if operation_record["params"]["operation"] == operation:
@@ -295,9 +297,7 @@ class FileData(BaseSlots):
             The key identifying the dataframe copy to plot.
         """
         if key in self.dataframe_copies:
-            # Handle request to plot using the dispatcher.
-            # This might involve complex logic, so we rely on another system (handle_request_cycle).
-            _ = self.handle_request_cycle("main_window", "plot_df", df=self.dataframe_copies[key])
+            _ = self.handle_request_cycle("main_window", OperationType.PLOT_DF, df=self.dataframe_copies[key])
             console.log(f"\n\nPlotting the DataFrame with key: {key}")
         else:
             logger.error(f"Key '{key}' not found in dataframe_copies.")
@@ -397,30 +397,29 @@ class FileData(BaseSlots):
             console.log("\n\nError: 'file_name' must be specified for the requested operation.")
             return
 
-        # Perform operation based on the request.
-        if operation == "differential":
-            if not self.check_operation_executed(file_name, "differential"):
+        if operation == OperationType.DIFFERENTIAL:
+            if not self.check_operation_executed(file_name, OperationType.DIFFERENTIAL):
                 self.modify_data(func, params)
             else:
                 console.log("\n\nThe data has already been transformed (differential operation).")
             params["data"] = True
 
-        elif operation == "check_differential":
-            params["data"] = self.check_operation_executed(file_name, "differential")
+        elif operation == OperationType.CHECK_DIFFERENTIAL:
+            params["data"] = self.check_operation_executed(file_name, OperationType.DIFFERENTIAL)
 
-        elif operation == "get_df_data":
+        elif operation == OperationType.GET_DF_DATA:
             params["data"] = self.dataframe_copies.get(file_name)
             if params["data"] is None:
                 console.log(f"\n\nNo data found for file '{file_name}'.")
 
-        elif operation == "get_all_data":
+        elif operation == OperationType.GET_ALL_DATA:
             params["data"] = self.dataframe_copies
 
-        elif operation == "reset_file_data":
+        elif operation == OperationType.RESET_FILE_DATA:
             self.reset_dataframe_copy(file_name)
             params["data"] = True
 
-        elif operation == "load_file":
+        elif operation == OperationType.LOAD_FILE:
             # Here we assume the request 'file_name' actually contains the tuple
             # (file_path, delimiter, skip_rows, columns_names).
             # This is part of the communication protocol outside the class scope.

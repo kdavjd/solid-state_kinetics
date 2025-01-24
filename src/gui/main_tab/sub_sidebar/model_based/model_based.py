@@ -15,14 +15,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.core.operation_enums import OperationType
 from src.gui.main_tab.sub_sidebar.model_based.models_scheme import ModelsScheme
 
 
 class ReactionTable(QTableWidget):
     def __init__(self, parent=None):
-        """
-        В таблице теперь 4 столбца (Parameter, Value, Min, Max) и 3 строки (Ea, log(A), contribution).
-        """
         super().__init__(3, 4, parent)
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max"])
         self.setColumnHidden(2, True)
@@ -80,8 +78,7 @@ class ReactionTable(QTableWidget):
             self.contribution_max_item.setText(str(contrib_max))
 
     def update_table(self, reaction_data: dict):
-        # Value
-        self.activation_energy_edit.setText(str(reaction_data.get("activation_energy", 120000)))
+        self.activation_energy_edit.setText(str(reaction_data.get("Ea", 120000)))
         self.log_a_edit.setText(str(reaction_data.get("log_A", 8)))
         self.contribution_edit.setText(str(reaction_data.get("contribution", 0.5)))
 
@@ -114,12 +111,12 @@ class ModelBasedTab(QWidget):
         self.reaction_type_combo = QComboBox()
         self.reaction_type_combo.addItems(["F1", "F2", "F3"])
 
+        self.reactions_combo = QComboBox()
+        main_layout.addWidget(self.reactions_combo)
+
         reaction_type_layout.addWidget(reaction_type_label)
         reaction_type_layout.addWidget(self.reaction_type_combo)
         main_layout.addLayout(reaction_type_layout)
-
-        self.reactions_combo = QComboBox()
-        main_layout.addWidget(self.reactions_combo)
 
         self.reaction_table = ReactionTable()
         main_layout.addWidget(self.reaction_table)
@@ -166,7 +163,7 @@ class ModelBasedTab(QWidget):
 
         self.simulation_started.emit(
             {
-                "operation": "model_based_calculation",
+                "operation": OperationType.MODEL_BASED_CALCULATION,
                 "scheme": scheme,
             }
         )

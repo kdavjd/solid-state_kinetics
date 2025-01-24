@@ -4,6 +4,7 @@ from typing import Dict
 
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
+from src.core.operation_enums import OperationType
 
 
 class BestResultStrategy(ABC):
@@ -79,10 +80,10 @@ class DeconvolutionStrategy(BestResultStrategy):
             console.log(f"\nReaction combination: {best_combination}")
             console.log(parameters_yaml.rstrip())
 
-            file_name = self.calculation.handle_request_cycle("main_window", "get_file_name")
+            file_name = self.calculation.handle_request_cycle("main_window", OperationType.GET_FILE_NAME)
             self.calculation.handle_request_cycle(
                 "calculations_data_operations",
-                "update_reactions_params",
+                OperationType.UPDATE_REACTIONS_PARAMS,
                 path_keys=[file_name],
                 best_combination=best_combination,
                 reactions_params=params,
