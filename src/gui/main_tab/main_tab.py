@@ -69,6 +69,7 @@ class MainTab(QWidget):
             self.to_main_window
         )
         self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_stopped.connect(self.to_main_window)
+        self.sub_sidebar.model_based.models_scene.scheme_change_signal.connect(self.to_main_window)
         self.sub_sidebar.model_based.simulation_started.connect(self.to_main_window)
 
     def initialize_sizes(self):

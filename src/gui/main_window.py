@@ -102,6 +102,7 @@ class MainWindow(QMainWindow):
             OperationType.ADD_NEW_SERIES: self._handle_add_new_series,
             OperationType.DELETE_SERIES: self._handle_delete_series,
             OperationType.MODEL_BASED_CALCULATION: self._handle_model_based_calculation,
+            OperationType.SCHEME_CHANGE: self._handle_scheme_change,
         }
 
         handler = operation_handlers.get(operation)
@@ -109,6 +110,11 @@ class MainWindow(QMainWindow):
             handler(params)
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")
+
+    def _handle_scheme_change(self, params: dict):
+        is_ok = self.handle_request_cycle("series_data", OperationType.SCHEME_CHANGE, **params)
+        if not is_ok:
+            logger.error("Failed to update scheme in series_data")
 
     def _handle_differential(self, params):
         params["function"] = self.handle_request_cycle("active_file_operations", OperationType.DIFFERENTIAL)
@@ -174,7 +180,6 @@ class MainWindow(QMainWindow):
         df_with_rates = {}
         for file_name, heating_rate in selected_files:
             df = df_copies[file_name].copy()
-
             other_col = None
             for col in df.columns:
                 if col.lower() != "temperature":
@@ -182,8 +187,10 @@ class MainWindow(QMainWindow):
 
             rate_col_name = str(heating_rate)
             if rate_col_name in df_with_rates:
-                logger.error(f"Duplicate heating rate '{heating_rate}' for file '{file_name}'.\
-                    Each heating rate must be unique.")
+                logger.error(
+                    f"Duplicate heating rate '{heating_rate}' for file '{file_name}'. "
+                    "Each heating rate must be unique."
+                )
                 continue
 
             df.rename(columns={other_col: rate_col_name}, inplace=True)
@@ -197,10 +204,11 @@ class MainWindow(QMainWindow):
 
         self.main_tab.plot_canvas.plot_data_from_dataframe(merged_df)
 
-        series_data = {"experimental_data": merged_df, "reaction_scheme": None}
-
         is_ok = self.handle_request_cycle(
-            "calculations_data", OperationType.SET_VALUE, path_keys=["series", series_name], value=series_data
+            "series_data",
+            OperationType.ADD_NEW_SERIES,
+            data=merged_df,
+            name=series_name,
         )
 
         if is_ok:

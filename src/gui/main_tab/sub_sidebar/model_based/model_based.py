@@ -147,9 +147,9 @@ class ModelBasedTab(QWidget):
     def update_reactions_combo_box(self):
         self.reactions_combo.clear()
         scheme = self.models_scene.get_reaction_scheme_as_json()
-        for edge in scheme["edges"]:
-            parent_letter = edge["from"]
-            child_letter = edge["to"]
+        for reaction in scheme["reactions"]:
+            parent_letter = reaction["from"]
+            child_letter = reaction["to"]
             label = f"{parent_letter} -> {child_letter}"
             self.reactions_combo.addItem(label)
 

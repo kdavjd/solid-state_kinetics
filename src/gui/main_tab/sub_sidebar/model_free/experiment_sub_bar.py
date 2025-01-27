@@ -26,21 +26,17 @@ class SmoothingBlock(QWidget):
         # Initialize smoothing method selection
         self.smoothing_method = QComboBox()
         self.smoothing_method.addItems(["Savitzky-Golay", "Other"])
-        logger.debug("Initialized smoothing_method ComboBox with items.")
 
         # Initialize window size and polynomial order inputs
         self.n_window = QLineEdit("1")
         self.n_poly = QLineEdit("0")
-        logger.debug("Initialized n_window and n_poly QLineEdits with default values.")
 
         # Initialize specific settings selection
         self.spec_settings = QComboBox()
         self.spec_settings.addItems(["Nearest", "Other"])
-        logger.debug("Initialized spec_settings ComboBox with items.")
 
         # Initialize apply button
         self.apply_button = QPushButton("apply")
-        logger.debug("Initialized apply_button with label 'Apply'.")
 
         # Layout for smoothing method
         layout = QVBoxLayout()
@@ -69,7 +65,6 @@ class SmoothingBlock(QWidget):
         layout.addWidget(self.apply_button)
 
         self.layout().addLayout(layout)
-        logger.debug("SmoothingBlock UI initialized successfully.")
 
 
 class BackgroundSubtractionBlock(QWidget):
@@ -96,16 +91,13 @@ class BackgroundSubtractionBlock(QWidget):
                 "Bezier",
             ]
         )
-        logger.debug("Initialized background_method ComboBox with items.")
 
         # Initialize range inputs
         self.range_left = QLineEdit()
         self.range_right = QLineEdit()
-        logger.debug("Initialized range_left and range_right QLineEdits.")
 
         # Initialize apply button
         self.apply_button = QPushButton("apply")
-        logger.debug("Initialized apply_button with label 'Apply'.")
 
         # Layout for background subtraction method
         layout = QVBoxLayout()
@@ -131,7 +123,6 @@ class BackgroundSubtractionBlock(QWidget):
 
         layout.addWidget(self.apply_button)
         self.layout().addLayout(layout)
-        logger.debug("BackgroundSubtractionBlock UI initialized successfully.")
 
 
 class ActionButtonsBlock(QWidget):
@@ -151,30 +142,25 @@ class ActionButtonsBlock(QWidget):
         # Initialize action buttons
         self.cancel_changes_button = QPushButton("reset changes")
         self.derivative_button = QPushButton("to da/dT")
-        logger.debug("Initialized cancel_changes_button and derivative_button.")
 
         # Connect buttons to their respective slots with logging
         self.cancel_changes_button.clicked.connect(self.emit_cancel_changes_signal)
         self.derivative_button.clicked.connect(self.emit_derivative_signal)
-        logger.debug("Connected buttons to their respective signal emitters.")
 
         # Add buttons to layout
         self.layout().addWidget(self.derivative_button)
         self.layout().addWidget(self.cancel_changes_button)
-        logger.debug("ActionButtonsBlock UI initialized successfully.")
 
     def emit_cancel_changes_signal(self):
         """
         Emit the cancel_changes_clicked signal with the reset operation.
         """
-        logger.debug("Cancel Changes button clicked. Emitting cancel_changes_clicked signal.")
         self.cancel_changes_clicked.emit({"operation": OperationType.RESET_FILE_DATA})
 
     def emit_derivative_signal(self):
         """
         Emit the derivative_clicked signal with the differential operation.
         """
-        logger.debug("Derivative button clicked. Emitting derivative_clicked signal.")
         self.derivative_clicked.emit({"operation": OperationType.DIFFERENTIAL})
 
 
@@ -187,27 +173,22 @@ class ExperimentSubBar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
-        logger.debug("ExperimentSubBar initialized successfully.")
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        logger.debug("Set up main vertical layout with top alignment.")
 
         # Initialize sub-components
         self.smoothing_block = SmoothingBlock(self)
         self.background_subtraction_block = BackgroundSubtractionBlock(self)
         self.action_buttons_block = ActionButtonsBlock(self)
-        logger.debug("Initialized SmoothingBlock, BackgroundSubtractionBlock, and ActionButtonsBlock.")
 
         # Add sub-components to the main layout
         layout.addWidget(self.smoothing_block)
         layout.addWidget(self.background_subtraction_block)
         layout.addWidget(self.action_buttons_block)
-        logger.debug("Added sub-components to the main layout.")
 
         self.updateGeometry()
-        logger.debug("Updated geometry after initializing UI components.")
 
     def resizeEvent(self, event):
         """

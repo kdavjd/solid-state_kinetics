@@ -1,6 +1,6 @@
 import string
 
-from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QPen, QPolygonF
 from PyQt6.QtWidgets import (
     QGraphicsRectItem,
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.core.logger_config import logger
+from src.core.operation_enums import OperationType
 
 
 class DiagramConfig:
@@ -268,6 +269,8 @@ class ReactionArrow:
 
 
 class ModelsScheme(QWidget):
+    scheme_change_signal = pyqtSignal(dict)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         logger.debug("ModelsScheme: __init__ start")
@@ -351,6 +354,7 @@ class ModelsScheme(QWidget):
         self.children_map.setdefault(parent_letter, []).append(new_id)
         self.rename_all_nodes()
         self.update_scene()
+        self.emit_scheme_change_signal()
 
     def on_connect_to_child(self, parent_letter):
         logger.debug(f"on_connect_to_child called with parent_letter={parent_letter}")
@@ -370,6 +374,7 @@ class ModelsScheme(QWidget):
                 self.children_map[parent_letter].append(child)
             self.rename_all_nodes()
             self.update_scene()
+            self.emit_scheme_change_signal()
 
     def on_delete_reaction_context(self, letter):
         logger.debug(f"on_delete_reaction_context called with letter={letter}")
@@ -386,6 +391,7 @@ class ModelsScheme(QWidget):
             self.remove_reaction(letter)
             self.rename_all_nodes()
             self.update_scene()
+            self.emit_scheme_change_signal()
 
     def remove_reaction(self, letter):
         """
@@ -479,7 +485,6 @@ class ModelsScheme(QWidget):
         """
         Updates the QGraphicsScene by clearing it and redrawing all nodes and arrows.
         """
-        logger.debug("update_scene: start")
         self.scene.clear()
         self.arrows.clear()
 
@@ -500,7 +505,6 @@ class ModelsScheme(QWidget):
         self.view.setScene(self.scene)
         self.view.setRenderHint(self.view.renderHints() | self.view.renderHints().Antialiasing)
         self.scene.update()
-        logger.debug("update_scene: end")
 
     def get_reaction_scheme_as_json(self):
         """
@@ -509,20 +513,24 @@ class ModelsScheme(QWidget):
         logger.debug("get_reaction_scheme_as_json called")
         nodes = []
         for letter, node in self.reactions.items():
-            nodes.append({"id": letter, "x": node.x, "y": node.y})
+            nodes.append({"id": letter})
         edges = []
         for parent, children in self.children_map.items():
             for child in children:
                 edges.append({"from": parent, "to": child})
-        scheme = {"nodes": nodes, "edges": edges}
+        scheme = {"components": nodes, "reactions": edges}
         return scheme
+
+    def emit_scheme_change_signal(self):
+        scheme = self.get_reaction_scheme_as_json()
+        data = {"reaction_scheme": scheme, "operation": OperationType.SCHEME_CHANGE}
+        self.scheme_change_signal.emit(data)
 
     def rename_all_nodes(self):
         """
         Renames all nodes in a breadth-first manner from the root to avoid duplicates.
         If there are more than 26 nodes, IDs after 'Z' remain temporary.
         """
-        logger.debug("rename_all_nodes: start")
         if not self.reactions:
             logger.debug("rename_all_nodes: no nodes in reactions, exit")
             return
@@ -541,7 +549,6 @@ class ModelsScheme(QWidget):
 
         # 4) Apply the new naming to children_map, reactions, generation_map
         self._apply_renaming(old_to_new)
-        logger.debug("rename_all_nodes: end")
 
     def _get_root_nodes(self):
         """
