@@ -400,8 +400,8 @@ class ModelsScheme(QWidget):
         :param letter: Label of the node to remove
         """
         logger.debug(f"remove_reaction called with letter={letter}")
-        if letter == "A":
-            QMessageBox.warning(self, "Error", "Component 'A' cannot be deleted.")
+        if letter in ["A", "B"]:
+            QMessageBox.warning(self, "Error", "Components 'A' and 'B' cannot be deleted.")
             return
 
         # 1) Remove all descendants recursively

@@ -50,7 +50,6 @@ class ReactionTable(QTableWidget):
         self.setCellWidget(2, 1, self.contribution_edit)
         self.contribution_min_item = QTableWidgetItem("")
         self.setItem(2, 2, self.contribution_min_item)
-        self.setItem(2, 3, QTableWidgetItem(""))
         self.contribution_max_item = QTableWidgetItem("")
         self.setItem(2, 3, self.contribution_max_item)
 
@@ -78,6 +77,22 @@ class ReactionTable(QTableWidget):
             self.contribution_max_item.setText(str(contrib_max))
 
     def update_table(self, reaction_data: dict):
+        """
+        Заполняет таблицу параметров реакциями.
+        Если reaction_data пустое, таблица очищается.
+        """
+        if not reaction_data:
+            self.activation_energy_edit.setText("")
+            self.log_a_edit.setText("")
+            self.contribution_edit.setText("")
+            self.ea_min_item.setText("")
+            self.ea_max_item.setText("")
+            self.log_a_min_item.setText("")
+            self.log_a_max_item.setText("")
+            self.contribution_min_item.setText("")
+            self.contribution_max_item.setText("")
+            return
+
         self.activation_energy_edit.setText(str(reaction_data.get("Ea", 120000)))
         self.log_a_edit.setText(str(reaction_data.get("log_A", 8)))
         self.contribution_edit.setText(str(reaction_data.get("contribution", 0.5)))
@@ -104,16 +119,19 @@ class ModelBasedTab(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._scheme_data = {}
+        self._reactions_list = []
+
         main_layout = QVBoxLayout(self)
         self.setLayout(main_layout)
+
+        self.reactions_combo = QComboBox()
+        main_layout.addWidget(self.reactions_combo)
 
         reaction_type_layout = QHBoxLayout()
         reaction_type_label = QLabel("Reaction type:")
         self.reaction_type_combo = QComboBox()
         self.reaction_type_combo.addItems(["F1", "F2", "F3"])
-
-        self.reactions_combo = QComboBox()
-        main_layout.addWidget(self.reactions_combo)
 
         reaction_type_layout.addWidget(reaction_type_label)
         reaction_type_layout.addWidget(self.reaction_type_combo)
@@ -140,33 +158,17 @@ class ModelBasedTab(QWidget):
 
         start_button.clicked.connect(self.start_simulation)
 
-        self.update_reactions_combo_box()
-
         self.reaction_table.activation_energy_edit.editingFinished.connect(self._on_params_changed)
         self.reaction_table.log_a_edit.editingFinished.connect(self._on_params_changed)
         self.reaction_table.contribution_edit.editingFinished.connect(self._on_params_changed)
         self.reaction_type_combo.currentIndexChanged.connect(self._on_params_changed)
+        self.reactions_combo.currentIndexChanged.connect(self._on_reactions_combo_changed)
 
     def on_show_range_checkbox_changed(self, state: int):
         self.reaction_table.set_ranges_visible(bool(state))
 
-    def update_reactions_combo_box(self):
-        self.reactions_combo.clear()
-        scheme = self.models_scene.get_reaction_scheme_as_json()
-        for reaction in scheme["reactions"]:
-            parent_letter = reaction["from"]
-            child_letter = reaction["to"]
-            label = f"{parent_letter} -> {child_letter}"
-            self.reactions_combo.addItem(label)
-
-    def update_reaction_table(self, reaction_data: dict):
-        self.reaction_table.update_table(reaction_data)
-
     def start_simulation(self):
         scheme = self.models_scene.get_reaction_scheme_as_json()
-
-        # scheme["selected_reaction_type"] = self.reaction_type_combo.currentText()
-
         self.simulation_started.emit(
             {
                 "operation": OperationType.MODEL_BASED_CALCULATION,
@@ -174,8 +176,69 @@ class ModelBasedTab(QWidget):
             }
         )
 
+    def load_scheme_data(self, scheme_data: dict):
+        old_from, old_to = None, None
+        if self.reactions_combo.count() > 0:
+            current_label = self.reactions_combo.currentText()
+            if "->" in current_label:
+                parts = current_label.split("->")
+                old_from, old_to = parts[0].strip(), parts[1].strip()
+
+        self._scheme_data = scheme_data
+        self._reactions_list = scheme_data.get("reactions", [])
+
+        self.reactions_combo.clear()
+        reaction_map = {}  # label -> (index, reaction_data)
+        for i, reaction in enumerate(self._reactions_list):
+            label = f"{reaction.get('from', '?')} -> {reaction.get('to', '?')}"
+            self.reactions_combo.addItem(label)
+            reaction_map[label] = (i, reaction)
+
+        new_index = None
+        if old_from and old_to:
+            old_label = f"{old_from} -> {old_to}"
+            if old_label in reaction_map:
+                new_index = reaction_map[old_label][0]
+
+        default_label = "A -> B"
+        if new_index is None and default_label in reaction_map:
+            new_index = reaction_map[default_label][0]
+
+        if new_index is None and len(self._reactions_list) > 0:
+            new_index = 0
+
+        if new_index is not None:
+            self.reactions_combo.setCurrentIndex(new_index)
+            self._on_reactions_combo_changed(new_index)
+        else:
+            self.reaction_table.update_table({})
+
+    def _on_reactions_combo_changed(self, index: int):
+        if 0 <= index < len(self._reactions_list):
+            reaction_data = self._reactions_list[index]
+            self.reaction_table.update_table(reaction_data)
+
+            new_reaction_type = reaction_data.get("reaction_type", "F1")
+            current_reaction_type = self.reaction_type_combo.currentText()
+
+            if new_reaction_type != current_reaction_type:
+                # to avoid recursuion problem, block signals
+                was_blocked = self.reaction_type_combo.blockSignals(True)
+                self.reaction_type_combo.setCurrentText(new_reaction_type)
+                self.reaction_type_combo.blockSignals(was_blocked)
+        else:
+            self.reaction_table.update_table({})
+
     @pyqtSlot()
     def _on_params_changed(self):
+        current_index = self.reactions_combo.currentIndex()
+        if not (0 <= current_index < len(self._reactions_list)):
+            return
+
+        from_comp = self._reactions_list[current_index].get("from")
+        to_comp = self._reactions_list[current_index].get("to")
+        reaction_type = self.reaction_type_combo.currentText()
+
         try:
             ea_val = float(self.reaction_table.activation_energy_edit.text())
         except ValueError:
@@ -191,31 +254,17 @@ class ModelBasedTab(QWidget):
         except ValueError:
             contrib_val = 0.5
 
-        reaction_type = self.reaction_type_combo.currentText()
+        new_scheme = self._scheme_data.copy()
 
-        current_label = self.reactions_combo.currentText()
-        from_comp, to_comp = None, None
-        if "->" in current_label:
-            parts = current_label.split("->")
-            from_comp = parts[0].strip()
-            to_comp = parts[1].strip()
+        for r in new_scheme.get("reactions", []):
+            if r.get("from") == from_comp and r.get("to") == to_comp:
+                r["reaction_type"] = reaction_type
+                r["Ea"] = ea_val
+                r["log_A"] = loga_val
+                r["contribution"] = contrib_val
+                break
 
-        update_data = {
-            "operation": OperationType.MODEL_PARAMS_CHANGE,
-            "reaction_scheme": {
-                "reactions": [
-                    {
-                        "from": from_comp,
-                        "to": to_comp,
-                        "reaction_type": reaction_type,
-                        "Ea": ea_val,
-                        "log_A": loga_val,
-                        "contribution": contrib_val,
-                    }
-                ]
-            },
-        }
-
+        update_data = {"operation": OperationType.MODEL_PARAMS_CHANGE, "reaction_scheme": new_scheme}
         self.model_params_changed.emit(update_data)
 
 

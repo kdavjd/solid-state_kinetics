@@ -130,15 +130,26 @@ class MainWindow(QMainWindow):
             logger.warning(f"Не удалось получить схему серии '{series_name}' после обновления.")
             return
 
-        self.main_tab.sub_sidebar.model_based.update_reactions_combo_box()
-        if "reactions" in scheme_data and len(scheme_data["reactions"]) > 0:
-            first_reaction = scheme_data["reactions"][0]
-            self.main_tab.sub_sidebar.model_based.update_reaction_table(first_reaction)
+        self.main_tab.sub_sidebar.model_based.load_scheme_data(scheme_data)
 
     def _handle_scheme_change(self, params: dict):
         is_ok = self.handle_request_cycle("series_data", OperationType.SCHEME_CHANGE, **params)
         if not is_ok:
             logger.error("Failed to update scheme in series_data")
+
+        series_name = params.get("series_name")
+        if not series_name:
+            logger.error("No series_name provided for SCHEME_CHANGE")
+            return
+
+        scheme_data = self.handle_request_cycle(
+            "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="scheme"
+        )
+        if not scheme_data:
+            logger.warning(f"Не удалось получить схему для серии '{series_name}'")
+            return
+
+        self.main_tab.sub_sidebar.model_based.load_scheme_data(scheme_data)
 
     def _handle_differential(self, params):
         params["function"] = self.handle_request_cycle("active_file_operations", OperationType.DIFFERENTIAL)
@@ -241,10 +252,7 @@ class MainWindow(QMainWindow):
                 "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="scheme"
             )
             if scheme_data:
-                self.main_tab.sub_sidebar.model_based.update_reactions_combo_box()
-                if "reactions" in scheme_data and len(scheme_data["reactions"]) > 0:
-                    first_reaction = scheme_data["reactions"][0]
-                    self.main_tab.sub_sidebar.model_based.update_reaction_table(first_reaction)
+                self.main_tab.sub_sidebar.model_based.load_scheme_data(scheme_data)
             else:
                 logger.warning("Не удалось получить схему реакций у только что добавленной серии.")
         else:

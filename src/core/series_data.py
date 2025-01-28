@@ -1,7 +1,6 @@
 from typing import Any, Optional
 
-from core.base_signals import BaseSlots
-
+from src.core.base_signals import BaseSlots
 from src.core.logger_config import logger
 from src.core.operation_enums import OperationType
 
@@ -161,7 +160,6 @@ class SeriesData(BaseSlots):
         self._get_default_reaction_params(series_name)
 
         logger.info(f"Updated scheme for series '{series_name}'.")
-        logger.debug(f"{self.series.get(series_name)=}")
         return True
 
     def delete_series(self, series_name: str) -> bool:
