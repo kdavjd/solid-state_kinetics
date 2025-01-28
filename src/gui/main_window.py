@@ -103,6 +103,7 @@ class MainWindow(QMainWindow):
             OperationType.DELETE_SERIES: self._handle_delete_series,
             OperationType.MODEL_BASED_CALCULATION: self._handle_model_based_calculation,
             OperationType.SCHEME_CHANGE: self._handle_scheme_change,
+            OperationType.MODEL_PARAMS_CHANGE: self._handle_model_params_change,
         }
 
         handler = operation_handlers.get(operation)
@@ -110,6 +111,29 @@ class MainWindow(QMainWindow):
             handler(params)
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")
+
+    def _handle_model_params_change(self, params: dict):
+        series_name = params.get("series_name")
+        if not series_name:
+            logger.error("No series_name provided for MODEL_PARAMS_CHANGE")
+            return
+
+        is_ok = self.handle_request_cycle("series_data", OperationType.SCHEME_CHANGE, **params)
+        if not is_ok:
+            logger.error("Failed to update scheme in series_data for MODEL_PARAMS_CHANGE")
+            return
+
+        scheme_data = self.handle_request_cycle(
+            "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="scheme"
+        )
+        if not scheme_data:
+            logger.warning(f"Не удалось получить схему серии '{series_name}' после обновления.")
+            return
+
+        self.main_tab.sub_sidebar.model_based.update_reactions_combo_box()
+        if "reactions" in scheme_data and len(scheme_data["reactions"]) > 0:
+            first_reaction = scheme_data["reactions"][0]
+            self.main_tab.sub_sidebar.model_based.update_reaction_table(first_reaction)
 
     def _handle_scheme_change(self, params: dict):
         is_ok = self.handle_request_cycle("series_data", OperationType.SCHEME_CHANGE, **params)
@@ -213,6 +237,16 @@ class MainWindow(QMainWindow):
 
         if is_ok:
             self.main_tab.sidebar.add_series(series_name)
+            scheme_data = self.handle_request_cycle(
+                "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="scheme"
+            )
+            if scheme_data:
+                self.main_tab.sub_sidebar.model_based.update_reactions_combo_box()
+                if "reactions" in scheme_data and len(scheme_data["reactions"]) > 0:
+                    first_reaction = scheme_data["reactions"][0]
+                    self.main_tab.sub_sidebar.model_based.update_reaction_table(first_reaction)
+            else:
+                logger.warning("Не удалось получить схему реакций у только что добавленной серии.")
         else:
             logger.error(f"Не удалось добавить серию: {series_name}")
 

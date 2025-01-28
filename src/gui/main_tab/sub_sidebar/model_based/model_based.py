@@ -1,4 +1,4 @@
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -100,6 +100,7 @@ class ReactionTable(QTableWidget):
 
 class ModelBasedTab(QWidget):
     simulation_started = pyqtSignal(dict)
+    model_params_changed = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -141,6 +142,11 @@ class ModelBasedTab(QWidget):
 
         self.update_reactions_combo_box()
 
+        self.reaction_table.activation_energy_edit.editingFinished.connect(self._on_params_changed)
+        self.reaction_table.log_a_edit.editingFinished.connect(self._on_params_changed)
+        self.reaction_table.contribution_edit.editingFinished.connect(self._on_params_changed)
+        self.reaction_type_combo.currentIndexChanged.connect(self._on_params_changed)
+
     def on_show_range_checkbox_changed(self, state: int):
         self.reaction_table.set_ranges_visible(bool(state))
 
@@ -167,6 +173,50 @@ class ModelBasedTab(QWidget):
                 "scheme": scheme,
             }
         )
+
+    @pyqtSlot()
+    def _on_params_changed(self):
+        try:
+            ea_val = float(self.reaction_table.activation_energy_edit.text())
+        except ValueError:
+            ea_val = 120000
+
+        try:
+            loga_val = float(self.reaction_table.log_a_edit.text())
+        except ValueError:
+            loga_val = 8
+
+        try:
+            contrib_val = float(self.reaction_table.contribution_edit.text())
+        except ValueError:
+            contrib_val = 0.5
+
+        reaction_type = self.reaction_type_combo.currentText()
+
+        current_label = self.reactions_combo.currentText()
+        from_comp, to_comp = None, None
+        if "->" in current_label:
+            parts = current_label.split("->")
+            from_comp = parts[0].strip()
+            to_comp = parts[1].strip()
+
+        update_data = {
+            "operation": OperationType.MODEL_PARAMS_CHANGE,
+            "reaction_scheme": {
+                "reactions": [
+                    {
+                        "from": from_comp,
+                        "to": to_comp,
+                        "reaction_type": reaction_type,
+                        "Ea": ea_val,
+                        "log_A": loga_val,
+                        "contribution": contrib_val,
+                    }
+                ]
+            },
+        }
+
+        self.model_params_changed.emit(update_data)
 
 
 class SelectFileDataDialog(QDialog):

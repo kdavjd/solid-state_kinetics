@@ -32,3 +32,4 @@ class OperationType(Enum):
     GET_ALL_DATA = "get_all_data"
     LOAD_FILE = "load_file"
     SCHEME_CHANGE = "scheme_change"
+    MODEL_PARAMS_CHANGE = "MODEL_PARAMS_CHANGE"

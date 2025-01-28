@@ -187,7 +187,7 @@ class SeriesData(BaseSlots):
         return True
 
     def get_series(self, series_name: str, info_type: str = "experimental"):
-        series_entry = self.series.get(series_name)
+        series_entry: dict = self.series.get(series_name)
         if not series_entry:
             return None
 
