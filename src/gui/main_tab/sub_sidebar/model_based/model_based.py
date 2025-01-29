@@ -320,7 +320,6 @@ class ModelBasedTab(QWidget):
         if dialog.exec():
             de_params, updated_reactions = dialog.get_data()
 
-            # Обновляем _reactions_list
             self._reactions_list = updated_reactions
 
             if self._scheme_data and "reactions" in self._scheme_data:
@@ -336,7 +335,6 @@ class ModelBasedTab(QWidget):
 
             QMessageBox.information(self, "Settings Saved", "The settings have been updated successfully.")
         else:
-            # Cancel button clicked, do nothing
             pass
 
 
@@ -441,16 +439,36 @@ class CalculationSettingsDialog(QDialog):
         left_widget.setLayout(left_layout)
         main_layout.addWidget(left_widget)
 
-        de_group = QGroupBox("Differential Evolution Settings")
-        de_layout = QFormLayout()
-        de_group.setLayout(de_layout)
-        left_layout.addWidget(de_group, stretch=0)
+        method_label = QLabel("Calculation method:")
+        self.calculation_method_combo = QComboBox()
+        self.calculation_method_combo.addItems(["differential_evolution", "another_method"])
+        self.calculation_method_combo.setCurrentText("differential_evolution")
+        self.calculation_method_combo.currentTextChanged.connect(self.update_method_parameters)
+        left_layout.addWidget(method_label)
+        left_layout.addWidget(self.calculation_method_combo)
+
+        self.de_group = QGroupBox("Differential Evolution Settings")
+        self.de_layout = QFormLayout()
+        self.de_group.setLayout(self.de_layout)
+        left_layout.addWidget(self.de_group, stretch=0)
 
         for param_name, default_value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
             label = QLabel(param_name)
-            edit = QLineEdit(str(default_value if default_value is not None else "None"))
-            de_layout.addRow(label, edit)
-            self.de_params_edits[param_name] = edit
+            label.setToolTip(self.get_tooltip_for_parameter(param_name))
+
+            if isinstance(default_value, bool):
+                edit_widget = QCheckBox()
+                edit_widget.setChecked(default_value)
+            elif param_name in ["strategy", "init", "updating"]:
+                edit_widget = QComboBox()
+                edit_widget.addItems(self.get_options_for_parameter(param_name))
+                edit_widget.setCurrentText(str(default_value))
+            else:
+                text_val = str(default_value) if default_value is not None else "None"
+                edit_widget = QLineEdit(text_val)
+
+            self.de_params_edits[param_name] = edit_widget
+            self.de_layout.addRow(label, edit_widget)
 
         left_layout.addStretch(1)
 
@@ -496,7 +514,7 @@ class CalculationSettingsDialog(QDialog):
             box_layout.addWidget(top_line_widget)
 
             table = QTableWidget(3, 2, self)
-            table.setHorizontalHeaderLabels(["from", "to"])
+            table.setHorizontalHeaderLabels(["Min", "Max"])
             table.setVerticalHeaderLabels(["Ea", "log(A)", "contribution"])
             table.setEditTriggers(QAbstractItemView.EditTrigger.AllEditTriggers)
             table.verticalHeader().setVisible(True)
@@ -508,13 +526,11 @@ class CalculationSettingsDialog(QDialog):
             table.setItem(0, 0, QTableWidgetItem(ea_min))
             table.setItem(0, 1, QTableWidgetItem(ea_max))
 
-            # log(A)
             log_a_min = str(reaction.get("log_A_min", 0.1))
             log_a_max = str(reaction.get("log_A_max", 100))
             table.setItem(1, 0, QTableWidgetItem(log_a_min))
             table.setItem(1, 1, QTableWidgetItem(log_a_max))
 
-            # contribution
             contrib_min = str(reaction.get("contribution_min", 0.01))
             contrib_max = str(reaction.get("contribution_max", 1.0))
             table.setItem(2, 0, QTableWidgetItem(contrib_min))
@@ -529,22 +545,42 @@ class CalculationSettingsDialog(QDialog):
         main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         right_layout.addWidget(btn_box)
 
-    def get_data(self):
-        de_params = {}
-        for param_name, edit in self.de_params_edits.items():
-            text = edit.text().strip()
-            if text.lower() == "none":
-                value = None
-            else:
-                # Пробуем интерпретировать как float или int, если подходит
-                try:
-                    if "." in text:
-                        value = float(text)
-                    else:
-                        value = int(text)
-                except ValueError:
-                    value = text
-            de_params[param_name] = value
+        self.update_method_parameters()
+
+    def update_method_parameters(self):
+        selected_method = self.calculation_method_combo.currentText()
+        if selected_method == "differential_evolution":
+            self.de_group.setVisible(True)
+        else:
+            self.de_group.setVisible(False)
+
+    def get_data(self):  # noqa: C901
+        selected_method = self.calculation_method_combo.currentText()
+        errors = []
+        method_params = {}
+
+        if selected_method == "differential_evolution":
+            for key, widget in self.de_params_edits.items():
+                if isinstance(widget, QCheckBox):
+                    value = widget.isChecked()
+                elif isinstance(widget, QComboBox):
+                    value = widget.currentText()
+                else:
+                    text = widget.text().strip()
+                    default_value = DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
+                    value = self.convert_to_type(text, default_value)
+
+                is_valid, error_msg = self.validate_parameter(key, value)
+                if not is_valid:
+                    errors.append(f"Parameter '{key}': {error_msg}")
+                method_params[key] = value
+
+        elif selected_method == "another_method":
+            method_params = {"info": "No additional params set for another_method"}
+
+        if errors:
+            QMessageBox.warning(self, "Invalid DE parameters", "\n".join(errors))
+            return None, None
 
         updated_reactions = []
         for (combo_type, table, label_reaction), old_reaction in zip(self.reaction_boxes, self.reactions_data):
@@ -573,19 +609,128 @@ class CalculationSettingsDialog(QDialog):
 
             updated_reactions.append(new_r)
 
-        return de_params, updated_reactions
+        return {"method": selected_method, "parameters": method_params}, updated_reactions
 
     def accept(self):
-        try:
-            popsize = float(self.de_params_edits["popsize"].text())
-            maxiter = float(self.de_params_edits["maxiter"].text())
-            if popsize <= 0 or maxiter <= 0:
-                QMessageBox.warning(self, "Invalid parameters", "popsize и maxiter должны быть > 0.")
+        data_result, reactions = self.get_data()
+        if data_result is None or reactions is None:
+            return
+
+        if data_result["method"] == "differential_evolution":
+            params = data_result["parameters"]
+            try:
+                popsize_val = float(params.get("popsize", 15))
+                maxiter_val = float(params.get("maxiter", 1000))
+                if popsize_val <= 0 or maxiter_val <= 0:
+                    QMessageBox.warning(self, "Invalid parameters", "popsize и maxiter должны быть > 0.")
+                    return
+            except Exception:
+                QMessageBox.warning(self, "Invalid parameters", "Не удалось прочитать popsize/maxiter корректно.")
                 return
-        except Exception:
-            pass
 
         super().accept()
+
+    def convert_to_type(self, text, default_value):
+        if text.lower() == "none":
+            return None
+
+        try:
+            if isinstance(default_value, int):
+                return int(text)
+            elif isinstance(default_value, float):
+                return float(text)
+            elif isinstance(default_value, tuple):
+                values = text.strip("() ").split(",")
+                return tuple(float(v.strip()) for v in values)
+            elif isinstance(default_value, str):
+                return text
+            elif default_value is None:
+                if "." in text:
+                    return float(text)
+                else:
+                    return int(text)
+            else:
+                return text
+        except (ValueError, TypeError):
+            return default_value
+
+    def validate_parameter(self, key, value):  # noqa: C901
+        try:
+            if key == "strategy":
+                strategies = self.get_options_for_parameter("strategy")
+                if value not in strategies:
+                    return False, f"Invalid strategy. Choose from {strategies}."
+            elif key == "maxiter":
+                if not isinstance(value, int) or value < 1:
+                    return False, "Must be an integer >= 1."
+            elif key == "popsize":
+                if not isinstance(value, int) or value < 1:
+                    return False, "Must be an integer >= 1."
+            elif key == "tol":
+                if not isinstance(value, (int, float)) or value < 0:
+                    return False, "Must be a non-negative number."
+            elif key == "mutation":
+                if isinstance(value, tuple):
+                    if len(value) != 2 or not all(0 <= v <= 2 for v in value):
+                        return False, "Must be a tuple of two numbers in [0, 2]."
+                elif isinstance(value, (int, float)):
+                    if not 0 <= value <= 2:
+                        return False, "Must be in [0, 2]."
+                else:
+                    return False, "Invalid format."
+            elif key == "recombination":
+                if not isinstance(value, (int, float)) or not 0 <= value <= 1:
+                    return False, "Must be in [0, 1]."
+            elif key == "seed":
+                if not (isinstance(value, int) or value is None):
+                    return False, "Must be an integer or None."
+            elif key == "atol":
+                if not isinstance(value, (int, float)) or value < 0:
+                    return False, "Must be a non-negative number."
+            elif key == "updating":
+                options = self.get_options_for_parameter("updating")
+                if value not in options:
+                    return False, f"Must be one of {options}."
+            elif key == "workers":
+                # The code currently does not support parallel processes other than 1.
+                if not isinstance(value, int) or value < 1 or value > 1:
+                    return False, "Must be an integer = 1. Parallel processing is not supported."
+            return True, ""
+        except Exception as e:
+            return False, f"Error validating parameter: {str(e)}"
+
+    def get_tooltip_for_parameter(self, param_name):
+        tooltips = {
+            "strategy": "The strategy for differential evolution.",
+            "maxiter": "Maximum number of iterations. Must be >= 1.",
+            "popsize": "Population size. Must be >= 1.",
+            "tol": "Tolerance. Must be non-negative.",
+            "mutation": "Mutation factor in [0, 2] or tuple of two values.",
+            "recombination": "Recombination factor in [0, 1].",
+            "workers": "Number of processes. Must be 1.",
+        }
+        return tooltips.get(param_name, "")
+
+    def get_options_for_parameter(self, param_name):
+        options = {
+            "strategy": [
+                "best1bin",
+                "best1exp",
+                "rand1exp",
+                "randtobest1exp",
+                "currenttobest1exp",
+                "best2exp",
+                "rand2exp",
+                "randtobest1bin",
+                "currenttobest1bin",
+                "best2bin",
+                "rand2bin",
+                "rand1bin",
+            ],
+            "init": ["latinhypercube", "random"],
+            "updating": ["immediate", "deferred"],
+        }
+        return options.get(param_name, [])
 
 
 DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
