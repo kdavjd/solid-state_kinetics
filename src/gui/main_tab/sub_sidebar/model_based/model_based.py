@@ -1,8 +1,13 @@
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -140,17 +145,18 @@ class ModelBasedTab(QWidget):
 
         bottom_layout = QVBoxLayout()
         buttons_layout = QHBoxLayout()
-        settings_button = QPushButton("Settings")
-        start_button = QPushButton("Start")
-        buttons_layout.addWidget(settings_button)
-        buttons_layout.addWidget(start_button)
+        self.settings_button = QPushButton("Settings")
+        self.start_button = QPushButton("Start")
+        buttons_layout.addWidget(self.settings_button)
+        self.settings_button.clicked.connect(self.open_settings)
+        buttons_layout.addWidget(self.start_button)
 
         self.models_scene = ModelsScheme(self)
         bottom_layout.addLayout(buttons_layout)
         bottom_layout.addWidget(self.models_scene)
         main_layout.addLayout(bottom_layout)
 
-        start_button.clicked.connect(self.start_simulation)
+        self.start_button.clicked.connect(self.start_simulation)
 
         self.reaction_table.activation_energy_edit.editingFinished.connect(self._on_params_changed)
         self.reaction_table.log_a_edit.editingFinished.connect(self._on_params_changed)
@@ -305,47 +311,33 @@ class ModelBasedTab(QWidget):
         update_data = {"operation": OperationType.MODEL_PARAMS_CHANGE, "reaction_scheme": new_scheme}
         self.model_params_changed.emit(update_data)
 
-    # def open_settings(self):
-    #     # Составляем словарь с реакциями и привязанными к ним QComboBox'ами (или другими виджетами)
-    #     reactions = {}
-    #     ...
+    def open_settings(self):
+        if not self._reactions_list:
+            QMessageBox.information(self, "No Reactions", "There are no available reactions to configure.")
+            return
 
-    #     # Создаём и показываем диалог
-    #     dialog = CalculationSettingsDialog(
-    #         reactions,
-    #         self
-    #     )
-    #     if dialog.exec():
-    #         selected_functions, selected_method, deconvolution_parameters = dialog.get_selected_functions()
+        dialog = CalculationSettingsDialog(self._reactions_list, parent=self)
+        if dialog.exec():
+            de_params, updated_reactions = dialog.get_data()
 
-    #         # Проверяем, что для каждой реакции выбрана хотя бы одна функция
-    #         empty_keys = [key for key, value in selected_functions.items() if not value]
-    #         if empty_keys:
-    #             QMessageBox.warning(
-    #                 self,
-    #                 "unselected functions",
-    #                 f"{', '.join(empty_keys)} must be described by at least one function.",
-    #             )
-    #             # Если какие-то реакции остались без функций, заново откроем настройки
-    #             self.open_settings()
-    #             return
+            # Обновляем _reactions_list
+            self._reactions_list = updated_reactions
 
-    #         # Сохраняем выбранные пользователем настройки
-    #         self.calculation_settings[self.active_file] = selected_functions
-    #         self.deconvolution_settings[self.active_file] = {
-    #             "method": selected_method,
-    #             "method_parameters": deconvolution_parameters,
-    #         }
+            if self._scheme_data and "reactions" in self._scheme_data:
+                for i, r in enumerate(self._scheme_data["reactions"]):
+                    if i < len(updated_reactions):
+                        self._scheme_data["reactions"][i] = updated_reactions[i]
 
-    #         # При желании можно добавить вывод в лог:
-    #         # logger.info(f"Selected functions: {selected_functions}")
-    #         # logger.info(f"Deconvolution settings: {self.deconvolution_settings[self.active_file]}")
+            update_data = {
+                "operation": OperationType.MODEL_PARAMS_CHANGE,
+                "reaction_scheme": self._scheme_data,
+            }
+            self.model_params_changed.emit(update_data)
 
-    #         # И уведомим пользователя
-    #         formatted_functions = "\n".join([f"{key}: {value}" for key, value in selected_functions.items()])
-    #         message = f"    {self.active_file}\n{formatted_functions}"
-
-    #         QMessageBox.information(self, "calculation settings", f"updated for:\n{message}")
+            QMessageBox.information(self, "Settings Saved", "The settings have been updated successfully.")
+        else:
+            # Cancel button clicked, do nothing
+            pass
 
 
 class SelectFileDataDialog(QDialog):
@@ -432,317 +424,169 @@ class SelectFileDataDialog(QDialog):
         return series_name, selected_files
 
 
-# class CalculationSettingsDialog(QDialog):
-#     def __init__(self, reactions, initial_settings, initial_deconvolution_settings, parent=None):
-#         super().__init__(parent)
-#         self.setWindowTitle("Calculation Settings")
+class CalculationSettingsDialog(QDialog):
+    def __init__(self, reactions_data, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Calculation Settings")
 
-#         self.reactions = reactions or []  # На случай, если передадут None
-#         # self.initial_settings = initial_settings
-#         # self.initial_deconvolution_settings = initial_deconvolution_settings
+        self.reactions_data = reactions_data or []
 
-#         self.init_ui()
+        self.de_params_edits = {}
 
-#     def init_ui(self):
-#         main_layout = QVBoxLayout()
-#         self.setLayout(main_layout)
+        main_layout = QHBoxLayout(self)
+        self.setLayout(main_layout)
 
-#         headers = [
-#             "Reaction Type",
-#             "Ea_min",
-#             "Ea_max",
-#             "log_A_min",
-#             "log_A_max",
-#             "contrib_min",
-#             "contrib_max",
-#         ]
-#         table = QTableWidget(len(self.reactions), len(headers))
-#         table.setHorizontalHeaderLabels(headers)
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_widget.setLayout(left_layout)
+        main_layout.addWidget(left_widget)
 
-#         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        de_group = QGroupBox("Differential Evolution Settings")
+        de_layout = QFormLayout()
+        de_group.setLayout(de_layout)
+        left_layout.addWidget(de_group, stretch=0)
 
-#         default_ea_min, default_ea_max = 1000, 2000000
-#         default_logA_min, default_logA_max = 0.1, 100
-#         default_contrib_min, default_contrib_max = 0.01, 1.0
+        for param_name, default_value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
+            label = QLabel(param_name)
+            edit = QLineEdit(str(default_value if default_value is not None else "None"))
+            de_layout.addRow(label, edit)
+            self.de_params_edits[param_name] = edit
 
-#         for row_index, reaction in enumerate(self.reactions):
-#             r_type = reaction.get("reaction_type", "F1")
+        left_layout.addStretch(1)
 
-#             ea_min = reaction.get("Ea_min", default_ea_min)
-#             ea_max = reaction.get("Ea_max", default_ea_max)
-#             log_a_min = reaction.get("log_A_min", default_logA_min)
-#             log_a_max = reaction.get("log_A_max", default_logA_max)
-#             contrib_min = reaction.get("contribution_min", default_contrib_min)
-#             contrib_max = reaction.get("contribution_max", default_contrib_max)
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_widget.setLayout(right_layout)
+        main_layout.addWidget(right_widget, stretch=1)
 
-#             # Добавляем ячейки в таблицу
-#             table.setItem(row_index, 0, QTableWidgetItem(str(r_type)))
-#             table.setItem(row_index, 1, QTableWidgetItem(str(ea_min)))
-#             table.setItem(row_index, 2, QTableWidgetItem(str(ea_max)))
-#             table.setItem(row_index, 3, QTableWidgetItem(str(log_a_min)))
-#             table.setItem(row_index, 4, QTableWidgetItem(str(log_a_max)))
-#             table.setItem(row_index, 5, QTableWidgetItem(str(contrib_min)))
-#             table.setItem(row_index, 6, QTableWidgetItem(str(contrib_max)))
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        right_layout.addWidget(scroll_area)
 
-#         main_layout.addWidget(table)
+        scroll_content = QWidget()
+        scroll_area.setWidget(scroll_content)
 
-#         # Кнопки OK/Cancel - при необходимости
-#         button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-#         button_box.accepted.connect(self.accept)
-#         button_box.rejected.connect(self.reject)
-#         main_layout.addWidget(button_box)
+        self.reactions_grid = QGridLayout(scroll_content)
+        scroll_content.setLayout(self.reactions_grid)
 
-#     def update_method_parameters(self):
-#         """
-#         Update the displayed parameters for the selected deconvolution method.
-#         Clears previous parameters and populates the layout with fields for the current method.
-#         """
-#         while self.method_parameters_layout.count():
-#             item = self.method_parameters_layout.takeAt(0)
-#             widget = item.widget()
-#             if widget is not None:
-#                 widget.deleteLater()
-#         selected_method = self.deconvolution_method_combo.currentText()
-#         if selected_method == "differential_evolution":
-#             self.de_parameters = {}
-#             initial_params = {}
-#             if (
-#                 self.initial_deconvolution_settings
-#                 and self.initial_deconvolution_settings.get("method") == selected_method
-#             ):
-#                 initial_params = self.initial_deconvolution_settings.get("deconvolution_parameters", {})
-#             row = 0
-#             for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
-#                 label = QLabel(key)
-#                 tooltip = self.get_tooltip_for_parameter(key)
-#                 label.setToolTip(tooltip)
-#                 # Choosing widget type based on parameter type
-#                 if isinstance(value, bool):
-#                     field = QCheckBox()
-#                     field.setChecked(initial_params.get(key, value))
-#                     field.setToolTip(tooltip)
-#                 elif key in ["strategy", "init", "updating"]:
-#                     field = QComboBox()
-#                     options = self.get_options_for_parameter(key)
-#                     field.addItems(options)
-#                     field.setCurrentText(initial_params.get(key, value))
-#                     field.setToolTip(tooltip)
-#                 else:
-#                     field = QLineEdit(str(initial_params.get(key, value)))
-#                     field.setToolTip(tooltip)
-#                 self.de_parameters[key] = field
-#                 self.method_parameters_layout.addWidget(label, row, 0)
-#                 self.method_parameters_layout.addWidget(field, row, 1)
-#                 row += 1
-#         elif selected_method == "another_method":
-#             # No parameters defined for this method in this example.
-#             pass
+        self.reaction_boxes = []
 
-#     def get_tooltip_for_parameter(self, param_name):
-#         tooltips = {
-#             "strategy": "The strategy for differential evolution. Choose one of the available options.",
-#             "maxiter": "Maximum number of iterations. An integer >= 1.",
-#             "popsize": "Population size. An integer >= 1.",
-#             "tol": "Relative tolerance for stop criteria. A non-negative number.",
-#             "mutation": "Mutation factor. A number or tuple of two numbers in [0, 2].",
-#             "recombination": "Recombination factor in [0, 1].",
-#             "seed": "Random seed. An integer or None.",
-#             "callback": "Callback function. Leave empty if not required.",
-#             "disp": "Display status during optimization.",
-#             "polish": "Perform a final polish optimization after differential evolution is done.",
-#             "init": "Population initialization method.",
-#             "atol": "Absolute tolerance for stop criteria. A non-negative number.",
-#             "updating": "Population updating mode: immediate or deferred.",
-#             "workers": "Number of processes for parallel computing. Must be 1 here.",
-#             "constraints": "Constraints for the optimization. Leave empty if not required.",
-#         }
-#         return tooltips.get(param_name, "")
+        for i, reaction in enumerate(self.reactions_data):
+            row = i % 2
+            col = i // 2
 
-#     def get_options_for_parameter(self, param_name):
-#         options = {
-#             "strategy": [
-#                 "best1bin",
-#                 "best1exp",
-#                 "rand1exp",
-#                 "randtobest1exp",
-#                 "currenttobest1exp",
-#                 "best2exp",
-#                 "rand2exp",
-#                 "randtobest1bin",
-#                 "currenttobest1bin",
-#                 "best2bin",
-#                 "rand2bin",
-#                 "rand1bin",
-#             ],
-#             "init": ["latinhypercube", "random"],
-#             "updating": ["immediate", "deferred"],
-#         }
-#         return options.get(param_name, [])
+            box_widget = QWidget()
+            box_layout = QVBoxLayout(box_widget)
+            box_widget.setLayout(box_layout)
 
-#     def get_selected_functions(self):
-#         """
-#         Get the selected functions for each reaction and the chosen deconvolution method and parameters.
+            top_line_widget = QWidget()
+            top_line_layout = QHBoxLayout(top_line_widget)
+            top_line_widget.setLayout(top_line_layout)
 
-#         Returns:
-#             tuple: (selected_functions (dict), selected_method (str), deconvolution_parameters (dict))
-#         """
-#         selected_functions = {}
-#         for reaction_name, checkboxes in self.checkboxes.items():
-#             selected_functions[reaction_name] = [cb.text() for cb in checkboxes if cb.isChecked()]
-#         selected_method, deconvolution_parameters = self.get_deconvolution_parameters()
-#         return selected_functions, selected_method, deconvolution_parameters
+            reaction_label = QLabel(f"{reaction.get('from', '?')} -> {reaction.get('to', '?')}")
+            top_line_layout.addWidget(reaction_label)
 
-#     def get_deconvolution_parameters(self):
-#         """
-#         Validate and retrieve deconvolution parameters for the selected method.
+            combo_type = QComboBox()
+            combo_type.addItems(["F1", "F2", "F3"])
+            current_type = reaction.get("reaction_type", "F1")
+            if current_type in ["F1", "F2", "F3"]:
+                combo_type.setCurrentText(current_type)
+            top_line_layout.addWidget(combo_type)
 
-#         Returns:
-#             tuple: (selected_method (str), parameters (dict))
-#         """
-#         selected_method = self.deconvolution_method_combo.currentText()
-#         parameters = {}
-#         errors = []
-#         if selected_method == "differential_evolution":
-#             for key, field in self.de_parameters.items():
-#                 if isinstance(field, QCheckBox):
-#                     parameters[key] = field.isChecked()
-#                 elif isinstance(field, QComboBox):
-#                     parameters[key] = field.currentText()
-#                 else:
-#                     text = field.text()
-#                     default_value = DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
-#                     value = self.convert_to_type(text, default_value)
+            box_layout.addWidget(top_line_widget)
 
-#                     is_valid, error_msg = self.validate_parameter(key, value)
-#                     if not is_valid:
-#                         errors.append(f"Parameter '{key}': {error_msg}")
-#                     parameters[key] = value
-#             if errors:
-#                 error_message = "\n".join(errors)
-#                 QMessageBox.warning(self, "Error entering parameters", error_message)
-#                 return None, None
-#         elif selected_method == "another_method":
-#             parameters = {}
-#         return selected_method, parameters
+            table = QTableWidget(3, 2, self)
+            table.setHorizontalHeaderLabels(["from", "to"])
+            table.setVerticalHeaderLabels(["Ea", "log(A)", "contribution"])
+            table.setEditTriggers(QAbstractItemView.EditTrigger.AllEditTriggers)
+            table.verticalHeader().setVisible(True)
+            table.horizontalHeader().setVisible(True)
+            box_layout.addWidget(table)
 
-#     def convert_to_type(self, text, default_value):
-#         """
-#         Convert text input into the appropriate type based on the default value type.
+            ea_min = str(reaction.get("Ea_min", 1))
+            ea_max = str(reaction.get("Ea_max", 2000))
+            table.setItem(0, 0, QTableWidgetItem(ea_min))
+            table.setItem(0, 1, QTableWidgetItem(ea_max))
 
-#         Args:
-#             text (str): The string to convert.
-#             default_value: The default value to infer type.
+            # log(A)
+            log_a_min = str(reaction.get("log_A_min", 0.1))
+            log_a_max = str(reaction.get("log_A_max", 100))
+            table.setItem(1, 0, QTableWidgetItem(log_a_min))
+            table.setItem(1, 1, QTableWidgetItem(log_a_max))
 
-#         Returns:
-#             Converted value or the default value if conversion fails.
-#         """
-#         try:
-#             if isinstance(default_value, int):
-#                 return int(text)
-#             elif isinstance(default_value, float):
-#                 return float(text)
-#             elif isinstance(default_value, tuple):
-#                 values = text.strip("() ").split(",")
-#                 return tuple(float(v.strip()) for v in values)
-#             elif isinstance(default_value, str):
-#                 return text
-#             elif default_value is None:
-#                 if text == "" or text.lower() == "none":
-#                     return None
-#                 else:
-#                     return text
-#             else:
-#                 return text
-#         except ValueError:
-#             return default_value
+            # contribution
+            contrib_min = str(reaction.get("contribution_min", 0.01))
+            contrib_max = str(reaction.get("contribution_max", 1.0))
+            table.setItem(2, 0, QTableWidgetItem(contrib_min))
+            table.setItem(2, 1, QTableWidgetItem(contrib_max))
 
-#     def validate_parameter(self, key, value):
-#         """
-#         Validate a parameter's value according to differential evolution rules.
+            self.reactions_grid.addWidget(box_widget, row, col)
+            self.reaction_boxes.append((combo_type, table, reaction_label))
 
-#         Args:
-#             key (str): Parameter name.
-#             value: Parameter value.
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btn_box.accepted.connect(self.accept)
+        btn_box.rejected.connect(self.reject)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        right_layout.addWidget(btn_box)
 
-#         Returns:
-#             tuple(bool, str): (Is valid, Error message if not valid)
-#         """
-#         try:
-#             if key == "strategy":
-#                 strategies = self.get_options_for_parameter("strategy")
-#                 if value not in strategies:
-#                     return False, f"Invalid strategy. Choose from {strategies}."
-#             elif key == "maxiter":
-#                 if not isinstance(value, int) or value < 1:
-#                     return False, "Must be an integer >= 1."
-#             elif key == "popsize":
-#                 if not isinstance(value, int) or value < 1:
-#                     return False, "Must be an integer >= 1."
-#             elif key == "tol":
-#                 if not isinstance(value, (int, float)) or value < 0:
-#                     return False, "Must be a non-negative number."
-#             elif key == "mutation":
-#                 if isinstance(value, tuple):
-#                     if len(value) != 2 or not all(0 <= v <= 2 for v in value):
-#                         return False, "Must be a tuple of two numbers in [0, 2]."
-#                 elif isinstance(value, (int, float)):
-#                     if not 0 <= value <= 2:
-#                         return False, "Must be in [0, 2]."
-#                 else:
-#                     return False, "Invalid format."
-#             elif key == "recombination":
-#                 if not isinstance(value, (int, float)) or not 0 <= value <= 1:
-#                     return False, "Must be in [0, 1]."
-#             elif key == "seed":
-#                 if not (isinstance(value, int) or value is None):
-#                     return False, "Must be an integer or None."
-#             elif key == "atol":
-#                 if not isinstance(value, (int, float)) or value < 0:
-#                     return False, "Must be a non-negative number."
-#             elif key == "updating":
-#                 options = self.get_options_for_parameter("updating")
-#                 if value not in options:
-#                     return False, f"Must be one of {options}."
-#             elif key == "workers":
-#                 # The code currently does not support parallel processes other than 1.
-#                 if not isinstance(value, int) or value < 1 or value > 1:
-#                     return False, "Must be an integer = 1. Parallel processing is not supported."
-#             return True, ""
-#         except Exception as e:
-#             return False, f"Error validating parameter: {str(e)}"
+    def get_data(self):
+        de_params = {}
+        for param_name, edit in self.de_params_edits.items():
+            text = edit.text().strip()
+            if text.lower() == "none":
+                value = None
+            else:
+                # Пробуем интерпретировать как float или int, если подходит
+                try:
+                    if "." in text:
+                        value = float(text)
+                    else:
+                        value = int(text)
+                except ValueError:
+                    value = text
+            de_params[param_name] = value
 
-#     def accept(self):
-#         """
-#         Validate settings before closing the dialog.
-#         Ensures each reaction has at least one function selected and parameters are valid.
-#         """
-#         selected_functions = {}
-#         for reaction_name, checkboxes in self.checkboxes.items():
-#             selected = [cb.text() for cb in checkboxes if cb.isChecked()]
-#             if not selected:
-#                 QMessageBox.warning(
-#                     self, "Settings error", f"raction '{reaction_name}' must have at least one function."
-#                 )
-#                 return
-#             selected_functions[reaction_name] = selected
+        updated_reactions = []
+        for (combo_type, table, label_reaction), old_reaction in zip(self.reaction_boxes, self.reactions_data):
+            ea_min_str = table.item(0, 0).text().strip()
+            ea_max_str = table.item(0, 1).text().strip()
+            loga_min_str = table.item(1, 0).text().strip()
+            loga_max_str = table.item(1, 1).text().strip()
+            contrib_min_str = table.item(2, 0).text().strip()
+            contrib_max_str = table.item(2, 1).text().strip()
 
-#         selected_method, deconvolution_parameters = self.get_deconvolution_parameters()
-#         if deconvolution_parameters is None:
-#             # Error in parameters, do not close the dialog
-#             return
-#         self.selected_functions = selected_functions
-#         self.selected_method = selected_method
-#         self.deconvolution_parameters = deconvolution_parameters
-#         super().accept()
+            def safe_cast(s, default):
+                try:
+                    return float(s)
+                except ValueError:
+                    return default
 
-#     def get_results(self):
-#         """
-#         Get the results selected in the dialog.
+            new_r = dict(old_reaction)
+            new_r["reaction_type"] = combo_type.currentText()
 
-#         Returns:
-#             tuple: (selected_functions (dict), selected_method (str), deconvolution_parameters (dict))
-#         """
-#         return self.selected_functions, self.selected_method, self.deconvolution_parameters
+            new_r["Ea_min"] = safe_cast(ea_min_str, old_reaction.get("Ea_min", 1))
+            new_r["Ea_max"] = safe_cast(ea_max_str, old_reaction.get("Ea_max", 2000))
+            new_r["log_A_min"] = safe_cast(loga_min_str, old_reaction.get("log_A_min", 0.1))
+            new_r["log_A_max"] = safe_cast(loga_max_str, old_reaction.get("log_A_max", 100))
+            new_r["contribution_min"] = safe_cast(contrib_min_str, old_reaction.get("contribution_min", 0.01))
+            new_r["contribution_max"] = safe_cast(contrib_max_str, old_reaction.get("contribution_max", 1.0))
+
+            updated_reactions.append(new_r)
+
+        return de_params, updated_reactions
+
+    def accept(self):
+        try:
+            popsize = float(self.de_params_edits["popsize"].text())
+            maxiter = float(self.de_params_edits["maxiter"].text())
+            if popsize <= 0 or maxiter <= 0:
+                QMessageBox.warning(self, "Invalid parameters", "popsize и maxiter должны быть > 0.")
+                return
+        except Exception:
+            pass
+
+        super().accept()
+
 
 DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
     "strategy": "best1bin",
