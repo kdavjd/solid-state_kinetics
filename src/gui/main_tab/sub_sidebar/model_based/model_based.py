@@ -112,8 +112,65 @@ class ReactionTable(QTableWidget):
         )
 
 
-class ModelBasedTab(QWidget):
+class ModelCalcButtons(QWidget):
     simulation_started = pyqtSignal(dict)
+    simulation_stopped = pyqtSignal(dict)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_ref = parent
+        self.is_calculating = False
+
+        layout = QHBoxLayout(self)
+        self.setLayout(layout)
+
+        self.settings_button = QPushButton("Settings")
+        self.start_button = QPushButton("Start")
+        self.stop_button = QPushButton("Stop")
+
+        layout.addWidget(self.settings_button)
+        layout.addWidget(self.start_button)
+        layout.addWidget(self.stop_button)
+
+        self.stop_button.hide()
+
+        self.settings_button.clicked.connect(self.open_settings_dialog)
+        self.start_button.clicked.connect(self.check_and_start_simulation)
+        self.stop_button.clicked.connect(self.stop_simulation)
+
+    def open_settings_dialog(self):
+        if hasattr(self.parent_ref, "open_settings"):
+            self.parent_ref.open_settings()
+
+    def check_and_start_simulation(self):
+        scheme = {}
+        if hasattr(self.parent_ref, "models_scene"):
+            scheme = self.parent_ref.models_scene.get_reaction_scheme_as_json()
+
+        data = {
+            "operation": OperationType.MODEL_BASED_CALCULATION,
+            "scheme": scheme,
+        }
+
+        self.simulation_started.emit(data)
+        self.start_simulation()
+
+    def start_simulation(self):
+        self.is_calculating = True
+        self.layout().replaceWidget(self.start_button, self.stop_button)
+        self.start_button.hide()
+        self.stop_button.show()
+
+    def stop_simulation(self):
+        if self.is_calculating:
+            self.simulation_stopped.emit({"operation": OperationType.STOP_CALCULATION})
+            self.is_calculating = False
+            self.layout().replaceWidget(self.stop_button, self.start_button)
+            self.stop_button.hide()
+            self.start_button.show()
+
+
+class ModelBasedTab(QWidget):
     model_params_changed = pyqtSignal(dict)
 
     def __init__(self, parent=None):
@@ -144,19 +201,13 @@ class ModelBasedTab(QWidget):
         main_layout.addWidget(self.show_range_checkbox)
 
         bottom_layout = QVBoxLayout()
-        buttons_layout = QHBoxLayout()
-        self.settings_button = QPushButton("Settings")
-        self.start_button = QPushButton("Start")
-        buttons_layout.addWidget(self.settings_button)
-        self.settings_button.clicked.connect(self.open_settings)
-        buttons_layout.addWidget(self.start_button)
-
         self.models_scene = ModelsScheme(self)
-        bottom_layout.addLayout(buttons_layout)
         bottom_layout.addWidget(self.models_scene)
-        main_layout.addLayout(bottom_layout)
 
-        self.start_button.clicked.connect(self.start_simulation)
+        self.calc_buttons = ModelCalcButtons(self)
+        bottom_layout.addWidget(self.calc_buttons)
+
+        main_layout.addLayout(bottom_layout)
 
         self.reaction_table.activation_energy_edit.editingFinished.connect(self._on_params_changed)
         self.reaction_table.log_a_edit.editingFinished.connect(self._on_params_changed)
@@ -173,15 +224,6 @@ class ModelBasedTab(QWidget):
 
     def on_show_range_checkbox_changed(self, state: int):
         self.reaction_table.set_ranges_visible(bool(state))
-
-    def start_simulation(self):
-        scheme = self.models_scene.get_reaction_scheme_as_json()
-        self.simulation_started.emit(
-            {
-                "operation": OperationType.MODEL_BASED_CALCULATION,
-                "scheme": scheme,
-            }
-        )
 
     def load_scheme_data(self, scheme_data: dict):
         old_from, old_to = None, None
@@ -229,7 +271,6 @@ class ModelBasedTab(QWidget):
             current_reaction_type = self.reaction_type_combo.currentText()
 
             if new_reaction_type != current_reaction_type:
-                # to avoid recursuion problem, block signals
                 was_blocked = self.reaction_type_combo.blockSignals(True)
                 self.reaction_type_combo.setCurrentText(new_reaction_type)
                 self.reaction_type_combo.blockSignals(was_blocked)
@@ -264,32 +305,32 @@ class ModelBasedTab(QWidget):
         try:
             ea_min_val = float(self.reaction_table.ea_min_item.text())
         except ValueError:
-            ea_min_val = self.reaction_table.default_ranges["Ea"][0]  # 1
+            ea_min_val = self.reaction_table.default_ranges["Ea"][0]
 
         try:
             ea_max_val = float(self.reaction_table.ea_max_item.text())
         except ValueError:
-            ea_max_val = self.reaction_table.default_ranges["Ea"][1]  # 2000
+            ea_max_val = self.reaction_table.default_ranges["Ea"][1]
 
         try:
             loga_min_val = float(self.reaction_table.log_a_min_item.text())
         except ValueError:
-            loga_min_val = self.reaction_table.default_ranges["log_A"][0]  # 0.1
+            loga_min_val = self.reaction_table.default_ranges["log_A"][0]
 
         try:
             loga_max_val = float(self.reaction_table.log_a_max_item.text())
         except ValueError:
-            loga_max_val = self.reaction_table.default_ranges["log_A"][1]  # 100
+            loga_max_val = self.reaction_table.default_ranges["log_A"][1]
 
         try:
             contrib_min_val = float(self.reaction_table.contribution_min_item.text())
         except ValueError:
-            contrib_min_val = self.reaction_table.default_ranges["contribution"][0]  # 0.01
+            contrib_min_val = self.reaction_table.default_ranges["contribution"][0]
 
         try:
             contrib_max_val = float(self.reaction_table.contribution_max_item.text())
         except ValueError:
-            contrib_max_val = self.reaction_table.default_ranges["contribution"][1]  # 1
+            contrib_max_val = self.reaction_table.default_ranges["contribution"][1]
 
         new_scheme = self._scheme_data.copy()
 
@@ -334,8 +375,6 @@ class ModelBasedTab(QWidget):
             self.model_params_changed.emit(update_data)
 
             QMessageBox.information(self, "Settings Saved", "The settings have been updated successfully.")
-        else:
-            pass
 
 
 class SelectFileDataDialog(QDialog):
@@ -378,7 +417,6 @@ class SelectFileDataDialog(QDialog):
         scroll.setWidget(scroll_content)
         layout.addWidget(scroll)
 
-        # Buttons
         button_box = QHBoxLayout()
         self.ok_button = QPushButton("OK")
         self.cancel_button = QPushButton("Cancel")
@@ -388,7 +426,6 @@ class SelectFileDataDialog(QDialog):
 
         self.setLayout(layout)
 
-        # Connect buttons
         self.ok_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
 
