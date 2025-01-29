@@ -75,11 +75,11 @@ class SeriesData(BaseSlots):
     def _get_default_reaction_params(self, series_name: str):
         default_params = {
             "reaction_type": "F1",
-            "Ea": 120000,
+            "Ea": 120,
             "log_A": 8,
             "contribution": 0.5,
-            "Ea_min": 1000,
-            "Ea_max": 2000000,
+            "Ea_min": 1,
+            "Ea_max": 2000,
             "log_A_min": 0.1,
             "log_A_max": 100,
             "contribution_min": 0.01,

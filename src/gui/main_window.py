@@ -1,10 +1,10 @@
 from functools import reduce
 
 import pandas as pd
-from core.base_signals import BaseSignals, BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 
+from src.core.base_signals import BaseSignals, BaseSlots
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
 from src.core.operation_enums import OperationType
@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
         self.signals = signals
         self.actor_name = "main_window"
 
-        self.basic_signals = BaseSlots(actor_name=self.actor_name, signals=self.signals)
+        self.base_slots = BaseSlots(actor_name=self.actor_name, signals=self.signals)
 
         self.signals.register_component(self.actor_name, self.process_request, self.process_response)
 
@@ -75,10 +75,10 @@ class MainWindow(QMainWindow):
     @pyqtSlot(dict)
     def process_response(self, params: dict):
         logger.debug(f"{self.actor_name} received response: {params}")
-        self.basic_signals.process_response(params)
+        self.base_slots.process_response(params)
 
     def handle_request_cycle(self, target: str, operation: str, **kwargs):
-        result = self.basic_signals.handle_request_cycle(target, operation, **kwargs)
+        result = self.base_slots.handle_request_cycle(target, operation, **kwargs)
         logger.debug(f"handle_request_cycle result for '{operation}': {result}")
         return result
 
@@ -254,9 +254,9 @@ class MainWindow(QMainWindow):
             if scheme_data:
                 self.main_tab.sub_sidebar.model_based.load_scheme_data(scheme_data)
             else:
-                logger.warning("Не удалось получить схему реакций у только что добавленной серии.")
+                logger.warning("It was not possible to obtain a reaction diagram for added series.")
         else:
-            logger.error(f"Не удалось добавить серию: {series_name}")
+            logger.error(f"Couldn't add a series: {series_name}")
 
     def _handle_delete_series(self, params):
         is_ok = self.handle_request_cycle("series_data", OperationType.DELETE_SERIES, **params)
