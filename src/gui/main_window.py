@@ -4,10 +4,10 @@ import pandas as pd
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 
+from src.core.app_settings import OperationType
 from src.core.base_signals import BaseSignals, BaseSlots
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.operation_enums import OperationType
 from src.gui.main_tab.main_tab import MainTab
 from src.gui.table_tab.table_tab import TableTab
 

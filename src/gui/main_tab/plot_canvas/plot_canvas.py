@@ -13,9 +13,9 @@ from matplotlib.lines import Line2D
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
+from src.core.app_settings import OperationType
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.operation_enums import OperationType
 from src.gui.main_tab.plot_canvas.anchor_group import HeightAnchorGroup, PositionAnchorGroup
 
 plt.style.use(["science", "no-latex", "nature", "grid"])

@@ -1,7 +1,7 @@
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
-from src.core.operation_enums import OperationType
+from src.core.app_settings import OperationType
 
 
 class AddSeriesDialog(QDialog):

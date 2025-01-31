@@ -9,11 +9,11 @@ from core.calculation_results_strategies import (
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from scipy.optimize import OptimizeResult, differential_evolution
 
+from src.core.app_settings import OperationType
 from src.core.calculation_scenarios import SCENARIO_REGISTRY
 from src.core.calculation_thread import CalculationThread
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.operation_enums import OperationType
 
 
 class Calculations(BaseSlots):

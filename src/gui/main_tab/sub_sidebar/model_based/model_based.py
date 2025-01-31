@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.core.operation_enums import OperationType
+from src.core.app_settings import NUC_MODELS_LIST, OperationType
 from src.gui.main_tab.sub_sidebar.model_based.models_scheme import ModelsScheme
 
 
@@ -189,7 +189,7 @@ class ModelBasedTab(QWidget):
         reaction_type_layout = QHBoxLayout()
         reaction_type_label = QLabel("Reaction type:")
         self.reaction_type_combo = QComboBox()
-        self.reaction_type_combo.addItems(["F1", "F2", "F3"])
+        self.reaction_type_combo.addItems(NUC_MODELS_LIST)
 
         reaction_type_layout.addWidget(reaction_type_label)
         reaction_type_layout.addWidget(self.reaction_type_combo)
@@ -555,9 +555,9 @@ class CalculationSettingsDialog(QDialog):
             top_line_layout.addWidget(reaction_label)
 
             combo_type = QComboBox()
-            combo_type.addItems(["F1", "F2", "F3"])
+            combo_type.addItems(NUC_MODELS_LIST)
             current_type = reaction.get("reaction_type", "F1")
-            if current_type in ["F1", "F2", "F3"]:
+            if current_type in NUC_MODELS_LIST:
                 combo_type.setCurrentText(current_type)
             top_line_layout.addWidget(combo_type)
 

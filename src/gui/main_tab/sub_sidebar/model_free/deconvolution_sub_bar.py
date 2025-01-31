@@ -24,27 +24,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.core.app_settings import MODEL_FREE_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS, OperationType
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.operation_enums import OperationType
-
-DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
-    "strategy": "best1bin",
-    "maxiter": 1000,
-    "popsize": 15,
-    "tol": 0.01,
-    "mutation": (0.5, 1),
-    "recombination": 0.7,
-    "seed": None,
-    "callback": None,
-    "disp": False,
-    "polish": True,
-    "init": "latinhypercube",
-    "atol": 0,
-    "updating": "deferred",
-    "workers": 1,
-    "constraints": (),
-}
 
 
 class FileTransferButtons(QWidget):
@@ -450,7 +432,7 @@ class CalculationSettingsDialog(QDialog):
             ):
                 initial_params = self.initial_deconvolution_settings.get("deconvolution_parameters", {})
             row = 0
-            for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
+            for key, value in MODEL_FREE_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
                 label = QLabel(key)
                 tooltip = self.get_tooltip_for_parameter(key)
                 label.setToolTip(tooltip)
@@ -548,7 +530,7 @@ class CalculationSettingsDialog(QDialog):
                     parameters[key] = field.currentText()
                 else:
                     text = field.text()
-                    default_value = DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
+                    default_value = MODEL_FREE_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
                     value = self.convert_to_type(text, default_value)
 
                     is_valid, error_msg = self.validate_parameter(key, value)

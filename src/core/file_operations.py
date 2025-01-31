@@ -1,8 +1,8 @@
 import pandas as pd
 from core.base_signals import BaseSlots
 
+from src.core.app_settings import OperationType
 from src.core.logger_config import logger
-from src.core.operation_enums import OperationType
 
 
 class ActiveFileOperations(BaseSlots):

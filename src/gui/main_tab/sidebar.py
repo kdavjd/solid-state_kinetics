@@ -4,8 +4,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeView, QVBoxLayout, QWidget
 
+from src.core.app_settings import OperationType
 from src.core.logger_config import logger
-from src.core.operation_enums import OperationType
 from src.gui.main_tab.load_file_button import LoadButton
 from src.gui.main_tab.sub_sidebar.model_based.model_based import SelectFileDataDialog
 

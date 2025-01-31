@@ -1,8 +1,8 @@
 from typing import Any, Optional
 
+from src.core.app_settings import MODEL_BASED_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS, OperationType
 from src.core.base_signals import BaseSlots
 from src.core.logger_config import logger
-from src.core.operation_enums import OperationType
 
 
 class SeriesData(BaseSlots):
@@ -127,7 +127,7 @@ class SeriesData(BaseSlots):
             "reaction_scheme": reaction_scheme,
             "calculation_settings": {
                 "method": "differential_evolution",
-                "method_parameters": DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS,
+                "method_parameters": MODEL_BASED_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS,
             },
         }
 
@@ -210,22 +210,3 @@ class SeriesData(BaseSlots):
 
     def get_all_series(self):
         return self.series.copy()
-
-
-DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
-    "strategy": "best1bin",
-    "maxiter": 60,
-    "popsize": 3,
-    "tol": 0.01,
-    "mutation": (0.5, 1),
-    "recombination": 0.7,
-    "seed": None,
-    "callback": None,
-    "disp": False,
-    "polish": True,
-    "init": "latinhypercube",
-    "atol": 0,
-    "updating": "deferred",
-    "workers": 1,
-    "constraints": (),
-}

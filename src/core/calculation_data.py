@@ -6,9 +6,9 @@ import numpy as np
 from core.base_signals import BaseSlots
 from PyQt6.QtCore import pyqtSignal
 
+from src.core.app_settings import OperationType
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.operation_enums import OperationType
 
 
 class CalculationsData(BaseSlots):

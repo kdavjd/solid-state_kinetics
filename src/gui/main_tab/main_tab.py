@@ -1,8 +1,8 @@
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
+from src.core.app_settings import OperationType
 from src.core.logger_config import logger
-from src.core.operation_enums import OperationType
 from src.gui.console_widget import ConsoleWidget
 from src.gui.main_tab.plot_canvas.plot_canvas import PlotCanvas
 from src.gui.main_tab.sidebar import SideBar

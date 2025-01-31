@@ -8,9 +8,9 @@ import pandas as pd
 from core.base_signals import BaseSlots
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
+from src.core.app_settings import OperationType
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.operation_enums import OperationType
 
 
 def detect_encoding(func):

@@ -12,11 +12,11 @@ from itertools import product
 import numpy as np
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
+from src.core.app_settings import OperationType
 from src.core.base_signals import BaseSlots
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
-from src.core.operation_enums import OperationType
 
 
 class CalculationsDataOperations(BaseSlots):

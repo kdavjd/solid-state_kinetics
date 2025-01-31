@@ -9,8 +9,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.core.app_settings import OperationType
 from src.core.logger_config import logger
-from src.core.operation_enums import OperationType
 
 
 class SmoothingBlock(QWidget):
