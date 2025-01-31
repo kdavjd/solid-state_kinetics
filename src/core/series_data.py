@@ -52,7 +52,8 @@ class SeriesData(BaseSlots):
         def handle_scheme_change(p: dict, r: dict):
             series_name = p.get("series_name")
             new_scheme = p.get("reaction_scheme", {})
-            success = self.update_series(series_name, new_scheme)
+            new_calculation_settings = p.get("calculation_settings", {})
+            success = self.update_series(series_name, new_scheme, new_calculation_settings)
             r["data"] = success
 
         operations_map = {
@@ -121,13 +122,20 @@ class SeriesData(BaseSlots):
             ],
         }
 
-        self.series[name] = {"experimental_data": data, "reaction_scheme": reaction_scheme}
+        self.series[name] = {
+            "experimental_data": data,
+            "reaction_scheme": reaction_scheme,
+            "calculation_settings": {
+                "method": "differential_evolution",
+                "method_parameters": DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS,
+            },
+        }
 
         self._get_default_reaction_params(name)
 
         return True, name
 
-    def update_series(self, series_name: str, new_scheme: dict) -> bool:
+    def update_series(self, series_name: str, new_scheme: dict, new_settings: dict) -> bool:
         series_entry = self.series.get(series_name)
         if not series_entry:
             logger.error(f"Series '{series_name}' not found; cannot update scheme.")
@@ -156,6 +164,7 @@ class SeriesData(BaseSlots):
 
         old_scheme["reactions"] = updated_reactions
         series_entry["reaction_scheme"] = old_scheme
+        series_entry["calculation_settings"] = new_settings
 
         self._get_default_reaction_params(series_name)
 
@@ -201,3 +210,22 @@ class SeriesData(BaseSlots):
 
     def get_all_series(self):
         return self.series.copy()
+
+
+DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
+    "strategy": "best1bin",
+    "maxiter": 60,
+    "popsize": 3,
+    "tol": 0.01,
+    "mutation": (0.5, 1),
+    "recombination": 0.7,
+    "seed": None,
+    "callback": None,
+    "disp": False,
+    "polish": True,
+    "init": "latinhypercube",
+    "atol": 0,
+    "updating": "deferred",
+    "workers": 1,
+    "constraints": (),
+}

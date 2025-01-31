@@ -123,14 +123,15 @@ class MainWindow(QMainWindow):
             logger.error("Failed to update scheme in series_data for MODEL_PARAMS_CHANGE")
             return
 
-        scheme_data = self.handle_request_cycle(
-            "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="scheme"
+        series_entry = self.handle_request_cycle(
+            "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
         )
-        if not scheme_data:
+        if not series_entry["reaction_scheme"]:
             logger.warning(f"Не удалось получить схему серии '{series_name}' после обновления.")
             return
 
-        self.main_tab.sub_sidebar.model_based.load_scheme_data(scheme_data)
+        self.main_tab.sub_sidebar.model_based.load_scheme_data(series_entry["reaction_scheme"])
+        self.main_tab.sub_sidebar.model_based.load_calculation_settings(series_entry["calculation_settings"])
 
     def _handle_scheme_change(self, params: dict):
         is_ok = self.handle_request_cycle("series_data", OperationType.SCHEME_CHANGE, **params)
@@ -248,11 +249,12 @@ class MainWindow(QMainWindow):
 
         if is_ok:
             self.main_tab.sidebar.add_series(series_name)
-            scheme_data = self.handle_request_cycle(
-                "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="scheme"
+            series_entry = self.handle_request_cycle(
+                "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
             )
-            if scheme_data:
-                self.main_tab.sub_sidebar.model_based.load_scheme_data(scheme_data)
+            if series_entry["reaction_scheme"]:
+                self.main_tab.sub_sidebar.model_based.load_scheme_data(series_entry["reaction_scheme"])
+                self.main_tab.sub_sidebar.model_based.load_calculation_settings(series_entry["calculation_settings"])
             else:
                 logger.warning("It was not possible to obtain a reaction diagram for added series.")
         else:

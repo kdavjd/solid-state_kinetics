@@ -177,6 +177,8 @@ class ModelBasedTab(QWidget):
         super().__init__(parent)
         self._scheme_data = {}
         self._reactions_list = []
+        self._calculation_method = None
+        self._calculation_method_params = None
 
         main_layout = QVBoxLayout(self)
         self.setLayout(main_layout)
@@ -261,6 +263,10 @@ class ModelBasedTab(QWidget):
             self._on_reactions_combo_changed(new_index)
         else:
             self.reaction_table.update_table({})
+
+    def load_calculation_settings(self, calculation_settings: dict):
+        self._calculation_method = calculation_settings.get("method")
+        self._calculation_method_params = calculation_settings.get("method_parameters")
 
     def _on_reactions_combo_changed(self, index: int):
         if 0 <= index < len(self._reactions_list):
@@ -357,9 +363,11 @@ class ModelBasedTab(QWidget):
             QMessageBox.information(self, "No Reactions", "There are no available reactions to configure.")
             return
 
-        dialog = CalculationSettingsDialog(self._reactions_list, parent=self)
+        dialog = CalculationSettingsDialog(
+            self._reactions_list, self._calculation_method, self._calculation_method_params, parent=self
+        )
         if dialog.exec():
-            de_params, updated_reactions = dialog.get_data()
+            new_calculation_settings, updated_reactions = dialog.get_data()
 
             self._reactions_list = updated_reactions
 
@@ -371,6 +379,7 @@ class ModelBasedTab(QWidget):
             update_data = {
                 "operation": OperationType.MODEL_PARAMS_CHANGE,
                 "reaction_scheme": self._scheme_data,
+                "calculation_settings": new_calculation_settings,
             }
             self.model_params_changed.emit(update_data)
 
@@ -460,8 +469,12 @@ class SelectFileDataDialog(QDialog):
 
 
 class CalculationSettingsDialog(QDialog):
-    def __init__(self, reactions_data, parent=None):
+    def __init__(
+        self, reactions_data: list[dict], calculation_method: str, calculation_method_params: dict, parent=None
+    ):
         super().__init__(parent)
+        self.calculation_method = calculation_method
+        self.calculation_method_params = calculation_method_params
         self.setWindowTitle("Calculation Settings")
 
         self.reactions_data = reactions_data or []
@@ -489,7 +502,7 @@ class CalculationSettingsDialog(QDialog):
         self.de_group.setLayout(self.de_layout)
         left_layout.addWidget(self.de_group, stretch=0)
 
-        for param_name, default_value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
+        for param_name, default_value in self.calculation_method_params.items():
             label = QLabel(param_name)
             label.setToolTip(self.get_tooltip_for_parameter(param_name))
 
@@ -556,6 +569,16 @@ class CalculationSettingsDialog(QDialog):
             table.setEditTriggers(QAbstractItemView.EditTrigger.AllEditTriggers)
             table.verticalHeader().setVisible(True)
             table.horizontalHeader().setVisible(True)
+            table.setStyleSheet("""
+                QTableWidget::item:selected {
+                    background-color: lightgray;
+                    color: black;
+                }
+                QTableWidget::item:focus {
+                    background-color: lightgray;
+                    color: black;
+                }
+            """)
             box_layout.addWidget(table)
 
             ea_min = str(reaction.get("Ea_min", 1))
@@ -604,7 +627,7 @@ class CalculationSettingsDialog(QDialog):
                     value = widget.currentText()
                 else:
                     text = widget.text().strip()
-                    default_value = DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
+                    default_value = self.calculation_method_params[key]
                     value = self.convert_to_type(text, default_value)
 
                 is_valid, error_msg = self.validate_parameter(key, value)
@@ -646,24 +669,12 @@ class CalculationSettingsDialog(QDialog):
 
             updated_reactions.append(new_r)
 
-        return {"method": selected_method, "parameters": method_params}, updated_reactions
+        return {"method": selected_method, "method_parameters": method_params}, updated_reactions
 
     def accept(self):
         data_result, reactions = self.get_data()
         if data_result is None or reactions is None:
             return
-
-        if data_result["method"] == "differential_evolution":
-            params = data_result["parameters"]
-            try:
-                popsize_val = float(params.get("popsize", 15))
-                maxiter_val = float(params.get("maxiter", 1000))
-                if popsize_val <= 0 or maxiter_val <= 0:
-                    QMessageBox.warning(self, "Invalid parameters", "popsize и maxiter должны быть > 0.")
-                    return
-            except Exception:
-                QMessageBox.warning(self, "Invalid parameters", "Не удалось прочитать popsize/maxiter корректно.")
-                return
 
         super().accept()
 
