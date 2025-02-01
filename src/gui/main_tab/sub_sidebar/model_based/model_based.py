@@ -392,7 +392,8 @@ class SelectFileDataDialog(QDialog):
         self.setWindowTitle("Select Files for Series")
         self.selected_files = []
         self.checkboxes = []
-        self.line_edits = []
+        self.rate_line_edits = []
+        self.mass_line_edits = []
 
         layout = QVBoxLayout()
 
@@ -408,19 +409,27 @@ class SelectFileDataDialog(QDialog):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout()
 
+        # Для каждого файла создаём чекбокс,
+        # поля для ввода скорости нагрева и массы
         for file_name in df_copies.keys():
             file_layout = QHBoxLayout()
 
             checkbox = QCheckBox(file_name)
-            line_edit = QLineEdit()
-            line_edit.setPlaceholderText("Enter heating rate")
+
+            rate_line_edit = QLineEdit()
+            rate_line_edit.setPlaceholderText("Enter heating rate")
+
+            mass_line_edit = QLineEdit()
+            mass_line_edit.setPlaceholderText("Enter mass")
 
             file_layout.addWidget(checkbox)
-            file_layout.addWidget(line_edit)
+            file_layout.addWidget(rate_line_edit)
+            file_layout.addWidget(mass_line_edit)
             scroll_layout.addLayout(file_layout)
 
             self.checkboxes.append(checkbox)
-            self.line_edits.append(line_edit)
+            self.rate_line_edits.append(rate_line_edit)
+            self.mass_line_edits.append(mass_line_edit)
 
         scroll_content.setLayout(scroll_layout)
         scroll.setWidget(scroll_content)
@@ -445,25 +454,38 @@ class SelectFileDataDialog(QDialog):
             return None, []
 
         selected_files = []
-        for checkbox, line_edit in zip(self.checkboxes, self.line_edits):
+        for checkbox, rate_line_edit, mass_line_edit in zip(
+            self.checkboxes, self.rate_line_edits, self.mass_line_edits
+        ):
             if checkbox.isChecked():
-                rate_text = line_edit.text().strip()
+                rate_text = rate_line_edit.text().strip()
+                mass_text = mass_line_edit.text().strip()
 
                 if not rate_text:
                     QMessageBox.warning(self, "Invalid Input", f"Please enter a heating rate for '{checkbox.text()}'")
                     return None, []
 
+                if not mass_text:
+                    QMessageBox.warning(self, "Invalid Input", f"Please enter a mass for '{checkbox.text()}'")
+                    return None, []
+
                 try:
-                    heating_rate = int(rate_text)
+                    heating_rate = float(rate_text)
                 except ValueError:
                     QMessageBox.warning(
-                        self,
-                        "Invalid Input",
-                        f"Please enter a valid integer heating rate for '{checkbox.text()}'",
+                        self, "Invalid Input", f"Please enter a valid number heating rate for '{checkbox.text()}'"
                     )
                     return None, []
-                else:
-                    selected_files.append((checkbox.text(), heating_rate))
+
+                try:
+                    mass = float(mass_text)
+                except ValueError:
+                    QMessageBox.warning(
+                        self, "Invalid Input", f"Please enter a valid number mass for '{checkbox.text()}'"
+                    )
+                    return None, []
+
+                selected_files.append((checkbox.text(), heating_rate, mass))
 
         return series_name, selected_files
 
@@ -779,22 +801,3 @@ class CalculationSettingsDialog(QDialog):
             "updating": ["immediate", "deferred"],
         }
         return options.get(param_name, [])
-
-
-DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
-    "strategy": "best1bin",
-    "maxiter": 1000,
-    "popsize": 15,
-    "tol": 0.01,
-    "mutation": (0.5, 1),
-    "recombination": 0.7,
-    "seed": None,
-    "callback": None,
-    "disp": False,
-    "polish": True,
-    "init": "latinhypercube",
-    "atol": 0,
-    "updating": "deferred",
-    "workers": 1,
-    "constraints": (),
-}

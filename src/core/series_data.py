@@ -26,7 +26,12 @@ class SeriesData(BaseSlots):
         def handle_add_new_series(p: dict, r: dict) -> None:
             data = p.get("data")
             name = p.get("name")
-            success, assigned_name = self.add_series(data=data, name=name)
+            masses = p.get("experimental_masses")
+            success, assigned_name = self.add_series(
+                data=data,
+                experimentl_masses=masses,
+                name=name,
+            )
             r["data"] = success
 
         def handle_delete_series(p: dict, r: dict) -> None:
@@ -102,7 +107,12 @@ class SeriesData(BaseSlots):
 
         self.series[series_name]["reaction_scheme"] = reaction_scheme
 
-    def add_series(self, data: Any, name: Optional[str] = None):
+    def add_series(
+        self,
+        data: Any,
+        experimentl_masses: list[float],
+        name: Optional[str] = None,
+    ):
         if name is None:
             name = f"Series {self.default_name_counter}"
             self.default_name_counter += 1
@@ -128,6 +138,7 @@ class SeriesData(BaseSlots):
             "calculation_settings": {
                 "method": "differential_evolution",
                 "method_parameters": MODEL_BASED_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS,
+                "experimental_masses": experimentl_masses,
             },
         }
 

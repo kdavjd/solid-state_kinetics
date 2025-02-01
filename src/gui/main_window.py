@@ -214,7 +214,9 @@ class MainWindow(QMainWindow):
             return
 
         df_with_rates = {}
-        for file_name, heating_rate in selected_files:
+        experimental_masses = []
+        for file_name, heating_rate, mass in selected_files:
+            experimental_masses.append(mass)
             df = df_copies[file_name].copy()
             other_col = None
             for col in df.columns:
@@ -243,6 +245,7 @@ class MainWindow(QMainWindow):
         is_ok = self.handle_request_cycle(
             "series_data",
             OperationType.ADD_NEW_SERIES,
+            experimental_masses=experimental_masses,
             data=merged_df,
             name=series_name,
         )
