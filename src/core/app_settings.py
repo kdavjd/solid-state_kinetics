@@ -34,7 +34,8 @@ class OperationType(Enum):
     GET_ALL_DATA = "get_all_data"
     LOAD_FILE = "load_file"
     SCHEME_CHANGE = "scheme_change"
-    MODEL_PARAMS_CHANGE = "MODEL_PARAMS_CHANGE"
+    MODEL_PARAMS_CHANGE = "model_params_change"
+    SELECT_SERIES = "select_series"
 
 
 MODEL_BASED_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {

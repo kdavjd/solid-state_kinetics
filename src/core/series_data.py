@@ -29,7 +29,7 @@ class SeriesData(BaseSlots):
             masses = p.get("experimental_masses")
             success, assigned_name = self.add_series(
                 data=data,
-                experimentl_masses=masses,
+                experimental_masses=masses,
                 name=name,
             )
             r["data"] = success
@@ -110,7 +110,7 @@ class SeriesData(BaseSlots):
     def add_series(
         self,
         data: Any,
-        experimentl_masses: list[float],
+        experimental_masses: list[float],
         name: Optional[str] = None,
     ):
         if name is None:
@@ -134,11 +134,11 @@ class SeriesData(BaseSlots):
 
         self.series[name] = {
             "experimental_data": data,
+            "experimental_masses": experimental_masses,
             "reaction_scheme": reaction_scheme,
             "calculation_settings": {
                 "method": "differential_evolution",
                 "method_parameters": MODEL_BASED_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS,
-                "experimental_masses": experimentl_masses,
             },
         }
 
@@ -214,10 +214,10 @@ class SeriesData(BaseSlots):
         elif info_type == "scheme":
             return series_entry.get("reaction_scheme", None)
         elif info_type == "all":
-            return series_entry
+            return series_entry.copy()
         else:
             logger.warning(f"Unknown info_type='{info_type}'. Returning all data by default.")
-            return series_entry
+            return series_entry.copy()
 
     def get_all_series(self):
         return self.series.copy()
