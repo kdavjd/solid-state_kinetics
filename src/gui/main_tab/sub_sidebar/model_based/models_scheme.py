@@ -1,4 +1,5 @@
 import string
+from collections import deque
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QPen, QPolygonF
@@ -286,20 +287,20 @@ class ModelsScheme(QWidget):
         self.alphabet = list(string.ascii_uppercase)
         self.temp_id_counter = 0
 
-        # Create a small initial example
-        root_id = self._get_new_temp_id()
-        child_id = self._get_new_temp_id()
-        self.generation_map[root_id] = 0
-        self.generation_map[child_id] = 1
-        self.add_reaction_node(root_id, 0, 0)
-        px, py = self.reactions[root_id].x, self.reactions[root_id].y
-        child_x, child_y = self.find_position_for_new_node(1, px, py)
-        self.add_reaction_node(child_id, child_x, child_y)
-        self.children_map[root_id] = [child_id]
+        # # Create a small initial example
+        # root_id = self._get_new_temp_id()
+        # child_id = self._get_new_temp_id()
+        # self.generation_map[root_id] = 0
+        # self.generation_map[child_id] = 1
+        # self.add_reaction_node(root_id, 0, 0)
+        # px, py = self.reactions[root_id].x, self.reactions[root_id].y
+        # child_x, child_y = self.find_position_for_new_node(1, px, py)
+        # self.add_reaction_node(child_id, child_x, child_y)
+        # self.children_map[root_id] = [child_id]
 
-        self.rename_all_nodes()
-        self.update_scene()
-        logger.debug("ModelsScheme: __init__ end")
+        # self.rename_all_nodes()
+        # self.update_scene()
+        # logger.debug("ModelsScheme: __init__ end")
 
     def _get_new_temp_id(self):
         t = f"temp{self.temp_id_counter}"
@@ -627,3 +628,95 @@ class ModelsScheme(QWidget):
         self.children_map = new_children_map
         self.reactions = new_reactions
         self.generation_map = new_generation_map
+
+    def update_from_scheme(self, scheme_data: dict, reactions_list: list):  # noqa: C901
+        """
+        Обновляет диаграмму в соответствии с переданной схемой реакции.
+        Принимает:
+          scheme_data - словарь со структурой:
+              {
+                  "components": [{"id": "A"}, {"id": "B"}, {"id": "C"}, {"id": "D"}],
+                  "reactions": [ ... ]
+              }
+          reactions_list - список реакций, например:
+              [
+                  {"from": "A", "to": "B", ...},
+                  {"from": "B", "to": "C", ...},
+                  {"from": "B", "to": "D", ...}
+              ]
+        """
+        # Очистка текущей схемы
+        self.scene.clear()
+        self.reactions.clear()
+        self.children_map.clear()
+        self.generation_map.clear()
+        self.occupied_positions.clear()
+        self.arrows.clear()
+
+        # Извлекаем компоненты
+        components = scheme_data.get("components", [])
+        node_ids = [comp.get("id") for comp in components if comp.get("id")]
+
+        # Формируем карту связей
+        children_map_local = {}
+        child_nodes = set()
+        for reaction in reactions_list:
+            parent = reaction.get("from")
+            child = reaction.get("to")
+            if parent and child:
+                children_map_local.setdefault(parent, []).append(child)
+                child_nodes.add(child)
+
+        # Определяем корневые узлы (те, которые не встречаются как "to")
+        roots = [node for node in node_ids if node not in child_nodes]
+        if not roots:
+            roots = node_ids
+        logger.debug(f"Roots: {roots}")
+
+        # Определяем поколения (BFS от корней)
+        generation = {}
+        queue = deque()
+        for root in roots:
+            generation[root] = 0
+            queue.append(root)
+        while queue:
+            current = queue.popleft()
+            for child in children_map_local.get(current, []):
+                if child not in generation or generation[current] + 1 < generation[child]:
+                    generation[child] = generation[current] + 1
+                    queue.append(child)
+        for node in node_ids:
+            if node not in generation:
+                generation[node] = 0
+
+        # Группируем узлы по поколениям
+        generation_to_nodes = {}
+        for node, gen in generation.items():
+            generation_to_nodes.setdefault(gen, []).append(node)
+        for gen in generation_to_nodes:
+            generation_to_nodes[gen].sort()
+
+        # Определяем позиции узлов
+        try:
+            HORIZONTAL_GAP = DiagramConfig.HORIZONTAL_GAP
+            NODE_HEIGHT = DiagramConfig.NODE_HEIGHT
+            VERTICAL_STEP = DiagramConfig.VERTICAL_STEP
+        except AttributeError:
+            HORIZONTAL_GAP = 150
+            NODE_HEIGHT = 50
+            VERTICAL_STEP = 20
+
+        for gen in sorted(generation_to_nodes.keys()):
+            nodes_in_gen = generation_to_nodes[gen]
+            for idx, node_id in enumerate(nodes_in_gen):
+                x = gen * HORIZONTAL_GAP
+                y = idx * (NODE_HEIGHT + VERTICAL_STEP)
+                self.generation_map[node_id] = gen
+                self.add_reaction_node(node_id, x, y)
+
+        # Сохраняем связи
+        self.children_map = children_map_local
+
+        # Перерисовываем сцену
+        self.update_scene()
+        logger.debug("ModelsScheme: update_from_scheme finished")

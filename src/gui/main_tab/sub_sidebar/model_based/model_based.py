@@ -268,6 +268,8 @@ class ModelBasedTab(QWidget):
         else:
             self.reaction_table.update_table({})
 
+        self.models_scene.update_from_scheme(scheme_data, self._reactions_list)
+
     def update_calculation_settings(self, calculation_settings: dict):
         self._calculation_method = calculation_settings.get("method")
         self._calculation_method_params = calculation_settings.get("method_parameters")
