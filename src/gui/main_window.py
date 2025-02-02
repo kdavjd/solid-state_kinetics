@@ -104,6 +104,7 @@ class MainWindow(QMainWindow):
             OperationType.MODEL_BASED_CALCULATION: self._handle_model_based_calculation,
             OperationType.SCHEME_CHANGE: self._handle_scheme_change,
             OperationType.MODEL_PARAMS_CHANGE: self._handle_model_params_change,
+            OperationType.SELECT_SERIES: self._handle_select_series,
         }
 
         handler = operation_handlers.get(operation)
@@ -111,6 +112,28 @@ class MainWindow(QMainWindow):
             handler(params)
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")
+
+    def _handle_select_series(self, params: dict):
+        series_name = params.get("series_name")
+        if not series_name:
+            logger.error("No series_name provided for SELECT_SERIES")
+            return
+
+        series_entry = self.handle_request_cycle(
+            "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
+        )
+        if not series_entry:
+            logger.warning(f"Couldn't get data for the series '{series_name}'")
+            return
+
+        reaction_scheme = series_entry.get("reaction_scheme")
+        calculation_settings = series_entry.get("calculation_settings")
+        if not reaction_scheme:
+            logger.warning(f"Couldn't get a scheme for the series '{series_name}'")
+            return
+
+        self.main_tab.sub_sidebar.model_based.update_scheme_data(reaction_scheme, series_name)
+        self.main_tab.sub_sidebar.model_based.update_calculation_settings(calculation_settings)
 
     def _handle_model_params_change(self, params: dict):
         series_name = params.get("series_name")
@@ -130,8 +153,8 @@ class MainWindow(QMainWindow):
             logger.warning(f"Не удалось получить схему серии '{series_name}' после обновления.")
             return
 
-        self.main_tab.sub_sidebar.model_based.load_scheme_data(series_entry["reaction_scheme"])
-        self.main_tab.sub_sidebar.model_based.load_calculation_settings(series_entry["calculation_settings"])
+        self.main_tab.sub_sidebar.model_based.update_scheme_data(series_entry["reaction_scheme"], series_name)
+        self.main_tab.sub_sidebar.model_based.update_calculation_settings(series_entry["calculation_settings"])
 
     def _handle_scheme_change(self, params: dict):
         is_ok = self.handle_request_cycle("series_data", OperationType.SCHEME_CHANGE, **params)
@@ -150,7 +173,7 @@ class MainWindow(QMainWindow):
             logger.warning(f"Не удалось получить схему для серии '{series_name}'")
             return
 
-        self.main_tab.sub_sidebar.model_based.load_scheme_data(scheme_data)
+        self.main_tab.sub_sidebar.model_based.update_scheme_data(scheme_data, series_name)
 
     def _handle_differential(self, params):
         params["function"] = self.handle_request_cycle("active_file_operations", OperationType.DIFFERENTIAL)
@@ -256,8 +279,8 @@ class MainWindow(QMainWindow):
                 "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
             )
             if series_entry["reaction_scheme"]:
-                self.main_tab.sub_sidebar.model_based.load_scheme_data(series_entry["reaction_scheme"])
-                self.main_tab.sub_sidebar.model_based.load_calculation_settings(series_entry["calculation_settings"])
+                self.main_tab.sub_sidebar.model_based.update_scheme_data(series_entry["reaction_scheme"], series_name)
+                self.main_tab.sub_sidebar.model_based.update_calculation_settings(series_entry["calculation_settings"])
             else:
                 logger.warning("It was not possible to obtain a reaction diagram for added series.")
         else:

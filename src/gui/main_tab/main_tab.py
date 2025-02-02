@@ -58,6 +58,7 @@ class MainTab(QWidget):
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(self.to_main_window)
         self.sub_sidebar.deconvolution_sub_bar.update_value.connect(self.to_main_window)
         self.sidebar.active_file_selected.connect(self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file)
+        self.sidebar.active_file_selected.connect(self.select_series)
         self.plot_canvas.update_value.connect(self.update_anchors_slot)
         self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(self.to_main_window)
         self.sub_sidebar.ea_sub_bar.create_series_signal.connect(self.to_main_window)
@@ -95,9 +96,6 @@ class MainTab(QWidget):
         if content_type:
             if content_type in self.sidebar.get_series_names():
                 self.sub_sidebar.update_content("model_based")
-                self.to_main_window_signal.emit(
-                    {"operation": OperationType.GET_SERIES_DATA, "series_name": content_type}
-                )
             elif content_type in self.sidebar.get_experiment_files_names():
                 self.sub_sidebar.update_content("experiments")
             else:
@@ -110,6 +108,10 @@ class MainTab(QWidget):
     def toggle_console_visibility(self, visible):
         self.console_widget.setVisible(visible)
         self.initialize_sizes()
+
+    def select_series(self, series_name):
+        if series_name in self.sidebar.get_series_names():
+            self.to_main_window_signal.emit({"operation": OperationType.SELECT_SERIES, "series_name": series_name})
 
     @pyqtSlot(dict)
     def to_main_window(self, params: dict):

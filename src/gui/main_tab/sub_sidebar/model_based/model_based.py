@@ -227,7 +227,11 @@ class ModelBasedTab(QWidget):
     def on_show_range_checkbox_changed(self, state: int):
         self.reaction_table.set_ranges_visible(bool(state))
 
-    def load_scheme_data(self, scheme_data: dict):
+    def update_scheme_data(self, scheme_data: dict, series_name: str):
+        """
+        This method updates the internal state for scheme data and reaction list.
+        It also updates or creates a new models_scene for each series.
+        """
         old_from, old_to = None, None
         if self.reactions_combo.count() > 0:
             current_label = self.reactions_combo.currentText()
@@ -264,7 +268,7 @@ class ModelBasedTab(QWidget):
         else:
             self.reaction_table.update_table({})
 
-    def load_calculation_settings(self, calculation_settings: dict):
+    def update_calculation_settings(self, calculation_settings: dict):
         self._calculation_method = calculation_settings.get("method")
         self._calculation_method_params = calculation_settings.get("method_parameters")
 
