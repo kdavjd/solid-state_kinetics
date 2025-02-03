@@ -227,39 +227,20 @@ class ModelBasedTab(QWidget):
     def on_show_range_checkbox_changed(self, state: int):
         self.reaction_table.set_ranges_visible(bool(state))
 
-    def update_scheme_data(self, scheme_data: dict, series_name: str):
-        """
-        This method updates the internal state for scheme data and reaction list.
-        It also updates or creates a new models_scene for each series.
-        """
-        old_from, old_to = None, None
-        if self.reactions_combo.count() > 0:
-            current_label = self.reactions_combo.currentText()
-            if "->" in current_label:
-                parts = current_label.split("->")
-                old_from, old_to = parts[0].strip(), parts[1].strip()
-
+    def update_scheme_data(self, scheme_data: dict):
         self._scheme_data = scheme_data
         self._reactions_list = scheme_data.get("reactions", [])
 
         self.reactions_combo.clear()
-        reaction_map = {}  # label -> (index, reaction_data)
+        reaction_map = {}
         for i, reaction in enumerate(self._reactions_list):
             label = f"{reaction.get('from', '?')} -> {reaction.get('to', '?')}"
             self.reactions_combo.addItem(label)
-            reaction_map[label] = (i, reaction)
-
-        new_index = None
-        if old_from and old_to:
-            old_label = f"{old_from} -> {old_to}"
-            if old_label in reaction_map:
-                new_index = reaction_map[old_label][0]
+            reaction_map[label] = i
 
         default_label = "A -> B"
-        if new_index is None and default_label in reaction_map:
-            new_index = reaction_map[default_label][0]
-
-        if new_index is None and len(self._reactions_list) > 0:
+        new_index = reaction_map.get(default_label, None)
+        if new_index is None and self._reactions_list:
             new_index = 0
 
         if new_index is not None:

@@ -132,7 +132,7 @@ class MainWindow(QMainWindow):
             logger.warning(f"Couldn't get a scheme for the series '{series_name}'")
             return
 
-        self.main_tab.sub_sidebar.model_based.update_scheme_data(reaction_scheme, series_name)
+        self.main_tab.sub_sidebar.model_based.update_scheme_data(reaction_scheme)
         self.main_tab.sub_sidebar.model_based.update_calculation_settings(calculation_settings)
 
     def _handle_model_params_change(self, params: dict):
@@ -153,7 +153,7 @@ class MainWindow(QMainWindow):
             logger.warning(f"Не удалось получить схему серии '{series_name}' после обновления.")
             return
 
-        self.main_tab.sub_sidebar.model_based.update_scheme_data(series_entry["reaction_scheme"], series_name)
+        self.main_tab.sub_sidebar.model_based.update_scheme_data(series_entry["reaction_scheme"])
         self.main_tab.sub_sidebar.model_based.update_calculation_settings(series_entry["calculation_settings"])
 
     def _handle_scheme_change(self, params: dict):
@@ -173,7 +173,7 @@ class MainWindow(QMainWindow):
             logger.warning(f"Не удалось получить схему для серии '{series_name}'")
             return
 
-        self.main_tab.sub_sidebar.model_based.update_scheme_data(scheme_data, series_name)
+        self.main_tab.sub_sidebar.model_based.update_scheme_data(scheme_data)
 
     def _handle_differential(self, params):
         params["function"] = self.handle_request_cycle("active_file_operations", OperationType.DIFFERENTIAL)
@@ -279,7 +279,7 @@ class MainWindow(QMainWindow):
                 "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
             )
             if series_entry["reaction_scheme"]:
-                self.main_tab.sub_sidebar.model_based.update_scheme_data(series_entry["reaction_scheme"], series_name)
+                self.main_tab.sub_sidebar.model_based.update_scheme_data(series_entry["reaction_scheme"])
                 self.main_tab.sub_sidebar.model_based.update_calculation_settings(series_entry["calculation_settings"])
             else:
                 logger.warning("It was not possible to obtain a reaction diagram for added series.")
