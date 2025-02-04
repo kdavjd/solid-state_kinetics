@@ -231,6 +231,8 @@ class ModelBasedTab(QWidget):
         self._scheme_data = scheme_data
         self._reactions_list = scheme_data.get("reactions", [])
 
+        current_label = self.reactions_combo.currentText() if self.reactions_combo.count() > 0 else None
+
         self.reactions_combo.clear()
         reaction_map = {}
         for i, reaction in enumerate(self._reactions_list):
@@ -239,15 +241,13 @@ class ModelBasedTab(QWidget):
             reaction_map[label] = i
 
         default_label = "A -> B"
-        new_index = reaction_map.get(default_label, None)
-        if new_index is None and self._reactions_list:
-            new_index = 0
+        new_index = reaction_map.get(current_label, reaction_map.get(default_label, 0))
 
-        if new_index is not None:
+        if not self._reactions_list:
+            self.reaction_table.update_table({})
+        else:
             self.reactions_combo.setCurrentIndex(new_index)
             self._on_reactions_combo_changed(new_index)
-        else:
-            self.reaction_table.update_table({})
 
         self.models_scene.update_from_scheme(scheme_data, self._reactions_list)
 
