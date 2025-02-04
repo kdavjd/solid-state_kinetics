@@ -299,4 +299,14 @@ class MainWindow(QMainWindow):
         series_entry = self.handle_request_cycle(
             "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
         )
-        logger.debug(f"{OperationType.MODEL_BASED_CALCULATION=} {series_entry=}")
+        if not series_entry:
+            logger.error(f"Series entry not found for series '{series_name}'")
+            return
+
+        params["calculation_scenario"] = "model_based_calculation"
+        params["reaction_scheme"] = series_entry.get("reaction_scheme")
+        params["experimental_data"] = series_entry.get("experimental_data")
+        params["calculation_settings"] = series_entry.get("calculation_settings")
+
+        logger.debug(f"Emitting model_based_calculation_signal with params: {params}")
+        self.model_based_calculation_signal.emit(params)
