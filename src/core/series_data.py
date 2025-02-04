@@ -147,18 +147,15 @@ class SeriesData(BaseSlots):
         return True, name
 
     def update_series(self, series_name: str, new_scheme: dict, new_settings: dict) -> bool:
-        series_entry = self.series.get(series_name)
+        series_entry: dict = self.series.get(series_name)
         if not series_entry:
-            logger.error(f"Series '{series_name}' not found; cannot update scheme.")
+            logger.error(f"Series '{series_name}' not found; update failed.")
             return False
 
-        old_scheme = series_entry.get("reaction_scheme", {})
-        # old_components = old_scheme.get("components", [])
-        old_reactions = old_scheme.get("reactions", [])
+        old_scheme: dict = series_entry.get("reaction_scheme", {})
+        old_scheme.update({k: v for k, v in new_scheme.items() if k != "reactions"})
 
-        new_components = new_scheme.get("components", [])
-        old_scheme["components"] = new_components
-
+        old_reactions: dict = old_scheme.get("reactions", [])
         new_reactions_data = new_scheme.get("reactions", [])
 
         old_reactions_map = {(r["from"], r["to"]): r for r in old_reactions}
@@ -175,11 +172,15 @@ class SeriesData(BaseSlots):
 
         old_scheme["reactions"] = updated_reactions
         series_entry["reaction_scheme"] = old_scheme
-        series_entry["calculation_settings"] = new_settings
+
+        old_settings: dict = series_entry.get("calculation_settings", {})
+        if new_settings:
+            old_settings.update(new_settings)
+
+        series_entry["calculation_settings"] = old_settings
 
         self._get_default_reaction_params(series_name)
 
-        logger.info(f"Updated scheme for series '{series_name}'.")
         return True
 
     def delete_series(self, series_name: str) -> bool:

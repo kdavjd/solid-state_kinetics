@@ -290,5 +290,13 @@ class MainWindow(QMainWindow):
         is_ok = self.handle_request_cycle("series_data", OperationType.DELETE_SERIES, **params)
         logger.debug(f"{OperationType.DELETE_SERIES=} {is_ok=}")
 
-    def _handle_model_based_calculation(self, params):
-        pass
+    def _handle_model_based_calculation(self, params: dict):
+        series_name = params.get("series_name")
+        if not series_name:
+            logger.error("No series_name provided for MODEL_BASED_CALCULATION")
+            return
+
+        series_entry = self.handle_request_cycle(
+            "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
+        )
+        logger.debug(f"{OperationType.MODEL_BASED_CALCULATION=} {series_entry=}")

@@ -178,7 +178,7 @@ class ModelBasedTab(QWidget):
         self._scheme_data = {}
         self._reactions_list = []
         self._calculation_method = None
-        self._calculation_method_params = None
+        self._calculation_method_params = {}
 
         main_layout = QVBoxLayout(self)
         self.setLayout(main_layout)
