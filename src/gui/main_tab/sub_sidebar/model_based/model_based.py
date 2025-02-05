@@ -14,6 +14,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
+    QSlider,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -26,12 +28,12 @@ from src.gui.main_tab.sub_sidebar.model_based.models_scheme import ModelsScheme
 
 class ReactionTable(QTableWidget):
     def __init__(self, parent=None):
-        super().__init__(3, 4, parent)
+        super().__init__(4, 4, parent)  # теперь 4 строки
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max"])
         self.setColumnHidden(2, True)
         self.setColumnHidden(3, True)
 
-        # Ea
+        # Строка 0: Ea
         self.setItem(0, 0, QTableWidgetItem("Ea, kJ"))
         self.activation_energy_edit = QLineEdit()
         self.setCellWidget(0, 1, self.activation_energy_edit)
@@ -40,7 +42,7 @@ class ReactionTable(QTableWidget):
         self.ea_max_item = QLineEdit()
         self.setCellWidget(0, 3, self.ea_max_item)
 
-        # log(A)
+        # Строка 1: log(A)
         self.setItem(1, 0, QTableWidgetItem("log(A)"))
         self.log_a_edit = QLineEdit()
         self.setCellWidget(1, 1, self.log_a_edit)
@@ -49,7 +51,7 @@ class ReactionTable(QTableWidget):
         self.log_a_max_item = QLineEdit()
         self.setCellWidget(1, 3, self.log_a_max_item)
 
-        # Contribution
+        # Строка 2: contribution
         self.setItem(2, 0, QTableWidgetItem("contribution"))
         self.contribution_edit = QLineEdit()
         self.setCellWidget(2, 1, self.contribution_edit)
@@ -57,6 +59,9 @@ class ReactionTable(QTableWidget):
         self.setCellWidget(2, 2, self.contribution_min_item)
         self.contribution_max_item = QLineEdit()
         self.setCellWidget(2, 3, self.contribution_max_item)
+
+        # Строка 3: пустая (можно использовать как запас или для будущих параметров)
+        self.setItem(3, 0, QTableWidgetItem(""))
 
         self.default_ranges = {
             "Ea": (1, 2000),
@@ -110,6 +115,105 @@ class ReactionTable(QTableWidget):
         self.contribution_max_item.setText(
             str(reaction_data.get("contribution_max", self.default_ranges["contribution"][1]))
         )
+
+
+class AdjustmentRowWidget(QWidget):
+    valueChanged = pyqtSignal(str, float)  # передаём имя параметра и новое значение
+
+    def __init__(self, parameter_name: str, initial_value: float, button_step: float, slider_scale: float, parent=None):
+        """
+        :param parameter_name: имя параметра (например, "Ea", "log_A", "contribution")
+        :param initial_value: начальное значение параметра
+        :param button_step: шаг изменения при нажатии кнопок (например, 10, 1, 0.1)
+        :param slider_scale: коэффициент для пересчёта значения ползунка:
+               итоговое смещение = slider_value * slider_scale.
+               Для Ea: slider_scale=1 (диапазон ±5), для log_A: 0.1 (±0.5),
+               для contribution: 0.01 (±0.05)
+        """
+        super().__init__(parent)
+        self.parameter_name = parameter_name
+        self.base_value = initial_value
+        self.button_step = button_step
+        self.slider_scale = slider_scale
+
+        # Вертикальное расположение: сверху метка, снизу строка с кнопками и ползунком
+        layout = QVBoxLayout(self)
+        self.value_label = QLabel(f"{self.base_value:.3f}")
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.value_label)
+
+        h_layout = QHBoxLayout()
+        self.left_button = QPushButton("<")
+        self.left_button.setFixedSize(24, 24)
+        self.left_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        # Для отображения диапазона ±5 в целых числах; коэффициент масштабирования переводит в нужные единицы
+        self.slider.setRange(-5, 5)
+        self.slider.setValue(0)
+        self.slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.slider.setTickInterval(1)
+        self.slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        self.right_button = QPushButton(">")
+        self.right_button.setFixedSize(24, 24)
+        self.right_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        h_layout.addWidget(self.left_button)
+        h_layout.addWidget(self.slider)
+        h_layout.addWidget(self.right_button)
+        layout.addLayout(h_layout)
+
+        # Подключаем слоты
+        self.left_button.clicked.connect(self.on_left_clicked)
+        self.right_button.clicked.connect(self.on_right_clicked)
+        self.slider.valueChanged.connect(self.on_slider_value_changed)
+        self.slider.sliderReleased.connect(self.on_slider_released)
+
+    def on_left_clicked(self):
+        self.base_value -= self.button_step
+        self.slider.setValue(0)  # сброс ползунка
+        self.update_label()
+        self.valueChanged.emit(self.parameter_name, self.base_value)
+
+    def on_right_clicked(self):
+        self.base_value += self.button_step
+        self.slider.setValue(0)
+        self.update_label()
+        self.valueChanged.emit(self.parameter_name, self.base_value)
+
+    def on_slider_value_changed(self, value):
+        potential_value = self.base_value + (value * self.slider_scale)
+        self.value_label.setText(f"{potential_value:.3f}")
+
+    def on_slider_released(self):
+        offset = self.slider.value() * self.slider_scale
+        self.base_value += offset
+        self.slider.setValue(0)
+        self.update_label()
+        self.valueChanged.emit(self.parameter_name, self.base_value)
+
+    def update_label(self):
+        self.value_label.setText(f"{self.base_value:.3f}")
+
+
+class AdjustingSettingsBox(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        main_layout = QVBoxLayout(self)
+        self.setLayout(main_layout)
+
+        initial_ea = 120
+        initial_log_a = 8
+        initial_contrib = 0.5
+
+        self.ea_adjuster = AdjustmentRowWidget("Ea", initial_ea, 10, 1, parent=self)
+        self.log_a_adjuster = AdjustmentRowWidget("log_A", initial_log_a, 1, 0.1, parent=self)
+        self.contrib_adjuster = AdjustmentRowWidget("contribution", initial_contrib, 0.1, 0.01, parent=self)
+
+        main_layout.addWidget(self.ea_adjuster)
+        main_layout.addWidget(self.log_a_adjuster)
+        main_layout.addWidget(self.contrib_adjuster)
 
 
 class ModelCalcButtons(QWidget):
@@ -170,6 +274,29 @@ class ModelCalcButtons(QWidget):
             self.start_button.show()
 
 
+class RangeAndCalculateWidget(QWidget):
+    showRangeToggled = pyqtSignal(bool)
+    calculateToggled = pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        self.setLayout(layout)
+
+        self.showRangeCheckbox = QCheckBox("Show Range")
+        self.calculateCheckbox = QCheckBox("Calculate")
+
+        layout.addWidget(self.showRangeCheckbox)
+        layout.addWidget(self.calculateCheckbox)
+
+        self.showRangeCheckbox.stateChanged.connect(
+            lambda state: self.showRangeToggled.emit(state == Qt.CheckState.Checked)
+        )
+        self.calculateCheckbox.stateChanged.connect(
+            lambda state: self.calculateToggled.emit(state == Qt.CheckState.Checked)
+        )
+
+
 class ModelBasedTab(QWidget):
     model_params_changed = pyqtSignal(dict)
 
@@ -195,21 +322,16 @@ class ModelBasedTab(QWidget):
         reaction_type_layout.addWidget(self.reaction_type_combo)
         main_layout.addLayout(reaction_type_layout)
 
+        self.range_calc_widget = RangeAndCalculateWidget()
+        self.range_calc_widget.showRangeToggled.connect(self.on_show_range_checkbox_changed)
+        self.range_calc_widget.calculateToggled.connect(self.on_calculate_toggled)
+        main_layout.addWidget(self.range_calc_widget)
+
         self.reaction_table = ReactionTable()
         main_layout.addWidget(self.reaction_table)
 
-        self.show_range_checkbox = QCheckBox("Show Range")
-        self.show_range_checkbox.stateChanged.connect(self.on_show_range_checkbox_changed)
-        main_layout.addWidget(self.show_range_checkbox)
-
-        bottom_layout = QVBoxLayout()
-        self.models_scene = ModelsScheme(self)
-        bottom_layout.addWidget(self.models_scene)
-
-        self.calc_buttons = ModelCalcButtons(self)
-        bottom_layout.addWidget(self.calc_buttons)
-
-        main_layout.addLayout(bottom_layout)
+        self.adjusting_settings_box = AdjustingSettingsBox()
+        main_layout.addWidget(self.adjusting_settings_box)
 
         self.reaction_table.activation_energy_edit.editingFinished.connect(self._on_params_changed)
         self.reaction_table.log_a_edit.editingFinished.connect(self._on_params_changed)
@@ -224,8 +346,33 @@ class ModelBasedTab(QWidget):
         self.reaction_type_combo.currentIndexChanged.connect(self._on_params_changed)
         self.reactions_combo.currentIndexChanged.connect(self._on_reactions_combo_changed)
 
-    def on_show_range_checkbox_changed(self, state: int):
-        self.reaction_table.set_ranges_visible(bool(state))
+        self.adjusting_settings_box.ea_adjuster.valueChanged.connect(self.on_adjuster_value_changed)
+        self.adjusting_settings_box.log_a_adjuster.valueChanged.connect(self.on_adjuster_value_changed)
+        self.adjusting_settings_box.contrib_adjuster.valueChanged.connect(self.on_adjuster_value_changed)
+
+        bottom_layout = QVBoxLayout()
+        self.models_scene = ModelsScheme(self)
+        bottom_layout.addWidget(self.models_scene)
+
+        self.calc_buttons = ModelCalcButtons(self)
+        bottom_layout.addWidget(self.calc_buttons)
+
+        main_layout.addLayout(bottom_layout)
+
+    def on_adjuster_value_changed(self, parameter_name: str, new_value: float):
+        if parameter_name == "Ea":
+            self.reaction_table.activation_energy_edit.setText(str(new_value))
+        elif parameter_name == "log_A":
+            self.reaction_table.log_a_edit.setText(str(new_value))
+        elif parameter_name == "contribution":
+            self.reaction_table.contribution_edit.setText(str(new_value))
+        self._on_params_changed()
+
+    def on_show_range_checkbox_changed(self, checked: bool):
+        self.reaction_table.set_ranges_visible(checked)
+
+    def on_calculate_toggled(self, checked: bool):
+        pass
 
     def update_scheme_data(self, scheme_data: dict):
         self._scheme_data = scheme_data
@@ -260,7 +407,7 @@ class ModelBasedTab(QWidget):
             reaction_data = self._reactions_list[index]
             self.reaction_table.update_table(reaction_data)
 
-            new_reaction_type = reaction_data.get("reaction_type", "F1")
+            new_reaction_type = reaction_data.get("reaction_type", "F2")
             current_reaction_type = self.reaction_type_combo.currentText()
 
             if new_reaction_type != current_reaction_type:
@@ -565,7 +712,7 @@ class CalculationSettingsDialog(QDialog):
 
             combo_type = QComboBox()
             combo_type.addItems(NUC_MODELS_LIST)
-            current_type = reaction.get("reaction_type", "F1")
+            current_type = reaction.get("reaction_type", "F2")
             if current_type in NUC_MODELS_LIST:
                 combo_type.setCurrentText(current_type)
             top_line_layout.addWidget(combo_type)

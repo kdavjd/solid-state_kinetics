@@ -74,6 +74,35 @@ MODEL_FREE_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
     "constraints": (),
 }
 
+
+def clamp_fraction(e, eps=1e-8):
+    """
+    Принудительно ограничивает e в диапазоне [eps, 1 - eps].
+    Если e выходит за эти границы, подменяет на ближайшее допустимое значение
+    и выводит предупреждение.
+    """
+    if e < eps:
+        e = eps
+    elif e > 1 - eps:
+        e = 1 - eps
+    return e
+
+
+def clamp_fraction_decorator(eps=1e-8):
+    """
+    Декоратор, который перед вызовом исходной функции зажимает (clamp) e в [eps, 1 - eps].
+    """
+
+    def decorator(func):
+        def wrapper(e, *args, **kwargs):
+            e_clamped = clamp_fraction(e, eps=eps)
+            return func(e_clamped, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 NUC_MODELS_TABLE = {
     "F1/3": {"differential_form": lambda e: (3 / 2) * e ** (1 / 3), "integral_form": lambda e: 1 - e ** (2 / 3)},
     "F3/4": {"differential_form": lambda e: 4 * e ** (3 / 4), "integral_form": lambda e: 1 - e ** (1 / 4)},
@@ -171,3 +200,7 @@ NUC_MODELS_TABLE = {
 }
 
 NUC_MODELS_LIST = list(NUC_MODELS_TABLE.keys())
+for key in NUC_MODELS_LIST:
+    if key in NUC_MODELS_TABLE:
+        df = NUC_MODELS_TABLE[key]["differential_form"]
+        NUC_MODELS_TABLE[key]["differential_form"] = clamp_fraction_decorator()(df)

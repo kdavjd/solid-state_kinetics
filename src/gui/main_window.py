@@ -1,10 +1,12 @@
 from functools import reduce
 
+import numpy as np
 import pandas as pd
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
+from scipy.integrate import solve_ivp
 
-from src.core.app_settings import OperationType
+from src.core.app_settings import NUC_MODELS_TABLE, OperationType
 from src.core.base_signals import BaseSignals, BaseSlots
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
@@ -134,6 +136,7 @@ class MainWindow(QMainWindow):
 
         self.main_tab.sub_sidebar.model_based.update_scheme_data(reaction_scheme)
         self.main_tab.sub_sidebar.model_based.update_calculation_settings(calculation_settings)
+        self.update_model_simulation(series_name)
 
     def _handle_model_params_change(self, params: dict):
         series_name = params.get("series_name")
@@ -155,6 +158,7 @@ class MainWindow(QMainWindow):
 
         self.main_tab.sub_sidebar.model_based.update_scheme_data(series_entry["reaction_scheme"])
         self.main_tab.sub_sidebar.model_based.update_calculation_settings(series_entry["calculation_settings"])
+        self.update_model_simulation(series_name)
 
     def _handle_scheme_change(self, params: dict):
         is_ok = self.handle_request_cycle("series_data", OperationType.SCHEME_CHANGE, **params)
@@ -174,6 +178,7 @@ class MainWindow(QMainWindow):
             return
 
         self.main_tab.sub_sidebar.model_based.update_scheme_data(scheme_data)
+        self.update_model_simulation(series_name)
 
     def _handle_differential(self, params):
         params["function"] = self.handle_request_cycle("active_file_operations", OperationType.DIFFERENTIAL)
@@ -310,3 +315,160 @@ class MainWindow(QMainWindow):
 
         logger.debug(f"Emitting model_based_calculation_signal with params: {params}")
         self.model_based_calculation_signal.emit(params)
+
+    def update_model_simulation(self, series_name: str):
+        """
+        Получает из series_data текущую серию, извлекает экспериментальные данные и
+        схему реакций, затем рассчитывает модельную зависимость массы по заданным реакционным параметрам.
+        Полученные кривые (одна для каждого значения скорости нагрева) отрисовываются на графике
+        поверх экспериментальных данных (например, с пунктирной синей линией).
+        """
+        # Получаем обновлённую серию (ожидается, что info_type="all" содержит и экспериментальные данные, и схему)
+        series_entry = self.handle_request_cycle(
+            "series_data", OperationType.GET_SERIES, series_name=series_name, info_type="all"
+        )
+        if not series_entry:
+            logger.error(f"Не удалось получить данные серии '{series_name}' для моделирования.")
+            return
+
+        reaction_scheme = series_entry.get("reaction_scheme")
+        experimental_data = series_entry.get("experimental_data")
+        if reaction_scheme is None or experimental_data is None:
+            logger.error(f"Отсутствует схема реакций или экспериментальные данные для серии '{series_name}'.")
+            return
+
+        # Получаем DataFrame с результатами моделирования
+        simulation_df = self._simulate_reaction_model(experimental_data, reaction_scheme)
+        if simulation_df is None:
+            logger.error("Ошибка при расчёте моделирования.")
+            return
+
+        # Для каждого столбца (кроме температуры) добавляем/обновляем линию моделирования на графике
+        for col in simulation_df.columns:
+            if col == "temperature":
+                continue
+            # Например, отрисовываем модельную кривую пунктирной синей линией
+            self.main_tab.plot_canvas.add_or_update_line(
+                f"simulation_{col}",
+                simulation_df["temperature"],
+                simulation_df[col],
+                linestyle="--",
+                color="blue",
+                label=f"Simulation β={col}",
+            )
+        self.main_tab.plot_canvas.canvas.draw_idle()
+
+    def _simulate_reaction_model(self, experimental_data: pd.DataFrame, reaction_scheme: dict):  # noqa: C901
+        """
+        Производит моделирование по заданной схеме реакций и экспериментальным данным.
+        Для каждого значения скорости нагрева (β) выполняется интегрирование системы ОДУ,
+        в которой для каждой реакции используется её Arrhenius-параметры (log_A, Ea),
+        вклад (contribution) и тип реакции (reaction_type) для выбора дифференциальной зависимости.
+
+        На основе полученных интегральных значений рассчитывается модельная зависимость массы по формуле:
+
+            model_mass = M0 - (M0 - Mfin) * int_sum
+
+        где int_sum – взвешенная сумма интегрированных значений мгновенных скоростей реакций.
+
+        Возвращает DataFrame, содержащий столбец "temperature" (исходные данные из эксперимента)
+        и для каждого β – рассчитанную модельную зависимость.
+        """
+        # Приводим температуру к Кельвинам
+        T = experimental_data["temperature"].values
+        T_K = T + 273.15
+
+        # Определяем столбцы, соответствующие разным значениям скорости нагрева (β)
+        beta_columns = [col for col in experimental_data.columns if col.lower() != "temperature"]
+
+        # Извлекаем схему реакций
+        reactions = reaction_scheme.get("reactions", [])
+        components = reaction_scheme.get("components", [])
+        if not reactions or not components:
+            logger.error("Схема реакций некорректна: отсутствуют реакции или компоненты.")
+            return None
+
+        species_list = [comp["id"] for comp in components]
+        num_species = len(species_list)
+        num_reactions = len(reactions)
+
+        # Извлекаем параметры для каждой реакции
+        logA = np.array([reaction.get("log_A", 0) for reaction in reactions])
+        Ea = np.array([reaction.get("Ea", 0) for reaction in reactions])
+        contributions = np.array([reaction.get("contribution", 0) for reaction in reactions])
+        R = 8.314  # универсальная газовая постоянная
+
+        simulation_results = {"temperature": T}
+
+        # Для каждого β выполняем моделирование
+        for beta_col in beta_columns:
+            try:
+                beta_value = float(beta_col)
+            except ValueError:
+                logger.error(f"Невозможно преобразовать имя столбца '{beta_col}' в число для скорости нагрева.")
+                continue
+
+            def ode_func(T_val, X):
+                """
+                Функция ОДУ для интегрирования по температуре.
+                Вектор состояния X имеет длину num_species + num_reactions.
+                Первые num_species элементов – концентрации веществ, затем накопленные значения скоростей реакций.
+                """
+                dXdt = np.zeros(num_species + num_reactions)
+                conc = X[:num_species]
+                beta_SI = beta_value / 60.0  # перевод в СИ (К/с)
+                for i, reaction in enumerate(reactions):
+                    src = reaction.get("from")
+                    tgt = reaction.get("to")
+                    if src not in species_list or tgt not in species_list:
+                        continue
+                    src_index = species_list.index(src)
+                    tgt_index = species_list.index(tgt)
+                    e_value = conc[src_index]
+                    reaction_type = reaction.get("reaction_type")
+                    model = NUC_MODELS_TABLE.get(reaction_type)
+                    if model is None:
+                        logger.warning(f"Неизвестный тип реакции '{reaction_type}'. Используется линейная зависимость.")
+                        f_e = e_value
+                    else:
+                        f_e = model["differential_form"](e_value)
+                    # Вычисляем кинетический коэффициент по схеме Arrhenius
+                    k_i = (10 ** logA[i]) * np.exp(-Ea[i] * 1000 / (R * T_val))
+                    k_i /= beta_SI
+                    rate = k_i * f_e
+                    dXdt[src_index] -= rate
+                    dXdt[tgt_index] += rate
+                    dXdt[num_species + i] = rate  # интегрированное значение (накопленная скорость)
+                return dXdt
+
+            # Начальные условия: концентрация исходного вещества равна 1, остальные – 0;
+            # для дополнительных переменных (скорости) – 0.
+            X0 = np.zeros(num_species + num_reactions)
+            if num_species > 0:
+                X0[0] = 1.0
+
+            sol = solve_ivp(ode_func, [T_K[0], T_K[-1]], X0, t_eval=T_K, method="RK45")
+            if not sol.success:
+                logger.error(f"Интегрирование ОДУ завершилось неудачно для β = {beta_value}.")
+                continue
+
+            # Извлекаем накопленные (интегрированные) значения для каждой реакции
+            if num_reactions > 0:
+                rates_int = sol.y[num_species : num_species + num_reactions, :]
+                # Взвешенная сумма по вкладам
+                int_sum = np.sum(contributions[:, np.newaxis] * rates_int, axis=0)
+            else:
+                int_sum = np.zeros_like(T)
+
+            # Используем экспериментальные данные для задания начального и конечного значений массы
+            exp_mass = experimental_data[beta_col].values
+            if len(exp_mass) < 2:
+                logger.error(f"Недостаточно экспериментальных точек для β = {beta_value}.")
+                continue
+            M0 = exp_mass[0]
+            Mfin = exp_mass[-1]
+            # Формула моделирования (аналог ModelBasedScenario)
+            model_mass = M0 - (M0 - Mfin) * int_sum
+            simulation_results[beta_col] = model_mass
+
+        return pd.DataFrame(simulation_results)
