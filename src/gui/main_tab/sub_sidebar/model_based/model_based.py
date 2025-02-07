@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -26,14 +28,55 @@ from src.core.app_settings import NUC_MODELS_LIST, OperationType
 from src.gui.main_tab.sub_sidebar.model_based.models_scheme import ModelsScheme
 
 
+@dataclass
+class ReactionDefaults:
+    Ea_default: float = 120
+    log_A_default: float = 8
+    contribution_default: float = 0.5
+    Ea_range: tuple = (1, 2000)
+    log_A_range: tuple = (0.1, 100)
+    contribution_range: tuple = (0.01, 1)
+
+
+@dataclass
+class AdjustmentDefaults:
+    BUTTON_SIZE: int = 24
+    SLIDER_MIN: int = -5
+    SLIDER_MAX: int = 5
+    SLIDER_TICK_INTERVAL: int = 1
+
+
+@dataclass
+class ReactionAdjustmentParameters:
+    ea_default: float = 120
+    log_a_default: float = 8
+    contribution_default: float = 0.5
+    ea_button_step: float = 10
+    log_a_button_step: float = 1
+    contribution_button_step: float = 0.1
+    ea_slider_scale: float = 1
+    log_a_slider_scale: float = 0.1
+    contribution_slider_scale: float = 0.01
+
+
+MODEL_BASED_TAB_LAYOUT = {
+    "reactions_combo": {"min_width": 200, "min_height": 30},
+    "reaction_type_combo": {"min_width": 100, "min_height": 30},
+    "range_calc_widget": {"min_height": 45},
+    "reaction_table": {"min_height": 90},
+    "adjusting_settings_box": {"min_height": 180},
+    "models_scene": {"min_width": 200, "min_height": 150},
+    "calc_buttons": {"button_width": 80, "button_height": 30},
+}
+
+
 class ReactionTable(QTableWidget):
     def __init__(self, parent=None):
-        super().__init__(4, 4, parent)  # теперь 4 строки
+        super().__init__(3, 4, parent)
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max"])
         self.setColumnHidden(2, True)
         self.setColumnHidden(3, True)
 
-        # Строка 0: Ea
         self.setItem(0, 0, QTableWidgetItem("Ea, kJ"))
         self.activation_energy_edit = QLineEdit()
         self.setCellWidget(0, 1, self.activation_energy_edit)
@@ -42,7 +85,6 @@ class ReactionTable(QTableWidget):
         self.ea_max_item = QLineEdit()
         self.setCellWidget(0, 3, self.ea_max_item)
 
-        # Строка 1: log(A)
         self.setItem(1, 0, QTableWidgetItem("log(A)"))
         self.log_a_edit = QLineEdit()
         self.setCellWidget(1, 1, self.log_a_edit)
@@ -51,7 +93,6 @@ class ReactionTable(QTableWidget):
         self.log_a_max_item = QLineEdit()
         self.setCellWidget(1, 3, self.log_a_max_item)
 
-        # Строка 2: contribution
         self.setItem(2, 0, QTableWidgetItem("contribution"))
         self.contribution_edit = QLineEdit()
         self.setCellWidget(2, 1, self.contribution_edit)
@@ -60,29 +101,22 @@ class ReactionTable(QTableWidget):
         self.contribution_max_item = QLineEdit()
         self.setCellWidget(2, 3, self.contribution_max_item)
 
-        # Строка 3: пустая (можно использовать как запас или для будущих параметров)
-        self.setItem(3, 0, QTableWidgetItem(""))
-
-        self.default_ranges = {
-            "Ea": (1, 2000),
-            "log_A": (0.1, 100),
-            "contribution": (0.01, 1),
-        }
+        self.defaults = ReactionDefaults()
 
     def set_ranges_visible(self, visible: bool):
         self.setColumnHidden(2, not visible)
         self.setColumnHidden(3, not visible)
 
         if visible:
-            ea_min, ea_max = self.default_ranges["Ea"]
+            ea_min, ea_max = self.defaults.Ea_range
             self.ea_min_item.setText(str(ea_min))
             self.ea_max_item.setText(str(ea_max))
 
-            log_a_min, log_a_max = self.default_ranges["log_A"]
+            log_a_min, log_a_max = self.defaults.log_A_range
             self.log_a_min_item.setText(str(log_a_min))
             self.log_a_max_item.setText(str(log_a_max))
 
-            contrib_min, contrib_max = self.default_ranges["contribution"]
+            contrib_min, contrib_max = self.defaults.contribution_range
             self.contribution_min_item.setText(str(contrib_min))
             self.contribution_max_item.setText(str(contrib_max))
 
@@ -99,21 +133,21 @@ class ReactionTable(QTableWidget):
             self.contribution_max_item.clear()
             return
 
-        self.activation_energy_edit.setText(str(reaction_data.get("Ea", 120)))
-        self.log_a_edit.setText(str(reaction_data.get("log_A", 8)))
-        self.contribution_edit.setText(str(reaction_data.get("contribution", 0.5)))
+        self.activation_energy_edit.setText(str(reaction_data.get("Ea", self.defaults.Ea_default)))
+        self.log_a_edit.setText(str(reaction_data.get("log_A", self.defaults.log_A_default)))
+        self.contribution_edit.setText(str(reaction_data.get("contribution", self.defaults.contribution_default)))
 
-        self.ea_min_item.setText(str(reaction_data.get("Ea_min", self.default_ranges["Ea"][0])))
-        self.ea_max_item.setText(str(reaction_data.get("Ea_max", self.default_ranges["Ea"][1])))
+        self.ea_min_item.setText(str(reaction_data.get("Ea_min", self.defaults.Ea_range[0])))
+        self.ea_max_item.setText(str(reaction_data.get("Ea_max", self.defaults.Ea_range[1])))
 
-        self.log_a_min_item.setText(str(reaction_data.get("log_A_min", self.default_ranges["log_A"][0])))
-        self.log_a_max_item.setText(str(reaction_data.get("log_A_max", self.default_ranges["log_A"][1])))
+        self.log_a_min_item.setText(str(reaction_data.get("log_A_min", self.defaults.log_A_range[0])))
+        self.log_a_max_item.setText(str(reaction_data.get("log_A_max", self.defaults.log_A_range[1])))
 
         self.contribution_min_item.setText(
-            str(reaction_data.get("contribution_min", self.default_ranges["contribution"][0]))
+            str(reaction_data.get("contribution_min", self.defaults.contribution_range[0]))
         )
         self.contribution_max_item.setText(
-            str(reaction_data.get("contribution_max", self.default_ranges["contribution"][1]))
+            str(reaction_data.get("contribution_max", self.defaults.contribution_range[1]))
         )
 
 
@@ -121,42 +155,32 @@ class AdjustmentRowWidget(QWidget):
     valueChanged = pyqtSignal(str, float)  # передаём имя параметра и новое значение
 
     def __init__(self, parameter_name: str, initial_value: float, button_step: float, slider_scale: float, parent=None):
-        """
-        :param parameter_name: имя параметра (например, "Ea", "log_A", "contribution")
-        :param initial_value: начальное значение параметра
-        :param button_step: шаг изменения при нажатии кнопок (например, 10, 1, 0.1)
-        :param slider_scale: коэффициент для пересчёта значения ползунка:
-               итоговое смещение = slider_value * slider_scale.
-               Для Ea: slider_scale=1 (диапазон ±5), для log_A: 0.1 (±0.5),
-               для contribution: 0.01 (±0.05)
-        """
         super().__init__(parent)
         self.parameter_name = parameter_name
         self.base_value = initial_value
         self.button_step = button_step
         self.slider_scale = slider_scale
 
-        # Вертикальное расположение: сверху метка, снизу строка с кнопками и ползунком
         layout = QVBoxLayout(self)
         self.value_label = QLabel(f"{self.base_value:.3f}")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.value_label)
 
         h_layout = QHBoxLayout()
+        const = AdjustmentDefaults()
         self.left_button = QPushButton("<")
-        self.left_button.setFixedSize(24, 24)
+        self.left_button.setFixedSize(const.BUTTON_SIZE, const.BUTTON_SIZE)
         self.left_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
-        # Для отображения диапазона ±5 в целых числах; коэффициент масштабирования переводит в нужные единицы
-        self.slider.setRange(-5, 5)
+        self.slider.setRange(const.SLIDER_MIN, const.SLIDER_MAX)
         self.slider.setValue(0)
         self.slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.slider.setTickInterval(1)
+        self.slider.setTickInterval(const.SLIDER_TICK_INTERVAL)
         self.slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self.right_button = QPushButton(">")
-        self.right_button.setFixedSize(24, 24)
+        self.right_button.setFixedSize(const.BUTTON_SIZE, const.BUTTON_SIZE)
         self.right_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         h_layout.addWidget(self.left_button)
@@ -164,7 +188,6 @@ class AdjustmentRowWidget(QWidget):
         h_layout.addWidget(self.right_button)
         layout.addLayout(h_layout)
 
-        # Подключаем слоты
         self.left_button.clicked.connect(self.on_left_clicked)
         self.right_button.clicked.connect(self.on_right_clicked)
         self.slider.valueChanged.connect(self.on_slider_value_changed)
@@ -203,13 +226,20 @@ class AdjustingSettingsBox(QWidget):
         main_layout = QVBoxLayout(self)
         self.setLayout(main_layout)
 
-        initial_ea = 120
-        initial_log_a = 8
-        initial_contrib = 0.5
-
-        self.ea_adjuster = AdjustmentRowWidget("Ea", initial_ea, 10, 1, parent=self)
-        self.log_a_adjuster = AdjustmentRowWidget("log_A", initial_log_a, 1, 0.1, parent=self)
-        self.contrib_adjuster = AdjustmentRowWidget("contribution", initial_contrib, 0.1, 0.01, parent=self)
+        params = ReactionAdjustmentParameters()
+        self.ea_adjuster = AdjustmentRowWidget(
+            "Ea", params.ea_default, params.ea_button_step, params.ea_slider_scale, parent=self
+        )
+        self.log_a_adjuster = AdjustmentRowWidget(
+            "log_A", params.log_a_default, params.log_a_button_step, params.log_a_slider_scale, parent=self
+        )
+        self.contrib_adjuster = AdjustmentRowWidget(
+            "contribution",
+            params.contribution_default,
+            params.contribution_button_step,
+            params.contribution_slider_scale,
+            parent=self,
+        )
 
         main_layout.addWidget(self.ea_adjuster)
         main_layout.addWidget(self.log_a_adjuster)
@@ -311,11 +341,15 @@ class ModelBasedTab(QWidget):
         self.setLayout(main_layout)
 
         self.reactions_combo = QComboBox()
+        rc = MODEL_BASED_TAB_LAYOUT["reactions_combo"]
+        self.reactions_combo.setMinimumSize(rc["min_width"], rc["min_height"])
         main_layout.addWidget(self.reactions_combo)
 
         reaction_type_layout = QHBoxLayout()
         reaction_type_label = QLabel("Reaction type:")
         self.reaction_type_combo = QComboBox()
+        rc2 = MODEL_BASED_TAB_LAYOUT["reaction_type_combo"]
+        self.reaction_type_combo.setMinimumSize(rc2["min_width"], rc2["min_height"])
         self.reaction_type_combo.addItems(NUC_MODELS_LIST)
 
         reaction_type_layout.addWidget(reaction_type_label)
@@ -323,14 +357,23 @@ class ModelBasedTab(QWidget):
         main_layout.addLayout(reaction_type_layout)
 
         self.range_calc_widget = RangeAndCalculateWidget()
+        rc3 = MODEL_BASED_TAB_LAYOUT.get("range_calc_widget", {})
+        if "min_height" in rc3:
+            self.range_calc_widget.setMinimumHeight(rc3["min_height"])
         self.range_calc_widget.showRangeToggled.connect(self.on_show_range_checkbox_changed)
         self.range_calc_widget.calculateToggled.connect(self.on_calculate_toggled)
         main_layout.addWidget(self.range_calc_widget)
 
         self.reaction_table = ReactionTable()
+        rc4 = MODEL_BASED_TAB_LAYOUT.get("reaction_table", {})
+        if "min_height" in rc4:
+            self.reaction_table.setMinimumHeight(rc4["min_height"])
         main_layout.addWidget(self.reaction_table)
 
         self.adjusting_settings_box = AdjustingSettingsBox()
+        rc5 = MODEL_BASED_TAB_LAYOUT.get("adjusting_settings_box", {})
+        if "min_height" in rc5:
+            self.adjusting_settings_box.setMinimumHeight(rc5["min_height"])
         main_layout.addWidget(self.adjusting_settings_box)
 
         self.reaction_table.activation_energy_edit.editingFinished.connect(self._on_params_changed)
@@ -352,9 +395,17 @@ class ModelBasedTab(QWidget):
 
         bottom_layout = QVBoxLayout()
         self.models_scene = ModelsScheme(self)
+        rc6 = MODEL_BASED_TAB_LAYOUT.get("models_scene", {})
+        if "min_width" in rc6 and "min_height" in rc6:
+            self.models_scene.setMinimumSize(rc6["min_width"], rc6["min_height"])
         bottom_layout.addWidget(self.models_scene)
 
         self.calc_buttons = ModelCalcButtons(self)
+        rc7 = MODEL_BASED_TAB_LAYOUT.get("calc_buttons", {})
+        if "button_width" in rc7 and "button_height" in rc7:
+            self.calc_buttons.settings_button.setFixedSize(rc7["button_width"], rc7["button_height"])
+            self.calc_buttons.start_button.setFixedSize(rc7["button_width"], rc7["button_height"])
+            self.calc_buttons.stop_button.setFixedSize(rc7["button_width"], rc7["button_height"])
         bottom_layout.addWidget(self.calc_buttons)
 
         main_layout.addLayout(bottom_layout)
@@ -445,32 +496,32 @@ class ModelBasedTab(QWidget):
         try:
             ea_min_val = float(self.reaction_table.ea_min_item.text())
         except ValueError:
-            ea_min_val = self.reaction_table.default_ranges["Ea"][0]
+            ea_min_val = self.reaction_table.defaults.Ea_range[0]
 
         try:
             ea_max_val = float(self.reaction_table.ea_max_item.text())
         except ValueError:
-            ea_max_val = self.reaction_table.default_ranges["Ea"][1]
+            ea_max_val = self.reaction_table.defaults.Ea_range[1]
 
         try:
             loga_min_val = float(self.reaction_table.log_a_min_item.text())
         except ValueError:
-            loga_min_val = self.reaction_table.default_ranges["log_A"][0]
+            loga_min_val = self.reaction_table.defaults.log_A_range[0]
 
         try:
             loga_max_val = float(self.reaction_table.log_a_max_item.text())
         except ValueError:
-            loga_max_val = self.reaction_table.default_ranges["log_A"][1]
+            loga_max_val = self.reaction_table.defaults.log_A_range[1]
 
         try:
             contrib_min_val = float(self.reaction_table.contribution_min_item.text())
         except ValueError:
-            contrib_min_val = self.reaction_table.default_ranges["contribution"][0]
+            contrib_min_val = self.reaction_table.defaults.contribution_range[0]
 
         try:
             contrib_max_val = float(self.reaction_table.contribution_max_item.text())
         except ValueError:
-            contrib_max_val = self.reaction_table.default_ranges["contribution"][1]
+            contrib_max_val = self.reaction_table.defaults.contribution_range[1]
 
         new_scheme = self._scheme_data.copy()
 
@@ -543,8 +594,6 @@ class SelectFileDataDialog(QDialog):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout()
 
-        # Для каждого файла создаём чекбокс,
-        # поля для ввода скорости нагрева и массы
         for file_name in df_copies.keys():
             file_layout = QHBoxLayout()
 
