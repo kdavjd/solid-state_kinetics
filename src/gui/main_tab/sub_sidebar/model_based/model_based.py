@@ -557,7 +557,11 @@ class ModelBasedTab(QWidget):
                 r["contribution_max"] = contrib_max_val
                 break
 
-        update_data = {"operation": OperationType.MODEL_PARAMS_CHANGE, "reaction_scheme": new_scheme}
+        update_data = {
+            "operation": OperationType.MODEL_PARAMS_CHANGE,
+            "reaction_scheme": new_scheme,
+            "is_calculate": True if self.range_calc_widget.calculateCheckbox.isChecked() else None,
+        }
         self.model_params_changed.emit(update_data)
 
     def open_settings(self):
@@ -582,6 +586,7 @@ class ModelBasedTab(QWidget):
                 "operation": OperationType.MODEL_PARAMS_CHANGE,
                 "reaction_scheme": self._scheme_data,
                 "calculation_settings": new_calculation_settings,
+                "is_calculate": True if self.range_calc_widget.calculateCheckbox.isChecked() else None,
             }
             self.model_params_changed.emit(update_data)
 
