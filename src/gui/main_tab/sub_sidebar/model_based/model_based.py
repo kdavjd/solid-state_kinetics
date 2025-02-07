@@ -157,16 +157,18 @@ class AdjustmentRowWidget(QWidget):
         slider_scale: float,
         display_name: str = None,
         parent=None,
+        decimals: int = 3,
     ):
         super().__init__(parent)
         self.parameter_name = parameter_name
         self.display_name = display_name if display_name is not None else parameter_name
-        self.base_value = initial_value
+        self.decimals = decimals
+        self.base_value = round(initial_value, self.decimals)
         self.button_step = button_step
         self.slider_scale = slider_scale
 
         layout = QVBoxLayout(self)
-        self.value_label = QLabel(f"{self.display_name}: {self.base_value:.3f}")
+        self.value_label = QLabel(f"{self.display_name}: {self.base_value:.{self.decimals}f}")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.value_label)
 
@@ -199,29 +201,32 @@ class AdjustmentRowWidget(QWidget):
 
     def on_left_clicked(self):
         self.base_value -= self.button_step
-        self.slider.setValue(0)  # reset position
+        self.base_value = round(self.base_value, self.decimals)
+        self.slider.setValue(0)
         self.update_label()
         self.valueChanged.emit(self.parameter_name, self.base_value)
 
     def on_right_clicked(self):
         self.base_value += self.button_step
+        self.base_value = round(self.base_value, self.decimals)
         self.slider.setValue(0)
         self.update_label()
         self.valueChanged.emit(self.parameter_name, self.base_value)
 
     def on_slider_value_changed(self, value):
         potential_value = self.base_value + (value * self.slider_scale)
-        self.value_label.setText(f"{self.display_name}: {potential_value:.3f}")
+        self.value_label.setText(f"{self.display_name}: {potential_value:.{self.decimals}f}")
 
     def on_slider_released(self):
         offset = self.slider.value() * self.slider_scale
         self.base_value += offset
+        self.base_value = round(self.base_value, self.decimals)
         self.slider.setValue(0)
         self.update_label()
         self.valueChanged.emit(self.parameter_name, self.base_value)
 
     def update_label(self):
-        self.value_label.setText(f"{self.display_name}: {self.base_value:.3f}")
+        self.value_label.setText(f"{self.display_name}: {self.base_value:.{self.decimals}f}")
 
 
 class AdjustingSettingsBox(QWidget):
@@ -611,9 +616,6 @@ class SelectFileDataDialog(QDialog):
         self.selected_files = []
         self.checkboxes = []
         self.rate_line_edits = []
-        # Удаляем список для ввода массы:
-        # self.mass_line_edits = []
-
         layout = QVBoxLayout()
 
         label = QLabel("Select files to include in the series:")
