@@ -59,6 +59,12 @@ class ReactionAdjustmentParameters:
     contribution_slider_scale: float = 0.01
 
 
+@dataclass
+class LayoutSettings:
+    reaction_table_column_widths: tuple[int, int, int, int] = (70, 50, 50, 50)
+    reaction_table_row_heights: tuple[int, int, int] = (30, 30, 30)
+
+
 MODEL_BASED_TAB_LAYOUT = {
     "reactions_combo": {"min_width": 200, "min_height": 30},
     "reaction_type_combo": {"min_width": 100, "min_height": 30},
@@ -74,6 +80,7 @@ class ReactionTable(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(3, 4, parent)
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max"])
+
         self.setColumnHidden(2, True)
         self.setColumnHidden(3, True)
 
@@ -106,19 +113,6 @@ class ReactionTable(QTableWidget):
     def set_ranges_visible(self, visible: bool):
         self.setColumnHidden(2, not visible)
         self.setColumnHidden(3, not visible)
-
-        if visible:
-            ea_min, ea_max = self.defaults.Ea_range
-            self.ea_min_item.setText(str(ea_min))
-            self.ea_max_item.setText(str(ea_max))
-
-            log_a_min, log_a_max = self.defaults.log_A_range
-            self.log_a_min_item.setText(str(log_a_min))
-            self.log_a_max_item.setText(str(log_a_max))
-
-            contrib_min, contrib_max = self.defaults.contribution_range
-            self.contribution_min_item.setText(str(contrib_min))
-            self.contribution_max_item.setText(str(contrib_max))
 
     def update_table(self, reaction_data: dict):
         if not reaction_data:
@@ -370,6 +364,12 @@ class ModelBasedTab(QWidget):
             self.reaction_table.setMinimumHeight(rc4["min_height"])
         main_layout.addWidget(self.reaction_table)
 
+        layout_settings = LayoutSettings()
+        for col, width in enumerate(layout_settings.reaction_table_column_widths):
+            self.reaction_table.setColumnWidth(col, width)
+        for row, height in enumerate(layout_settings.reaction_table_row_heights):
+            self.reaction_table.setRowHeight(row, height)
+
         self.adjusting_settings_box = AdjustingSettingsBox()
         rc5 = MODEL_BASED_TAB_LAYOUT.get("adjusting_settings_box", {})
         if "min_height" in rc5:
@@ -458,9 +458,26 @@ class ModelBasedTab(QWidget):
             reaction_data = self._reactions_list[index]
             self.reaction_table.update_table(reaction_data)
 
+            # Обновляем значения в слайдерах согласно выбранной реакции
+            default_reaction = ReactionDefaults()
+            ea_value = reaction_data.get("Ea", default_reaction.Ea_default)
+            log_a_value = reaction_data.get("log_A", default_reaction.log_A_default)
+            contrib_value = reaction_data.get("contribution", default_reaction.contribution_default)
+
+            self.adjusting_settings_box.ea_adjuster.base_value = ea_value
+            self.adjusting_settings_box.ea_adjuster.slider.setValue(0)
+            self.adjusting_settings_box.ea_adjuster.update_label()
+
+            self.adjusting_settings_box.log_a_adjuster.base_value = log_a_value
+            self.adjusting_settings_box.log_a_adjuster.slider.setValue(0)
+            self.adjusting_settings_box.log_a_adjuster.update_label()
+
+            self.adjusting_settings_box.contrib_adjuster.base_value = contrib_value
+            self.adjusting_settings_box.contrib_adjuster.slider.setValue(0)
+            self.adjusting_settings_box.contrib_adjuster.update_label()
+
             new_reaction_type = reaction_data.get("reaction_type", "F2")
             current_reaction_type = self.reaction_type_combo.currentText()
-
             if new_reaction_type != current_reaction_type:
                 was_blocked = self.reaction_type_combo.blockSignals(True)
                 self.reaction_type_combo.setCurrentText(new_reaction_type)
@@ -921,7 +938,7 @@ class CalculationSettingsDialog(QDialog):
                     return False, "Must be an integer >= 1."
             elif key == "tol":
                 if not isinstance(value, (int, float)) or value < 0:
-                    return False, "Must be a non-negative number."
+                    return False, "Must be non-negative."
             elif key == "mutation":
                 if isinstance(value, tuple):
                     if len(value) != 2 or not all(0 <= v <= 2 for v in value):
@@ -939,13 +956,12 @@ class CalculationSettingsDialog(QDialog):
                     return False, "Must be an integer or None."
             elif key == "atol":
                 if not isinstance(value, (int, float)) or value < 0:
-                    return False, "Must be a non-negative number."
+                    return False, "Must be non-negative."
             elif key == "updating":
                 options = self.get_options_for_parameter("updating")
                 if value not in options:
                     return False, f"Must be one of {options}."
             elif key == "workers":
-                # The code currently does not support parallel processes other than 1.
                 if not isinstance(value, int) or value < 1 or value > 1:
                     return False, "Must be an integer = 1. Parallel processing is not supported."
             return True, ""
