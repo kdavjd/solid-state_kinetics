@@ -34,8 +34,8 @@ class ReactionDefaults:
     log_A_default: float = 8
     contribution_default: float = 0.5
     Ea_range: tuple = (1, 2000)
-    log_A_range: tuple = (0.1, 100)
-    contribution_range: tuple = (0.01, 1)
+    log_A_range: tuple = (-100, 100)
+    contribution_range: tuple = (-1, 1)
 
 
 @dataclass
@@ -113,6 +113,7 @@ class ReactionTable(QTableWidget):
     def set_ranges_visible(self, visible: bool):
         self.setColumnHidden(2, not visible)
         self.setColumnHidden(3, not visible)
+        self.viewport().update()
 
     def update_table(self, reaction_data: dict):
         if not reaction_data:
@@ -146,17 +147,26 @@ class ReactionTable(QTableWidget):
 
 
 class AdjustmentRowWidget(QWidget):
-    valueChanged = pyqtSignal(str, float)  # передаём имя параметра и новое значение
+    valueChanged = pyqtSignal(str, float)
 
-    def __init__(self, parameter_name: str, initial_value: float, button_step: float, slider_scale: float, parent=None):
+    def __init__(
+        self,
+        parameter_name: str,
+        initial_value: float,
+        button_step: float,
+        slider_scale: float,
+        display_name: str = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.parameter_name = parameter_name
+        self.display_name = display_name if display_name is not None else parameter_name
         self.base_value = initial_value
         self.button_step = button_step
         self.slider_scale = slider_scale
 
         layout = QVBoxLayout(self)
-        self.value_label = QLabel(f"{self.base_value:.3f}")
+        self.value_label = QLabel(f"{self.display_name}: {self.base_value:.3f}")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.value_label)
 
@@ -189,7 +199,7 @@ class AdjustmentRowWidget(QWidget):
 
     def on_left_clicked(self):
         self.base_value -= self.button_step
-        self.slider.setValue(0)  # сброс ползунка
+        self.slider.setValue(0)  # reset position
         self.update_label()
         self.valueChanged.emit(self.parameter_name, self.base_value)
 
@@ -201,7 +211,7 @@ class AdjustmentRowWidget(QWidget):
 
     def on_slider_value_changed(self, value):
         potential_value = self.base_value + (value * self.slider_scale)
-        self.value_label.setText(f"{potential_value:.3f}")
+        self.value_label.setText(f"{self.display_name}: {potential_value:.3f}")
 
     def on_slider_released(self):
         offset = self.slider.value() * self.slider_scale
@@ -211,7 +221,7 @@ class AdjustmentRowWidget(QWidget):
         self.valueChanged.emit(self.parameter_name, self.base_value)
 
     def update_label(self):
-        self.value_label.setText(f"{self.base_value:.3f}")
+        self.value_label.setText(f"{self.display_name}: {self.base_value:.3f}")
 
 
 class AdjustingSettingsBox(QWidget):
@@ -222,16 +232,17 @@ class AdjustingSettingsBox(QWidget):
 
         params = ReactionAdjustmentParameters()
         self.ea_adjuster = AdjustmentRowWidget(
-            "Ea", params.ea_default, params.ea_button_step, params.ea_slider_scale, parent=self
+            "Ea", params.ea_default, params.ea_button_step, params.ea_slider_scale, "Ea", parent=self
         )
         self.log_a_adjuster = AdjustmentRowWidget(
-            "log_A", params.log_a_default, params.log_a_button_step, params.log_a_slider_scale, parent=self
+            "log_A", params.log_a_default, params.log_a_button_step, params.log_a_slider_scale, "log(A)", parent=self
         )
         self.contrib_adjuster = AdjustmentRowWidget(
             "contribution",
             params.contribution_default,
             params.contribution_button_step,
             params.contribution_slider_scale,
+            "contribution",
             parent=self,
         )
 
@@ -314,10 +325,10 @@ class RangeAndCalculateWidget(QWidget):
         layout.addWidget(self.calculateCheckbox)
 
         self.showRangeCheckbox.stateChanged.connect(
-            lambda state: self.showRangeToggled.emit(state == Qt.CheckState.Checked)
+            lambda state: self.showRangeToggled.emit(state == Qt.CheckState.Checked.value)
         )
         self.calculateCheckbox.stateChanged.connect(
-            lambda state: self.calculateToggled.emit(state == Qt.CheckState.Checked)
+            lambda state: self.calculateToggled.emit(state == Qt.CheckState.Checked.value)
         )
 
 
@@ -600,7 +611,8 @@ class SelectFileDataDialog(QDialog):
         self.selected_files = []
         self.checkboxes = []
         self.rate_line_edits = []
-        self.mass_line_edits = []
+        # Удаляем список для ввода массы:
+        # self.mass_line_edits = []
 
         layout = QVBoxLayout()
 
@@ -624,17 +636,12 @@ class SelectFileDataDialog(QDialog):
             rate_line_edit = QLineEdit()
             rate_line_edit.setPlaceholderText("Enter heating rate")
 
-            mass_line_edit = QLineEdit()
-            mass_line_edit.setPlaceholderText("Enter mass")
-
             file_layout.addWidget(checkbox)
             file_layout.addWidget(rate_line_edit)
-            file_layout.addWidget(mass_line_edit)
             scroll_layout.addLayout(file_layout)
 
             self.checkboxes.append(checkbox)
             self.rate_line_edits.append(rate_line_edit)
-            self.mass_line_edits.append(mass_line_edit)
 
         scroll_content.setLayout(scroll_layout)
         scroll.setWidget(scroll_content)
@@ -659,19 +666,11 @@ class SelectFileDataDialog(QDialog):
             return None, []
 
         selected_files = []
-        for checkbox, rate_line_edit, mass_line_edit in zip(
-            self.checkboxes, self.rate_line_edits, self.mass_line_edits
-        ):
+        for checkbox, rate_line_edit in zip(self.checkboxes, self.rate_line_edits):
             if checkbox.isChecked():
                 rate_text = rate_line_edit.text().strip()
-                mass_text = mass_line_edit.text().strip()
-
                 if not rate_text:
                     QMessageBox.warning(self, "Invalid Input", f"Please enter a heating rate for '{checkbox.text()}'")
-                    return None, []
-
-                if not mass_text:
-                    QMessageBox.warning(self, "Invalid Input", f"Please enter a mass for '{checkbox.text()}'")
                     return None, []
 
                 try:
@@ -682,15 +681,7 @@ class SelectFileDataDialog(QDialog):
                     )
                     return None, []
 
-                try:
-                    mass = float(mass_text)
-                except ValueError:
-                    QMessageBox.warning(
-                        self, "Invalid Input", f"Please enter a valid number mass for '{checkbox.text()}'"
-                    )
-                    return None, []
-
-                selected_files.append((checkbox.text(), heating_rate, mass))
+                selected_files.append((checkbox.text(), heating_rate, 1))  # 1 is mass for future use
 
         return series_name, selected_files
 
