@@ -474,7 +474,6 @@ class ModelBasedTab(QWidget):
             reaction_data = self._reactions_list[index]
             self.reaction_table.update_table(reaction_data)
 
-            # Обновляем значения в слайдерах согласно выбранной реакции
             default_reaction = ReactionDefaults()
             ea_value = reaction_data.get("Ea", default_reaction.Ea_default)
             log_a_value = reaction_data.get("log_A", default_reaction.log_A_default)
@@ -783,6 +782,31 @@ class CalculationSettingsDialog(QDialog):
 
             box_layout.addWidget(top_line_widget)
 
+            models_selection_widget = QWidget()
+            models_selection_layout = QHBoxLayout(models_selection_widget)
+            models_selection_widget.setLayout(models_selection_layout)
+            many_models_checkbox = QCheckBox("Many models")
+            add_models_button = QPushButton("Add models")
+            add_models_button.setEnabled(False)
+
+            add_models_button.selected_models = []
+            models_selection_layout.addWidget(many_models_checkbox)
+            models_selection_layout.addWidget(add_models_button)
+            box_layout.addWidget(models_selection_widget)
+
+            many_models_checkbox.stateChanged.connect(
+                lambda state, btn=add_models_button: btn.setEnabled(state == Qt.CheckState.Checked.value)
+            )
+
+            def open_models_dialog(checked, btn=add_models_button):
+                dialog = ModelsSelectionDialog(NUC_MODELS_LIST, parent=self)
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    selected = dialog.get_selected_models()
+                    btn.selected_models = selected
+                    btn.setText(f"Add models ({len(selected)})")
+
+            add_models_button.clicked.connect(open_models_dialog)
+
             table = QTableWidget(3, 2, self)
             table.setHorizontalHeaderLabels(["Min", "Max"])
             table.setVerticalHeaderLabels(["Ea", "log(A)", "contribution"])
@@ -817,7 +841,7 @@ class CalculationSettingsDialog(QDialog):
             table.setItem(2, 1, QTableWidgetItem(contrib_max))
 
             self.reactions_grid.addWidget(box_widget, row, col)
-            self.reaction_boxes.append((combo_type, table, reaction_label))
+            self.reaction_boxes.append((combo_type, many_models_checkbox, add_models_button, table, reaction_label))
 
         btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btn_box.accepted.connect(self.accept)
@@ -863,7 +887,9 @@ class CalculationSettingsDialog(QDialog):
             return None, None
 
         updated_reactions = []
-        for (combo_type, table, label_reaction), old_reaction in zip(self.reaction_boxes, self.reactions_data):
+        for (combo_type, many_models_checkbox, add_models_button, table, label_reaction), old_reaction in zip(
+            self.reaction_boxes, self.reactions_data
+        ):
             ea_min_str = table.item(0, 0).text().strip()
             ea_max_str = table.item(0, 1).text().strip()
             loga_min_str = table.item(1, 0).text().strip()
@@ -879,13 +905,19 @@ class CalculationSettingsDialog(QDialog):
 
             new_r = dict(old_reaction)
             new_r["reaction_type"] = combo_type.currentText()
-
             new_r["Ea_min"] = safe_cast(ea_min_str, old_reaction.get("Ea_min", 1))
             new_r["Ea_max"] = safe_cast(ea_max_str, old_reaction.get("Ea_max", 2000))
             new_r["log_A_min"] = safe_cast(loga_min_str, old_reaction.get("log_A_min", 0.1))
             new_r["log_A_max"] = safe_cast(loga_max_str, old_reaction.get("log_A_max", 100))
             new_r["contribution_min"] = safe_cast(contrib_min_str, old_reaction.get("contribution_min", 0.01))
             new_r["contribution_max"] = safe_cast(contrib_max_str, old_reaction.get("contribution_max", 1.0))
+
+            many_models_value = many_models_checkbox.isChecked()
+            if many_models_value:
+                selected_models = add_models_button.selected_models
+            else:
+                selected_models = [combo_type.currentText()]
+            new_r["allowed_models"] = selected_models
 
             updated_reactions.append(new_r)
 
@@ -960,8 +992,8 @@ class CalculationSettingsDialog(QDialog):
                 if value not in options:
                     return False, f"Must be one of {options}."
             elif key == "workers":
-                if not isinstance(value, int) or value < 1 or value > 1:
-                    return False, "Must be an integer = 1. Parallel processing is not supported."
+                if not isinstance(value, int) or value < 1 or value > 4:
+                    return False, "Must be an integer = 1. Parallel processing is not supported. Up to 4 for test"
             return True, ""
         except Exception as e:
             return False, f"Error validating parameter: {str(e)}"
@@ -998,3 +1030,32 @@ class CalculationSettingsDialog(QDialog):
             "updating": ["immediate", "deferred"],
         }
         return options.get(param_name, [])
+
+
+class ModelsSelectionDialog(QDialog):
+    def __init__(self, models_list, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Models")
+        self.models_list = models_list
+        self.selected_models = []
+        layout = QVBoxLayout(self)
+        self.setLayout(layout)
+
+        grid = QGridLayout()
+        layout.addLayout(grid)
+        self.checkboxes = []
+        col_count = 6
+        for index, model in enumerate(models_list):
+            checkbox = QCheckBox(model)
+            self.checkboxes.append(checkbox)
+            row = index // col_count
+            col = index % col_count
+            grid.addWidget(checkbox, row, col)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def get_selected_models(self):
+        return [cb.text() for cb in self.checkboxes if cb.isChecked()]

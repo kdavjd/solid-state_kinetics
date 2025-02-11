@@ -81,6 +81,7 @@ class SeriesData(BaseSlots):
     def _get_default_reaction_params(self, series_name: str):
         default_params = {
             "reaction_type": "F2",
+            "allowed_models": ["F1/3", "F3/4", "F3/2", "F2", "F3"],
             "Ea": 120,
             "log_A": 8,
             "contribution": 0.5,

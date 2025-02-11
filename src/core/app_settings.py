@@ -191,7 +191,7 @@ def clamp_fraction_decorator(eps=1e-8):
     return decorator
 
 
-NUC_MODELS_LIST = list(NUC_MODELS_TABLE.keys())
+NUC_MODELS_LIST = sorted(NUC_MODELS_TABLE.keys())
 for key in NUC_MODELS_LIST:
     if key in NUC_MODELS_TABLE:
         df = NUC_MODELS_TABLE[key]["differential_form"]
