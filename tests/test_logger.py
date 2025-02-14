@@ -2,7 +2,7 @@ import logging
 import sys
 import unittest
 
-from core.logger_config import configure_logger
+from src.core.logger_config import configure_logger
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name

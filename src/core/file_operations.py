@@ -1,24 +1,29 @@
 import pandas as pd
-from core.basic_signals import BasicSignals
-from core.logger_config import logger
-from PyQt6.QtCore import pyqtSlot
+from core.base_signals import BaseSlots
+
+from src.core.app_settings import OperationType
+from src.core.logger_config import logger
 
 
-class ActiveFileOperations(BasicSignals):
-    def __init__(self):
-        super().__init__("active_file_operations")
+class ActiveFileOperations(BaseSlots):
+    def __init__(self, signals):
+        super().__init__(actor_name="active_file_operations", signals=signals)
 
-    @pyqtSlot(dict)
-    def request_slot(self, params: dict):
-        logger.debug(f"В request_slot пришли данные {params}")
-        operation = params.pop("operation", None)
+    def process_request(self, params: dict):
+        operation = params.get("operation")
+        actor = params.get("actor")
+        logger.debug(f"{self.actor_name} processing request '{operation}' from '{actor}'")
+        response = params.copy()
 
-        if operation == "differential":
-            params["function"] = self.diff_function
+        if operation == OperationType.DIFFERENTIAL:
+            response["data"] = self.diff_function
+        if operation == "load":
+            pass
+        else:
+            logger.warning(f"{self.actor_name} received unknown operation '{operation}'")
 
-        response_data = self.handle_request_cycle("file_data", operation, **params)
-
-        logger.debug(f"В операция {operation} завершилась статусом {response_data}")
+        response["target"], response["actor"] = response["actor"], response["target"]
+        self.signals.response_signal.emit(response)
 
     def diff_function(self, data: pd.DataFrame):
         return data.diff() * -1

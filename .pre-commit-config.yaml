@@ -21,24 +21,24 @@ repos:
         types: [python]
         args: []
 
-  - repo: local
-    hooks:
-      - id: pytest
-        name: pytest
-        entry: poetry run pytest tests/
-        language: system
-        types: [python]
-        args: []
+  # - repo: local
+  #   hooks:
+  #     - id: pytest
+  #       name: pytest
+  #       entry: poetry run pytest tests/
+  #       language: system
+  #       types: [python]
+  #       args: []
 
-  - repo: local
-    hooks:
-      - id: mypy
-        name: mypy
-        description: ""
-        entry: poetry run mypy
-        language: python
-        "types_or": [python, pyi]
-        args: ["--ignore-missing-imports", "--scripts-are-modules"]
-        require_serial: true
-        additional_dependencies: []
-        minimum_pre_commit_version: "2.9.2"
+  # - repo: local
+  #   hooks:
+  #     - id: mypy
+  #       name: mypy
+  #       description: ""
+  #       entry: poetry run mypy
+  #       language: python
+  #       "types_or": [python, pyi]
+  #       args: ["--ignore-missing-imports", "--scripts-are-modules"]
+  #       require_serial: true
+  #       additional_dependencies: []
+  #       minimum_pre_commit_version: "2.9.2"

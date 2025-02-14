@@ -3,10 +3,7 @@ import os
 from collections import defaultdict
 
 import numpy as np
-from core.basic_signals import BasicSignals
-from core.logger_config import logger
-from core.logger_console import LoggerConsole as console
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -27,78 +24,59 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
-    "strategy": "best1bin",
-    "maxiter": 1000,
-    "popsize": 15,
-    "tol": 0.01,
-    "mutation": (0.5, 1),
-    "recombination": 0.7,
-    "seed": None,
-    "callback": None,
-    "disp": False,
-    "polish": True,
-    "init": "latinhypercube",
-    "atol": 0,
-    "updating": "deferred",
-    "workers": 1,
-    "constraints": (),
-}
+from src.core.app_settings import MODEL_FREE_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS, OperationType
+from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
 
 
-class FileTransferButtons(QWidget, BasicSignals):
-    request_signal = pyqtSignal(dict)
+class FileTransferButtons(QWidget):
+    import_reactions_signal = pyqtSignal(dict)
+    export_reactions_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        QWidget.__init__(self, parent)
-        # После добавления сигналов при первом выборе вкладки деконволюции происходит
-        # непрусмотренное выскакивание окна на долю секунды
-        BasicSignals.__init__(self, actor_name="file_tansfer_buttons")
+        """
+        Initialize the file transfer buttons widget.
+        """
+        super().__init__(parent)
+
         self.layout = QVBoxLayout(self)
 
-        self.load_reactions_button = QPushButton("Импорт")
-        self.export_reactions_button = QPushButton("Экспорт")
+        self.load_reactions_button = QPushButton("import")
+        self.export_reactions_button = QPushButton("export")
+
         self.buttons_layout = QHBoxLayout()
         self.buttons_layout.addWidget(self.load_reactions_button)
         self.buttons_layout.addWidget(self.export_reactions_button)
         self.layout.addLayout(self.buttons_layout)
 
         self.load_reactions_button.clicked.connect(self.load_reactions)
-        self.export_reactions_button.clicked.connect(self.export_reactions)
-
-    @pyqtSlot(dict)
-    def response_slot(self, params: dict):
-        super().response_slot(params)
+        self.export_reactions_button.clicked.connect(self._export_reactions)
 
     def load_reactions(self):
-        load_file_name, _ = QFileDialog.getOpenFileName(
-            self, "Выберите JSON файл для импорта данных", "", "JSON Files (*.json)"
+        """
+        Opens a file dialog to select a JSON file for importing reaction data.
+        Emits the 'import_reactions_signal' upon success.
+        """
+        import_file_name, _ = QFileDialog.getOpenFileName(
+            self, "Select the JSON file to import the data", "", "JSON Files (*.json)"
         )
 
-        if load_file_name:
-            with open(load_file_name, "r", encoding="utf-8") as file:
-                data = json.load(file)
-
-            for reaction_key, reaction_data in data.items():
-                if "x" in reaction_data:
-                    reaction_data["x"] = np.array(reaction_data["x"])
-
-            request_id = self.create_and_emit_request("main_tab", "get_file_name")
-            file_name = self.handle_response_data(request_id)
-            logger.debug(f"Current file_name: {file_name}")
-
-            request_id = self.create_and_emit_request(
-                "calculations_data", "set_value", path_keys=[file_name], value=data
+        if import_file_name:
+            self.import_reactions_signal.emit(
+                {"import_file_name": import_file_name, "operation": OperationType.IMPORT_REACTIONS}
             )
-            self.handle_response_data(request_id)
-
-            console.log(f"Данные успешно импортированы из файла:\n\n{load_file_name}")
-            logger.info(f"Данные успешно импортированы из файла: {load_file_name}")
-
-            request_id = self.create_and_emit_request("main_tab", "update_reaction_table", reactions_data=data)
-            self.handle_response_data(request_id)
 
     def _generate_suggested_file_name(self, file_name: str, data: dict):
+        """
+        Generate a suggested file name for exporting reactions based on the number and types of reactions.
+
+        Args:
+            file_name (str): Base file name.
+            data (dict): Reaction data dictionary.
+
+        Returns:
+            str: Suggested file name incorporating reaction count and types.
+        """
         n_reactions = len(data)
         reaction_types = []
         for reaction_key, reaction_data in data.items():
@@ -115,29 +93,35 @@ class FileTransferButtons(QWidget, BasicSignals):
         suggested_file_name = f"{base_name}_{n_reactions}_rcts_{reaction_codes}.json"
         return suggested_file_name
 
-    def export_reactions(self):
-        request_id = self.create_and_emit_request("main_tab", "get_file_name")
-        file_name = self.handle_response_data(request_id)
-        logger.debug(f"file_name: {file_name}")
+    def _export_reactions(self):
+        self.export_reactions_signal.emit(
+            {"function": self._generate_suggested_file_name, "operation": OperationType.EXPORT_REACTIONS}
+        )
 
-        request_id = self.create_and_emit_request("calculations_data", "get_value", path_keys=[file_name])
-        data = self.handle_response_data(request_id)
-        logger.debug(f"data: {data}")
+    def export_reactions(self, data, suggested_file_name):
+        """
+        Export the provided reaction data to a JSON file chosen by the user.
 
-        suggested_file_name = self._generate_suggested_file_name(file_name, data)
-
+        Args:
+            data (dict): Reaction data to export.
+            suggested_file_name (str): Suggested file name for saving.
+        """
         save_file_name, _ = QFileDialog.getSaveFileName(
-            self, "Выберите место для сохранения JSON файла", suggested_file_name, "JSON Files (*.json)"
+            self, "Select a location to save JSON", suggested_file_name, "JSON Files (*.json)"
         )
 
         if save_file_name:
             with open(save_file_name, "w", encoding="utf-8") as file:
                 json.dump(data, file, ensure_ascii=False, indent=4, cls=NumpyArrayEncoder)
-                console.log(f"Данные успешно экспортированы в файл:\n\n{save_file_name}")
-                logger.info(f"Данные успешно экспортированы в файл:{save_file_name}")
+                console.log(f"Data successfully exported to file:\n\n{save_file_name}")
+                logger.info(f"Data successfully exported to file: {save_file_name}")
 
 
 class NumpyArrayEncoder(json.JSONEncoder):
+    """
+    Custom JSON encoder that converts NumPy arrays to lists for JSON serialization.
+    """
+
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
@@ -154,8 +138,9 @@ class ReactionTable(QWidget):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
 
-        self.add_reaction_button = QPushButton("Добавить")
-        self.del_reaction_button = QPushButton("Удалить")
+        self.add_reaction_button = QPushButton("add reaction")
+        self.del_reaction_button = QPushButton("delete")
+
         self.top_buttons_layout = QHBoxLayout()
         self.top_buttons_layout.addWidget(self.add_reaction_button)
         self.top_buttons_layout.addWidget(self.del_reaction_button)
@@ -168,7 +153,7 @@ class ReactionTable(QWidget):
         self.calculation_settings = defaultdict(dict)
         self.deconvolution_settings = defaultdict(dict)
 
-        self.settings_button = QPushButton("Настрйоки расчета")
+        self.settings_button = QPushButton("settings")
         self.layout.addWidget(self.settings_button)
 
         self.add_reaction_button.clicked.connect(self.add_reaction)
@@ -176,10 +161,14 @@ class ReactionTable(QWidget):
         self.settings_button.clicked.connect(self.open_settings)
 
     def switch_file(self, file_name):
+        """
+        Switch the active file's reaction table to the specified file_name.
+        Create a new table if none exists for that file.
+        """
         if file_name not in self.reactions_tables:
             self.reactions_tables[file_name] = QTableWidget()
             self.reactions_tables[file_name].setColumnCount(2)
-            self.reactions_tables[file_name].setHorizontalHeaderLabels(["Имя", "Функция"])
+            self.reactions_tables[file_name].setHorizontalHeaderLabels(["name", "function"])
             self.reactions_tables[file_name].horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.reactions_tables[file_name].itemClicked.connect(self.selected_reaction)
             self.layout.addWidget(self.reactions_tables[file_name])
@@ -191,18 +180,35 @@ class ReactionTable(QWidget):
         self.active_file = file_name
 
     def function_changed(self, reaction_name, combo):
+        """
+        Handle changes in the reaction function.
+
+        Args:
+            reaction_name (str): Name of the reaction.
+            combo (QComboBox): ComboBox widget for selecting the function.
+        """
         function = combo.currentText()
         data_change = {
             "path_keys": [reaction_name, "function"],
-            "operation": "update_value",
+            "operation": OperationType.UPDATE_VALUE,
             "value": function,
         }
         self.reaction_function_changed.emit(data_change)
-        logger.debug(f"Изменена реакция для {reaction_name}: {function}")
+        logger.debug(f"Reaction changed for {reaction_name}: {function}")
 
     def add_reaction(self, checked=False, reaction_name=None, function_name=None, emit_signal=True):
+        """
+        Add a new reaction to the currently active file's table.
+        If no file is active, show a warning message.
+
+        Args:
+            checked (bool): Unused checkbox state for signal/slot compatibility.
+            reaction_name (str): Custom reaction name. If None, a default name is generated.
+            function_name (str): Initial function name for the reaction. If None, 'gauss' is used.
+            emit_signal (bool): Whether to emit the 'reaction_added' signal.
+        """
         if not self.active_file:
-            QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
+            QMessageBox.warning(self, "The file is not selected", "Choose an experiment")
             return
 
         table = self.reactions_tables[self.active_file]
@@ -212,13 +218,14 @@ class ReactionTable(QWidget):
         if reaction_name is None:
             reaction_name = f"reaction_{self.reactions_counters[self.active_file]}"
         else:
+            # Validate the reaction name format
             try:
                 counter_value = int(reaction_name.split("_")[-1])
                 self.reactions_counters[self.active_file] = max(
                     self.reactions_counters[self.active_file], counter_value + 1
                 )
             except ValueError:
-                logger.error(f"Неверный формат имени реакции: {reaction_name}")
+                logger.error(f"Invalid reaction name format: {reaction_name}")
 
         combo = QComboBox()
         combo.addItems(["gauss", "fraser", "ads"])
@@ -232,14 +239,17 @@ class ReactionTable(QWidget):
         table.setCellWidget(row_count, 1, combo)
 
         if emit_signal:
-            reaction_data = {"path_keys": [reaction_name], "operation": "add_reaction"}
+            reaction_data = {"path_keys": [reaction_name], "operation": OperationType.ADD_REACTION}
             self.reaction_added.emit(reaction_data)
 
         self.reactions_counters[self.active_file] += 1
 
     def on_fail_add_reaction(self):
+        """
+        Roll back the last added reaction if addition failed.
+        """
         if not self.active_file:
-            logger.debug("Файл не выбран. Откат операции добавления невозможен.")
+            logger.debug("No file selected. Cannot roll back last addition.")
             return
 
         table = self.reactions_tables[self.active_file]
@@ -247,11 +257,15 @@ class ReactionTable(QWidget):
             last_row = table.rowCount() - 1
             table.removeRow(last_row)
             self.reactions_counters[self.active_file] -= 1
-            logger.debug("Неудачное добавление реакции. Удалена последняя строка.")
+            logger.debug("Failed to add reaction. The last row has been removed.")
 
     def del_reaction(self):
+        """
+        Delete the last reaction from the currently active file's table.
+        If no file is active or no reactions are available, show a warning.
+        """
         if not self.active_file:
-            QMessageBox.warning(self, "Удаление Реакции", "Файл не выбран.")
+            QMessageBox.warning(self, "The file is not selected.", "Choose an experiment")
             return
 
         table = self.reactions_tables[self.active_file]
@@ -265,22 +279,32 @@ class ReactionTable(QWidget):
 
                 reaction_data = {
                     "path_keys": [reaction_name],
-                    "operation": "remove_reaction",
+                    "operation": OperationType.REMOVE_REACTION,
                 }
                 self.reaction_removed.emit(reaction_data)
             else:
-                logger.debug("Попытка удалить пустую ячейку.")
+                logger.debug("Attempted to delete an empty cell.")
         else:
-            QMessageBox.warning(self, "Удаление Реакции", "В списке нет реакций для удаления.")
+            QMessageBox.warning(self, "Empty list", "There are no reactions to delete.")
 
     def selected_reaction(self, item):
+        """
+        Handle selection of a reaction from the table.
+        Emits 'reaction_chosed' signal.
+
+        Args:
+            item (QTableWidgetItem): The selected table item.
+        """
         row = item.row()
         reaction_name = self.reactions_tables[self.active_file].item(row, 0).text()
         self.active_reaction = reaction_name
-        logger.debug(f"Активная реакция: {reaction_name}")
-        self.reaction_chosed.emit({"path_keys": [reaction_name], "operation": "highlight_reaction"})
+        logger.debug(f"Active reaction: {reaction_name}")
+        self.reaction_chosed.emit({"path_keys": [reaction_name], "operation": OperationType.HIGHLIGHT_REACTION})
 
     def open_settings(self):
+        """
+        Open a dialog to configure calculation and deconvolution settings for the current file's reactions.
+        """
         if self.active_file:
             table = self.reactions_tables[self.active_file]
             reactions = {}
@@ -295,12 +319,13 @@ class ReactionTable(QWidget):
             if dialog.exec():
                 selected_functions, selected_method, deconvolution_parameters = dialog.get_selected_functions()
 
+                # Validate that each reaction has at least one function selected
                 empty_keys = [key for key, value in selected_functions.items() if not value]
                 if empty_keys:
                     QMessageBox.warning(
                         self,
-                        "Ошибка настроек",
-                        f"{', '.join(empty_keys)} должна описываться хотя бы одной функцией.",
+                        "unselected functions",
+                        f"{', '.join(empty_keys)} must be described by at least one function.",
                     )
                     self.open_settings()
                     return
@@ -308,23 +333,23 @@ class ReactionTable(QWidget):
                 self.calculation_settings[self.active_file] = selected_functions
                 self.deconvolution_settings[self.active_file] = {
                     "method": selected_method,
-                    "deconvolution_parameters": deconvolution_parameters,
+                    "method_parameters": deconvolution_parameters,
                 }
-                logger.info(f"Выбранные функции: {selected_functions}")
-                logger.info(f"Настройки деконволюции: {self.deconvolution_settings[self.active_file]}")
+                logger.info(f"Selected functions: {selected_functions}")
+                logger.info(f"Deconvolution settings: {self.deconvolution_settings[self.active_file]}")
 
                 formatted_functions = "\n".join([f"{key}: {value}" for key, value in selected_functions.items()])
                 message = f"    {self.active_file}\n{formatted_functions}"
 
-                QMessageBox.information(self, "Настройки расчета", f"Настройки обновлены для:\n{message}")
+                QMessageBox.information(self, "calculation settings", f"updated for:\n{message}")
         else:
-            QMessageBox.warning(self, "Настройки расчета", "Файл не выбран.")
+            QMessageBox.warning(self, "File is not selected.", "Choose an experiment")
 
 
 class CalculationSettingsDialog(QDialog):
     def __init__(self, reactions, initial_settings, initial_deconvolution_settings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Настройки расчета")
+        self.setWindowTitle("calculation settings")
         self.reactions = reactions
         self.initial_settings = initial_settings
         self.initial_deconvolution_settings = initial_deconvolution_settings
@@ -332,7 +357,7 @@ class CalculationSettingsDialog(QDialog):
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-        reactions_group_box = QGroupBox("Выбор функций реакций")
+        reactions_group_box = QGroupBox("functions")
         reactions_layout = QGridLayout()
         reactions_group_box.setLayout(reactions_layout)
         self.checkboxes = {}
@@ -354,12 +379,12 @@ class CalculationSettingsDialog(QDialog):
 
         main_layout.addWidget(reactions_group_box)
 
-        deconvolution_group_box = QGroupBox("Параметры деконволюции")
+        deconvolution_group_box = QGroupBox("deconvolution parameters")
         deconvolution_layout = QVBoxLayout()
         deconvolution_group_box.setLayout(deconvolution_layout)
 
         method_layout = QHBoxLayout()
-        method_label = QLabel("Метод деконволюции:")
+        method_label = QLabel("deconvolution method:")
         self.deconvolution_method_combo = QComboBox()
         self.deconvolution_method_combo.addItems(["differential_evolution", "another_method"])
         method_layout.addWidget(method_label)
@@ -388,6 +413,10 @@ class CalculationSettingsDialog(QDialog):
         main_layout.addWidget(self.button_box)
 
     def update_method_parameters(self):
+        """
+        Update the displayed parameters for the selected deconvolution method.
+        Clears previous parameters and populates the layout with fields for the current method.
+        """
         while self.method_parameters_layout.count():
             item = self.method_parameters_layout.takeAt(0)
             widget = item.widget()
@@ -403,10 +432,11 @@ class CalculationSettingsDialog(QDialog):
             ):
                 initial_params = self.initial_deconvolution_settings.get("deconvolution_parameters", {})
             row = 0
-            for key, value in DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
+            for key, value in MODEL_FREE_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS.items():
                 label = QLabel(key)
                 tooltip = self.get_tooltip_for_parameter(key)
                 label.setToolTip(tooltip)
+                # Choosing widget type based on parameter type
                 if isinstance(value, bool):
                     field = QCheckBox()
                     field.setChecked(initial_params.get(key, value))
@@ -425,25 +455,26 @@ class CalculationSettingsDialog(QDialog):
                 self.method_parameters_layout.addWidget(field, row, 1)
                 row += 1
         elif selected_method == "another_method":
+            # No parameters defined for this method in this example.
             pass
 
     def get_tooltip_for_parameter(self, param_name):
         tooltips = {
-            "strategy": "Стратегия дифференциальной эволюции. Выберите один из доступных вариантов.",
-            "maxiter": "Максимальное количество итераций. Целое число >= 1.",
-            "popsize": "Размер популяции. Целое число >= 1.",
-            "tol": "Относительная точность для критериев остановки. Положительное число.",
-            "mutation": "Коэффициент мутации. Число или кортеж из двух чисел в диапазоне [0, 2].",
-            "recombination": "Коэффициент рекомбинации. Число в диапазоне [0, 1].",
-            "seed": "Зерно для генератора случайных чисел. Целое число или оставьте пустым.",
-            "callback": "Функция обратного вызова. Оставьте пустым, если не требуется.",
-            "disp": "Отображать статус при оптимизации.",
-            "polish": "Производить ли окончательную оптимизацию при завершении дифференциальной эволюции.",
-            "init": "Метод инициализации популяции.",
-            "atol": "Абсолютная точность для критериев остановки. Положительное число.",
-            "updating": "Режим обновления популяции: immediate или deferred.",
-            "workers": "Количество процессов для параллельных вычислений. Целое число >= 1.",
-            "constraints": "Ограничения для задачи оптимизации. Оставьте пустым, если не требуется.",
+            "strategy": "The strategy for differential evolution. Choose one of the available options.",
+            "maxiter": "Maximum number of iterations. An integer >= 1.",
+            "popsize": "Population size. An integer >= 1.",
+            "tol": "Relative tolerance for stop criteria. A non-negative number.",
+            "mutation": "Mutation factor. A number or tuple of two numbers in [0, 2].",
+            "recombination": "Recombination factor in [0, 1].",
+            "seed": "Random seed. An integer or None.",
+            "callback": "Callback function. Leave empty if not required.",
+            "disp": "Display status during optimization.",
+            "polish": "Perform a final polish optimization after differential evolution is done.",
+            "init": "Population initialization method.",
+            "atol": "Absolute tolerance for stop criteria. A non-negative number.",
+            "updating": "Population updating mode: immediate or deferred.",
+            "workers": "Number of processes for parallel computing. Must be 1 here.",
+            "constraints": "Constraints for the optimization. Leave empty if not required.",
         }
         return tooltips.get(param_name, "")
 
@@ -469,6 +500,12 @@ class CalculationSettingsDialog(QDialog):
         return options.get(param_name, [])
 
     def get_selected_functions(self):
+        """
+        Get the selected functions for each reaction and the chosen deconvolution method and parameters.
+
+        Returns:
+            tuple: (selected_functions (dict), selected_method (str), deconvolution_parameters (dict))
+        """
         selected_functions = {}
         for reaction_name, checkboxes in self.checkboxes.items():
             selected_functions[reaction_name] = [cb.text() for cb in checkboxes if cb.isChecked()]
@@ -476,6 +513,12 @@ class CalculationSettingsDialog(QDialog):
         return selected_functions, selected_method, deconvolution_parameters
 
     def get_deconvolution_parameters(self):
+        """
+        Validate and retrieve deconvolution parameters for the selected method.
+
+        Returns:
+            tuple: (selected_method (str), parameters (dict))
+        """
         selected_method = self.deconvolution_method_combo.currentText()
         parameters = {}
         errors = []
@@ -487,22 +530,32 @@ class CalculationSettingsDialog(QDialog):
                     parameters[key] = field.currentText()
                 else:
                     text = field.text()
-                    default_value = DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
+                    default_value = MODEL_FREE_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS[key]
                     value = self.convert_to_type(text, default_value)
 
                     is_valid, error_msg = self.validate_parameter(key, value)
                     if not is_valid:
-                        errors.append(f"Параметр '{key}': {error_msg}")
+                        errors.append(f"Parameter '{key}': {error_msg}")
                     parameters[key] = value
             if errors:
                 error_message = "\n".join(errors)
-                QMessageBox.warning(self, "Ошибка ввода параметров", error_message)
+                QMessageBox.warning(self, "Error entering parameters", error_message)
                 return None, None
         elif selected_method == "another_method":
             parameters = {}
         return selected_method, parameters
 
     def convert_to_type(self, text, default_value):
+        """
+        Convert text input into the appropriate type based on the default value type.
+
+        Args:
+            text (str): The string to convert.
+            default_value: The default value to infer type.
+
+        Returns:
+            Converted value or the default value if conversion fails.
+        """
         try:
             if isinstance(default_value, int):
                 return int(text)
@@ -524,64 +577,78 @@ class CalculationSettingsDialog(QDialog):
             return default_value
 
     def validate_parameter(self, key, value):  # noqa: C901
+        """
+        Validate a parameter's value according to differential evolution rules.
+
+        Args:
+            key (str): Parameter name.
+            value: Parameter value.
+
+        Returns:
+            tuple(bool, str): (Is valid, Error message if not valid)
+        """
         try:
             if key == "strategy":
                 strategies = self.get_options_for_parameter("strategy")
                 if value not in strategies:
-                    return False, f"Недопустимая стратегия. Выберите из {strategies}."
+                    return False, f"Invalid strategy. Choose from {strategies}."
             elif key == "maxiter":
                 if not isinstance(value, int) or value < 1:
-                    return False, "Должно быть целым числом >= 1."
+                    return False, "Must be an integer >= 1."
             elif key == "popsize":
                 if not isinstance(value, int) or value < 1:
-                    return False, "Должно быть целым числом >= 1."
+                    return False, "Must be an integer >= 1."
             elif key == "tol":
                 if not isinstance(value, (int, float)) or value < 0:
-                    return False, "Должно быть неотрицательным числом."
+                    return False, "Must be a non-negative number."
             elif key == "mutation":
                 if isinstance(value, tuple):
                     if len(value) != 2 or not all(0 <= v <= 2 for v in value):
-                        return False, "Должен быть кортежем из двух чисел в диапазоне [0, 2]."
+                        return False, "Must be a tuple of two numbers in [0, 2]."
                 elif isinstance(value, (int, float)):
                     if not 0 <= value <= 2:
-                        return False, "Должно быть числом в диапазоне [0, 2]."
+                        return False, "Must be in [0, 2]."
                 else:
-                    return False, "Неверный формат."
+                    return False, "Invalid format."
             elif key == "recombination":
                 if not isinstance(value, (int, float)) or not 0 <= value <= 1:
-                    return False, "Должно быть числом в диапазоне [0, 1]."
+                    return False, "Must be in [0, 1]."
             elif key == "seed":
                 if not (isinstance(value, int) or value is None):
-                    return False, "Должно быть целым числом или пустым."
+                    return False, "Must be an integer or None."
             elif key == "atol":
                 if not isinstance(value, (int, float)) or value < 0:
-                    return False, "Должно быть неотрицательным числом."
+                    return False, "Must be a non-negative number."
             elif key == "updating":
                 options = self.get_options_for_parameter("updating")
                 if value not in options:
-                    return False, f"Должно быть одним из {options}."
+                    return False, f"Must be one of {options}."
             elif key == "workers":
+                # The code currently does not support parallel processes other than 1.
                 if not isinstance(value, int) or value < 1 or value > 1:
-                    return False, "Должно быть целым числом = 1. Множество параллельных процессов не поддерживается"
-
+                    return False, "Must be an integer = 1. Parallel processing is not supported."
             return True, ""
         except Exception as e:
-            return False, f"Ошибка при проверке параметра: {str(e)}"
+            return False, f"Error validating parameter: {str(e)}"
 
     def accept(self):
+        """
+        Validate settings before closing the dialog.
+        Ensures each reaction has at least one function selected and parameters are valid.
+        """
         selected_functions = {}
         for reaction_name, checkboxes in self.checkboxes.items():
             selected = [cb.text() for cb in checkboxes if cb.isChecked()]
             if not selected:
                 QMessageBox.warning(
-                    self, "Ошибка настроек", f"Реакция '{reaction_name}' должна иметь хотя бы одну функцию."
+                    self, "Settings error", f"raction '{reaction_name}' must have at least one function."
                 )
                 return
             selected_functions[reaction_name] = selected
 
         selected_method, deconvolution_parameters = self.get_deconvolution_parameters()
         if deconvolution_parameters is None:
-            # Если произошла ошибка в параметрах, не закрываем диалог
+            # Error in parameters, do not close the dialog
             return
         self.selected_functions = selected_functions
         self.selected_method = selected_method
@@ -589,6 +656,12 @@ class CalculationSettingsDialog(QDialog):
         super().accept()
 
     def get_results(self):
+        """
+        Get the results selected in the dialog.
+
+        Returns:
+            tuple: (selected_functions (dict), selected_method (str), deconvolution_parameters (dict))
+        """
         return self.selected_functions, self.selected_method, self.deconvolution_parameters
 
 
@@ -597,7 +670,7 @@ class CoeffsTable(QTableWidget):
 
     def __init__(self, parent=None):
         super().__init__(5, 2, parent)
-        self.header_labels = ["от", "до"]
+        self.header_labels = ["from", "to"]
         self.row_labels_dict = {
             "gauss": ["h", "z", "w"],
             "fraser": ["h", "z", "w", "fr"],
@@ -613,6 +686,9 @@ class CoeffsTable(QTableWidget):
         self._is_table_filling = False
 
     def calculate_fixed_height(self):
+        """
+        Adjust the table's height based on the number of rows and header heights.
+        """
         row_height = self.rowHeight(0)
         borders_height = len(self.default_row_labels) * 2
         header_height = self.horizontalHeader().height()
@@ -620,16 +696,26 @@ class CoeffsTable(QTableWidget):
         self.setFixedHeight(total_height)
 
     def mock_table(self):
+        """
+        Fill the table with 'NaN' as placeholder values.
+        """
         for i in range(len(self.default_row_labels)):
             for j in range(len(self.header_labels)):
                 self.setItem(i, j, QTableWidgetItem("NaN"))
 
     def fill_table(self, reaction_params: dict):
-        logger.debug(f"Приняты параметры реакции для таблицы {reaction_params}")
+        """
+        Fill the table with given reaction parameters.
+
+        Args:
+            reaction_params (dict): Dictionary containing 'lower_bound_coeffs' and 'upper_bound_coeffs',
+                                    each a list with indices [2] for parameter data.
+        """
+        logger.debug(f"Received reaction parameters for the table: {reaction_params}")
         param_keys = ["lower_bound_coeffs", "upper_bound_coeffs"]
         function_type = reaction_params[param_keys[0]][1]
         if function_type not in self.row_labels_dict:
-            logger.error(f"Неизвестный тип функции: {function_type}")
+            logger.error(f"Unknown function type: {function_type}")
             return
 
         self._is_table_filling = True
@@ -639,22 +725,35 @@ class CoeffsTable(QTableWidget):
 
         for j, key in enumerate(param_keys):
             try:
-                data = reaction_params[key][2]  # структура ключей: x_range, function_type, params
+                # data structure: [x_range, function_type, params]
+                data = reaction_params[key][2]
                 for i in range(min(len(row_labels), len(data))):
                     value = f"{data[i]:.2f}"
                     self.setItem(i, j, QTableWidgetItem(value))
             except IndexError as e:
-                logger.error(f"Ошибка индекса при обработке данных '{key}': {e}")
+                logger.error(f"Index error processing data '{key}': {e}")
 
         self.mock_remaining_cells(len(row_labels))
         self._is_table_filling = False
 
     def mock_remaining_cells(self, num_rows):
+        """
+        Fill remaining cells below the actual data with 'NaN'.
+        This ensures a consistent table size if needed.
+        """
         for i in range(num_rows, len(self.default_row_labels)):
             for j in range(len(self.header_labels)):
                 self.setItem(i, j, QTableWidgetItem("NaN"))
 
     def update_reaction_params(self, row, column):
+        """
+        Handle updates to the reaction parameter cell values.
+        Emits 'update_value' signal with the changed data.
+
+        Args:
+            row (int): Row index of the changed cell.
+            column (int): Column index of the changed cell.
+        """
         if not self._is_table_filling:
             try:
                 item = self.item(row, column)
@@ -665,26 +764,27 @@ class CoeffsTable(QTableWidget):
                 path_keys = [self.column_to_bound(column_label), row_label]
                 data_change = {
                     "path_keys": path_keys,
-                    "operation": "update_value",
+                    "operation": OperationType.UPDATE_VALUE,
                     "value": value,
                 }
                 self.update_value.emit(data_change)
             except ValueError as e:
-                console.log(f"Неверные данные для преобразования в число: ряд {row+1}, колонка {column+1}")
-                logger.error(f"Неверные данные для преобразования в число: ряд {row}, колонка {column}: {e}")
+                console.log(f"Invalid data for conversion to number: row {row+1}, column {column+1}")
+                logger.error(f"Invalid data for conversion to number: row {row}, column {column}: {e}")
 
     def column_to_bound(self, column_label):
-        return {"от": "lower_bound_coeffs", "до": "upper_bound_coeffs"}.get(column_label, "")
+        return {"from": "lower_bound_coeffs", "to": "upper_bound_coeffs"}.get(column_label, "")
 
 
 class CalcButtons(QWidget):
     calculation_started = pyqtSignal(dict)
+    calculation_stopped = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
-        self.start_button = QPushButton("Начать расчет")
-        self.stop_button = QPushButton("Остановить расчет")
+        self.start_button = QPushButton("calculate")
+        self.stop_button = QPushButton("stop calculating")
         self.layout.addWidget(self.start_button)
 
         self.start_button.clicked.connect(self.check_and_start_calculation)
@@ -692,9 +792,20 @@ class CalcButtons(QWidget):
         self.is_calculating = False
         self.parent = parent
 
+    def revert_to_default(self):
+        if self.is_calculating:
+            self.is_calculating = False
+            self.layout.replaceWidget(self.stop_button, self.start_button)
+            self.stop_button.hide()
+            self.start_button.show()
+
     def check_and_start_calculation(self):
+        """
+        Check that a file is active and settings are chosen before starting the calculation.
+        If settings are missing, prompt the user to configure them.
+        """
         if not self.parent.reactions_table.active_file:
-            QMessageBox.warning(self, "Ошибка", "Файл не выбран.")
+            QMessageBox.warning(self, "The file is not selected.", "Choose an experiment")
             return
 
         settings = self.parent.reactions_table.calculation_settings.get(self.parent.reactions_table.active_file, {})
@@ -702,12 +813,12 @@ class CalcButtons(QWidget):
             self.parent.reactions_table.active_file, {}
         )
         if not settings or not deconvolution_settings:
-            QMessageBox.information(self, "Настройки обязательны.", "Настройки расчета не установлены.")
+            QMessageBox.information(self, "Settings are required.", "The calculation settings are not set.")
             self.parent.open_settings_dialog()
         else:
             data = {
                 "path_keys": [],
-                "operation": "deconvolution",
+                "operation": OperationType.DECONVOLUTION,
                 "chosen_functions": settings,
                 "deconvolution_settings": deconvolution_settings,
             }
@@ -715,24 +826,28 @@ class CalcButtons(QWidget):
             self.start_calculation()
 
     def start_calculation(self):
+        """
+        Switch to 'stop' mode indicating that the calculation is in progress.
+        """
         self.is_calculating = True
         self.layout.replaceWidget(self.start_button, self.stop_button)
         self.start_button.hide()
         self.stop_button.show()
 
     def stop_calculation(self):
-        self.is_calculating = False
-        self.layout.replaceWidget(self.stop_button, self.start_button)
-        self.stop_button.hide()
-        self.start_button.show()
+        if self.is_calculating:
+            self.calculation_stopped.emit({"operation": OperationType.STOP_CALCULATION})
+            self.is_calculating = False
+            self.layout.replaceWidget(self.stop_button, self.start_button)
+            self.stop_button.hide()
+            self.start_button.show()
 
 
-class DeconvolutionSubBar(QWidget, BasicSignals):
+class DeconvolutionSubBar(QWidget):
     update_value = pyqtSignal(dict)
 
     def __init__(self, parent=None):
-        QWidget.__init__(self, parent)
-        BasicSignals.__init__(self, actor_name="deconvolution_sub_bar")
+        super().__init__(parent)
         layout = QVBoxLayout(self)
 
         self.reactions_table = ReactionTable(self)
@@ -749,20 +864,45 @@ class DeconvolutionSubBar(QWidget, BasicSignals):
         self.reactions_table.reaction_function_changed.connect(self.handle_update_function_value)
 
     def handle_update_value(self, data: dict):
+        """
+        Handle updates to reaction parameter values by inserting the active reaction into path_keys,
+        then emitting the 'update_value' signal.
+
+        Args:
+            data (dict): Update data containing path_keys and new value.
+        """
         if self.reactions_table.active_reaction:
             data["path_keys"].insert(0, self.reactions_table.active_reaction)
             self.update_value.emit(data)
         else:
-            console.log("Для изменения значения выберите реакцию.")
+            console.log("Select a reaction before changing its values.")
 
     def handle_update_function_value(self, data: dict):
+        """
+        Handle updates to a reaction's function.
+
+        Args:
+            data (dict): Data for updating the reaction function.
+        """
         if self.reactions_table.active_reaction is not None:
             self.update_value.emit(data)
 
     def open_settings_dialog(self):
+        """
+        Opens the calculation settings dialog via the ReactionTable instance.
+        """
         self.reactions_table.open_settings()
 
     def get_reactions_for_file(self, file_name):
+        """
+        Retrieve a dictionary of reaction names and their associated ComboBoxes for a given file.
+
+        Args:
+            file_name (str): The name of the file.
+
+        Returns:
+            dict: Mapping of reaction_name -> QComboBox for reactions in the file.
+        """
         table = self.reactions_table.reactions_tables[file_name]
         reactions = {}
         for row in range(table.rowCount()):

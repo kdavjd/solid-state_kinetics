@@ -1,66 +1,42 @@
+import os
 import sys
 
-from core.calculations import Calculations
-from core.calculations_data import CalculationsData
-from core.calculations_data_operations import CalculationsDataOperations
-from core.file_data import FileData
-from core.file_operations import ActiveFileOperations
-from gui.main_window import MainWindow
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
+
 from PyQt6.QtWidgets import QApplication
+
+from src.core.base_signals import BaseSignals
+from src.core.calculation import Calculations
+from src.core.calculation_data import CalculationsData
+from src.core.calculation_data_operations import CalculationsDataOperations
+from src.core.file_data import FileData
+from src.core.file_operations import ActiveFileOperations
+from src.core.series_data import SeriesData
+from src.gui.main_window import MainWindow
 
 
 def main():
     app = QApplication(sys.argv)
-    window = MainWindow()
-    file_data = FileData()
-    calculations_data = CalculationsData()
-    calcultaions = Calculations()
-    calculations_data_operations = CalculationsDataOperations()
-    file_operations = ActiveFileOperations()
+    signals = BaseSignals()
+    window = MainWindow(signals=signals)
+    file_data = FileData(signals=signals)
+    series_data = SeriesData(signals=signals)  # noqa: F841
+    calculations_data = CalculationsData(signals=signals)  # noqa: F841
+    calculations = Calculations(signals=signals)
+    calculations_data_operations = CalculationsDataOperations(signals=signals)
+    file_operations = ActiveFileOperations(signals=signals)  # noqa: F841
 
     window.main_tab.sidebar.load_button.file_selected.connect(file_data.load_file)
     window.main_tab.sidebar.chosen_experiment_signal.connect(file_data.plot_dataframe_copy)
-    window.main_tab.active_file_modify_signal.connect(file_operations.request_slot)
-    window.main_tab.calculations_data_modify_signal.connect(calculations_data_operations.request_slot)
-    window.main_tab.processing_signal.connect(calcultaions.calc_data_operations_in_progress)
-    window.main_tab.request_signal.connect(calculations_data_operations.request_slot)
-    window.main_tab.request_signal.connect(calculations_data.request_slot)
-    window.main_tab.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.request_signal.connect(
-        window.main_tab.request_slot
-    )
-    window.main_tab.response_signal.connect(
-        window.main_tab.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.response_slot
-    )
-    window.main_tab.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.request_signal.connect(
-        calculations_data.request_slot
-    )
-    window.main_tab.response_signal.connect(file_data.response_slot)
-    window.main_tab.response_signal.connect(calcultaions.response_slot)
-    window.main_tab.response_signal.connect(calculations_data_operations.response_slot)
-    file_data.request_signal.connect(window.main_tab.request_slot)
-    file_data.data_loaded_signal.connect(window.main_tab.plot_canvas.plot_file_data_from_dataframe)
-    file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
-    file_data.response_signal.connect(file_operations.response_slot)
-    file_data.response_signal.connect(calculations_data_operations.response_slot)
-    file_operations.request_signal.connect(file_data.request_slot)
-    calcultaions.request_signal.connect(window.main_tab.request_slot)
-    calcultaions.request_signal.connect(calculations_data_operations.request_slot)
-    calculations_data.response_signal.connect(calculations_data_operations.response_slot)
-    calculations_data.response_signal.connect(window.main_tab.response_slot)
-    calculations_data.response_signal.connect(
-        window.main_tab.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.response_slot
-    )
-    calculations_data_operations.plot_reaction.connect(window.main_tab.plot_canvas.plot_reaction)
-    calculations_data_operations.request_signal.connect(file_data.request_slot)
-    calculations_data_operations.request_signal.connect(calculations_data.request_slot)
-    calculations_data_operations.request_signal.connect(window.main_tab.request_slot)
-    calculations_data_operations.response_signal.connect(calcultaions.response_slot)
-    calculations_data_operations.response_signal.connect(window.main_tab.response_slot)
-    calculations_data_operations.deconvolution_signal.connect(calcultaions.run_deconvolution)
+    file_data.data_loaded_signal.connect(window.main_tab.plot_canvas.plot_data_from_dataframe)
     calculations_data_operations.reaction_params_to_gui.connect(window.main_tab.plot_canvas.add_anchors)
+    file_data.data_loaded_signal.connect(window.table_tab.table_widget.display_dataframe)
+    calculations_data_operations.plot_reaction.connect(window.main_tab.plot_canvas.plot_reaction)
+    calculations_data_operations.deconvolution_signal.connect(calculations.run_calculation_scenario)
     calculations_data_operations.reaction_params_to_gui.connect(
         window.main_tab.sub_sidebar.deconvolution_sub_bar.coeffs_table.fill_table
     )
+    window.model_based_calculation_signal.connect(calculations.run_calculation_scenario)
 
     window.show()
     sys.exit(app.exec())
