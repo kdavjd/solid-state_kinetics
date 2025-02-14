@@ -106,10 +106,11 @@ class ModelBasedScenario(BaseCalculationScenario):
 
     def get_bounds(self) -> list[tuple]:
         """
-        Для каждой реакции задаём три параметра:
-          1. logA: [log_A_min, log_A_max]
-          2. Ea:   [Ea_min, Ea_max]
-          3. contribution: [contribution_min, contribution_max]
+        Порядок параметров в оптимизационном векторе:
+          1. logA: [log_A_min, log_A_max] (индексы 0 ... num_reactions - 1)
+          2. Ea:   [Ea_min, Ea_max]       (индексы num_reactions ... 2*num_reactions - 1)
+          3. модель: [0, len(allowed_models) - 1] (индексы 2*num_reactions ... 3*num_reactions - 1)
+          4. contribution: [contribution_min, contribution_max] (индексы 3*num_reactions ... 4*num_reactions - 1)
         """
         scheme = self.params.get("reaction_scheme")
         if not scheme:
@@ -119,16 +120,19 @@ class ModelBasedScenario(BaseCalculationScenario):
             raise ValueError("No 'reactions' in reaction_scheme.")
 
         bounds = []
-        # Ограничения для logA
         for reaction in reactions:
             logA_min = reaction.get("log_A_min", 0)
             logA_max = reaction.get("log_A_max", 10)
             bounds.append((logA_min, logA_max))
-        # Ограничения для Ea
+
         for reaction in reactions:
-            Ea_min = reaction.get("Ea_min", 1)  # Если не передано, значения по умолчанию в джоулях
+            Ea_min = reaction.get("Ea_min", 1)
             Ea_max = reaction.get("Ea_max", 2000)
             bounds.append((Ea_min, Ea_max))
+
+        for reaction in reactions:
+            num_models = len(reaction["allowed_models"])
+            bounds.append((0, num_models - 1))
 
         for reaction in reactions:
             contrib_min = reaction.get("contribution_min", 0)
@@ -196,72 +200,90 @@ class ModelBasedTargetFunction:
         self.lock = lock
         self.R = 8.314
 
-    def __call__(self, X: np.ndarray) -> float:
-        # sum_contrib = np.sum(X[2 * self.num_reactions : 3 * self.num_reactions])
-        # if not np.isclose(sum_contrib, 1.0, atol=1e-4):
-        #     return 1e12
-
+    def __call__(self, params: np.ndarray) -> float:
         total_mse = 0.0
+        n = self.num_reactions
 
-        def ode_func(T, X, beta):
-            dXdt = np.zeros_like(X)
-            conc = X[: self.num_species]
+        # Нормируем «вклады»
+        raw_contrib = params[3 * n : 4 * n]
+        sum_contrib = np.sum(raw_contrib)
+        norm_contrib = raw_contrib / sum_contrib  # теперь сумма norm_contrib всегда равна 1
+
+        # Определяем функцию ОДУ
+        def ode_func(T, y, beta):
+            dYdt = np.zeros_like(y)
+            conc = y[: self.num_species]
             beta_SI = beta / 60.0
-            for i in range(self.num_reactions):
+            for i in range(n):
+                # Получаем индексы исходного и целевого компонентов
                 src = self.reactions[i]["from"]
                 tgt = self.reactions[i]["to"]
                 src_index = self.species_list.index(src)
                 tgt_index = self.species_list.index(tgt)
                 e_value = conc[src_index]
-                reaction_type = self.reactions[i]["reaction_type"]
+
+                # Извлекаем индекс модели из среза [2*n, 3*n)
+                model_param_index = 2 * n + i
+                model_index = int(
+                    np.clip(round(params[model_param_index]), 0, len(self.reactions[i]["allowed_models"]) - 1)
+                )
+                reaction_type = self.reactions[i]["allowed_models"][model_index]
                 model = NUC_MODELS_TABLE.get(reaction_type)
                 if model is None:
-                    logger.warning(f"Unknown reaction type '{reaction_type}'. Using linear dependence.")
                     f_e = e_value
                 else:
                     f_e = model["differential_form"](e_value)
 
-                k_i = (10 ** (X[i]) * np.exp(-X[self.num_reactions + i] * 1000 / (self.R * T))) / beta_SI
+                # Извлекаем параметры Arrhenius: logA из params[0:n] и Ea из params[n:2*n]
+                logA = params[i]
+                Ea = params[n + i]
+                k_i = (10**logA * np.exp(-Ea * 1000 / (self.R * T))) / beta_SI
+
                 rate = k_i * f_e
-                dXdt[src_index] -= rate
-                dXdt[tgt_index] += rate
-                dXdt[self.num_species + i] = rate
-            return dXdt
+                dYdt[src_index] -= rate
+                dYdt[tgt_index] += rate
+                dYdt[self.num_species + i] = rate
+            return dYdt
 
-        for i, beta_val in enumerate(self.betas):
-            exp_mass_i = self.all_exp_masses[i]
-            T_array = self.exp_temperature
-            X0 = np.zeros(self.num_species + self.num_reactions)
-            if self.num_species > 0:
-                X0[0] = 1.0
-            try:
-                sol = solve_ivp(
-                    lambda T, vec: ode_func(T, vec, beta_val),
-                    [T_array[0], T_array[-1]],
-                    X0,
-                    t_eval=T_array,
-                    method="RK45",
-                )
-                if not sol.success:
-                    return 1e12
-
-                ints = sol.y[self.num_species : self.num_species + self.num_reactions, :]
-                M0 = exp_mass_i[0]
-                Mfin = exp_mass_i[-1]
-                contributions = X[2 * self.num_reactions : 3 * self.num_reactions]
-                int_sum = np.sum(contributions[:, np.newaxis] * ints, axis=0)
-                model_mass = M0 - (M0 - Mfin) * int_sum
-                mse_i = np.mean((model_mass - exp_mass_i) ** 2)
-                total_mse += mse_i
-            except Exception as e:
-                logger.error(f"Error in ODE integration: {e}")
-                return 1e12
+        # Теперь функция интеграции выполняется без дополнительных параллельных вызовов
+        for beta_val in self.betas:
+            total_mse += self.integrate_ode(beta_val, norm_contrib, params, ode_func)
 
         with self.lock:
             if total_mse < self.best_mse.value:
                 self.best_mse.value = total_mse
 
         return total_mse
+
+    def integrate_ode(self, beta_val, norm_contrib, params, ode_func):
+        try:
+            exp_mass_i = self.all_exp_masses[0]
+            T_array = self.exp_temperature
+
+            y0 = np.zeros(self.num_species + self.num_reactions)
+            if self.num_species > 0:
+                y0[0] = 1.0
+
+            sol = solve_ivp(
+                lambda T, y: ode_func(T, y, beta_val),
+                [T_array[0], T_array[-1]],
+                y0,
+                t_eval=T_array,
+                method="RK45",
+            )
+            if not sol.success:
+                return 1e12
+
+            rates_int = sol.y[self.num_species : self.num_species + self.num_reactions, :]
+            M0 = exp_mass_i[0]
+            Mfin = exp_mass_i[-1]
+            int_sum = np.sum(norm_contrib[:, np.newaxis] * rates_int, axis=0)
+            model_mass = M0 - (M0 - Mfin) * int_sum
+            mse_i = np.mean((model_mass - exp_mass_i) ** 2)
+            return mse_i
+        except Exception as e:
+            logger.error(f"Error in ODE integration: {e}")
+            return 1e12
 
 
 SCENARIO_REGISTRY = {

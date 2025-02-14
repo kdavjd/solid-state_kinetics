@@ -398,9 +398,6 @@ class MainWindow(QMainWindow):
             rates_int = sol.y[num_species : num_species + num_reactions, :]
             int_sum = np.sum(contributions[:, np.newaxis] * rates_int, axis=0)
             exp_mass = experimental_data[beta_col].values
-            if len(exp_mass) < 2:
-                logger.error(f"Недостаточно экспериментальных точек для β = {beta_value}.")
-                continue
             M0 = exp_mass[0]
             Mfin = exp_mass[-1]
 
