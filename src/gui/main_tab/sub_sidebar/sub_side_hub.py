@@ -10,6 +10,7 @@ class SubSideHub(QWidget):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
 
+        # Initialize the different sections
         self.deconvolution_sub_bar = DeconvolutionSubBar(self)
         self.ea_sub_bar = EaSubBar(self)
         self.experiment_sub_bar = ExperimentSubBar(self)
@@ -33,7 +34,7 @@ class SubSideHub(QWidget):
             self.current_widget = self.ea_sub_bar
         elif content_type == "experiments":
             self.current_widget = self.experiment_sub_bar
-        elif content_type == "model_based":
+        elif content_type == "series":
             self.current_widget = self.model_based
         else:
             self.current_widget = QLabel("unknown content", self)

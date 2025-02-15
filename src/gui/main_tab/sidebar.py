@@ -53,22 +53,23 @@ class SideBar(QWidget):
         self.experiments_data_root.appendRow(self.delete_data_item)
         self.model.appendRow(self.experiments_data_root)
 
-        # Initialize model-free calculation section
-        self.model_free_root = QStandardItem("model-free calculation")
-        self.model.appendRow(self.model_free_root)
-        self.model_free_root.appendRow(QStandardItem("deconvolution"))
-        self.model_free_root.appendRow(QStandardItem("Ea"))
-        self.model_free_root.appendRow(QStandardItem("A"))
-
-        # Initialize model-based calculation section
-        self.model_based_root = QStandardItem("model-based calculation")
-        self.model.appendRow(self.model_based_root)
+        # Initialize series section
+        self.series_root = QStandardItem("series")
+        self.model.appendRow(self.series_root)
         self.add_new_series_item = QStandardItem("add new series")
         self.import_series_item = QStandardItem("import series")
         self.delete_series_item = QStandardItem("delete series")
-        self.model_based_root.appendRow(self.add_new_series_item)
-        self.model_based_root.appendRow(self.import_series_item)
-        self.model_based_root.appendRow(self.delete_series_item)
+        self.series_root.appendRow(self.add_new_series_item)
+        self.series_root.appendRow(self.import_series_item)
+        self.series_root.appendRow(self.delete_series_item)
+
+        # Initialize calculation section
+        self.calculation_root = QStandardItem("calculation")
+        self.model.appendRow(self.calculation_root)
+        self.calculation_root.appendRow(QStandardItem("deconvolution"))
+        self.calculation_root.appendRow(QStandardItem("Ea"))
+        self.calculation_root.appendRow(QStandardItem("A"))
+        self.calculation_root.appendRow(QStandardItem("model-based"))
 
         # Initialize settings section
         self.settings_root = QStandardItem("settings")
@@ -140,13 +141,6 @@ class SideBar(QWidget):
         item.setFont(font)
 
     def on_item_clicked(self, index):  # noqa: C901
-        """
-        Handles the item click event in the tree view. Performs different actions
-        based on which item is clicked.
-
-        Args:
-            index: The index of the clicked item.
-        """
         item = self.model.itemFromIndex(index)
 
         # Handle actions for the "experiments" section
@@ -154,7 +148,7 @@ class SideBar(QWidget):
             self.load_button.open_file_dialog()
         elif item == self.delete_data_item:
             self.delete_active_file()
-        # Handle actions for the "model-based calculation" section
+        # Handle actions for the "series" section
         elif item == self.add_new_series_item:
             self.add_new_series()
         elif item == self.import_series_item:
@@ -175,19 +169,18 @@ class SideBar(QWidget):
             if item.checkState() == Qt.CheckState.Checked:
                 self.console_show_signal.emit(False)
                 self.console_show_state.setCheckState(Qt.CheckState.Unchecked)
-        # Handle items under "model-free calculation"
-        elif item.parent() == self.model_free_root:
+        # Handle items under "calculation"
+        elif item.parent() == self.calculation_root:
             self.sub_side_bar_needed.emit(item.text())
-        # Handle items under "model-based calculation"
-        elif item.parent() == self.model_based_root:
+        # Handle items under "series"
+        elif item.parent() == self.series_root:
             # Define action items to distinguish from series names
             action_items = {"add new series", "import series", "delete series"}
             if item.text() in action_items:
-                # Action items are already handled above
-                pass
+                pass  # These are action items already handled
             else:
                 # If the item is a series name, emit "model_based" content type
-                self.sub_side_bar_needed.emit("model_based")
+                self.sub_side_bar_needed.emit("series")
                 self.mark_as_active(item, is_series=True)
                 logger.debug(f"Selected series: {item.text()}")
         else:
@@ -243,7 +236,7 @@ class SideBar(QWidget):
                 QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.Yes:
-                self.model_based_root.removeRow(self.active_series_item.row())
+                self.series_root.removeRow(self.active_series_item.row())
                 self.to_main_window_signal.emit({"operation": OperationType.DELETE_SERIES, "series_name": series_name})
                 logger.info(f"Series deleted: {series_name}")
                 self.active_series_item = None
@@ -309,8 +302,8 @@ class SideBar(QWidget):
             A list of strings representing the names of series.
         """
         series_names = []
-        for row in range(self.model_based_root.rowCount()):
-            item = self.model_based_root.child(row)
+        for row in range(self.series_root.rowCount()):  # Use series_root here
+            item = self.series_root.child(row)
             if item and item.text() not in {"add new series", "import series", "delete series"}:
                 series_names.append(item.text())
         return series_names
@@ -320,8 +313,8 @@ class SideBar(QWidget):
             logger.warning("An empty series name will not be added.")
             return
 
-        for row in range(self.model_based_root.rowCount()):
-            item = self.model_based_root.child(row)
+        for row in range(self.series_root.rowCount()):
+            item = self.series_root.child(row)
             if item.text() == series_name:
                 logger.warning(f"Series '{series_name}' already exists.")
                 QMessageBox.warning(
@@ -333,7 +326,7 @@ class SideBar(QWidget):
 
         new_series_item = QStandardItem(series_name)
         new_series_item.setEditable(False)
-        self.model_based_root.insertRow(0, new_series_item)
+        self.series_root.insertRow(0, new_series_item)
         self.tree_view.expandAll()
         logger.info(f"New series added to model-based tree: {series_name}")
 

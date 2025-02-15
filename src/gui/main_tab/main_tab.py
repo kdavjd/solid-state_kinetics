@@ -62,7 +62,6 @@ class MainTab(QWidget):
         self.plot_canvas.update_value.connect(self.update_anchors_slot)
         self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(self.to_main_window)
         self.sub_sidebar.ea_sub_bar.create_series_signal.connect(self.to_main_window)
-        # self.calculations_data_signal.connect(self.sub_sidebar.ea_sub_bar.open_merge_dialog)
         self.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.import_reactions_signal.connect(
             self.to_main_window
         )
