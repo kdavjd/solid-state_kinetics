@@ -2,12 +2,23 @@ from os import path
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeView, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QTreeView,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.core.app_settings import OperationType
 from src.core.logger_config import logger
 from src.gui.main_tab.load_file_button import LoadButton
-from src.gui.main_tab.sub_sidebar.model_based.model_based import SelectFileDataDialog
 
 
 class SideBar(QWidget):
@@ -325,3 +336,82 @@ class SideBar(QWidget):
         self.model_based_root.insertRow(0, new_series_item)
         self.tree_view.expandAll()
         logger.info(f"New series added to model-based tree: {series_name}")
+
+
+class SelectFileDataDialog(QDialog):
+    def __init__(self, df_copies, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Files for Series")
+        self.selected_files = []
+        self.checkboxes = []
+        self.rate_line_edits = []
+        layout = QVBoxLayout()
+
+        label = QLabel("Select files to include in the series:")
+        layout.addWidget(label)
+
+        self.series_name_line_edit = QLineEdit()
+        self.series_name_line_edit.setPlaceholderText("Enter series name")
+        layout.addWidget(self.series_name_line_edit)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout()
+
+        for file_name in df_copies.keys():
+            file_layout = QHBoxLayout()
+
+            checkbox = QCheckBox(file_name)
+
+            rate_line_edit = QLineEdit()
+            rate_line_edit.setPlaceholderText("Enter heating rate")
+
+            file_layout.addWidget(checkbox)
+            file_layout.addWidget(rate_line_edit)
+            scroll_layout.addLayout(file_layout)
+
+            self.checkboxes.append(checkbox)
+            self.rate_line_edits.append(rate_line_edit)
+
+        scroll_content.setLayout(scroll_layout)
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
+
+        button_box = QHBoxLayout()
+        self.ok_button = QPushButton("OK")
+        self.cancel_button = QPushButton("Cancel")
+        button_box.addWidget(self.ok_button)
+        button_box.addWidget(self.cancel_button)
+        layout.addLayout(button_box)
+
+        self.setLayout(layout)
+
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+
+    def get_selected_files(self):
+        series_name = self.series_name_line_edit.text().strip()
+        if not series_name:
+            QMessageBox.warning(self, "Invalid Input", "Please enter a series name.")
+            return None, []
+
+        selected_files = []
+        for checkbox, rate_line_edit in zip(self.checkboxes, self.rate_line_edits):
+            if checkbox.isChecked():
+                rate_text = rate_line_edit.text().strip()
+                if not rate_text:
+                    QMessageBox.warning(self, "Invalid Input", f"Please enter a heating rate for '{checkbox.text()}'")
+                    return None, []
+
+                try:
+                    heating_rate = float(rate_text)
+                except ValueError:
+                    QMessageBox.warning(
+                        self, "Invalid Input", f"Please enter a valid number heating rate for '{checkbox.text()}'"
+                    )
+                    return None, []
+
+                selected_files.append((checkbox.text(), heating_rate, 1))  # 1 is mass for future use
+
+        return series_name, selected_files
