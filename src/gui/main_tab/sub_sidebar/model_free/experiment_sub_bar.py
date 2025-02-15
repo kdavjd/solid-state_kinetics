@@ -126,50 +126,37 @@ class BackgroundSubtractionBlock(QWidget):
 
 
 class ActionButtonsBlock(QWidget):
-    """
-    A QWidget subclass that provides action buttons for resetting changes
-    and performing derivative operations.
-    """
-
-    # Define custom signals
     cancel_changes_clicked = pyqtSignal(dict)
     derivative_clicked = pyqtSignal(dict)
+    deconvolution_clicked = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setLayout(QVBoxLayout())
 
-        # Initialize action buttons
         self.cancel_changes_button = QPushButton("reset changes")
         self.derivative_button = QPushButton("to da/dT")
+        self.deconvolution_button = QPushButton("deconvolution")
 
-        # Connect buttons to their respective slots with logging
         self.cancel_changes_button.clicked.connect(self.emit_cancel_changes_signal)
         self.derivative_button.clicked.connect(self.emit_derivative_signal)
+        self.deconvolution_button.clicked.connect(self.emit_deconvolution_signal)
 
-        # Add buttons to layout
         self.layout().addWidget(self.derivative_button)
+        self.layout().addWidget(self.deconvolution_button)
         self.layout().addWidget(self.cancel_changes_button)
 
     def emit_cancel_changes_signal(self):
-        """
-        Emit the cancel_changes_clicked signal with the reset operation.
-        """
         self.cancel_changes_clicked.emit({"operation": OperationType.RESET_FILE_DATA})
 
     def emit_derivative_signal(self):
-        """
-        Emit the derivative_clicked signal with the differential operation.
-        """
         self.derivative_clicked.emit({"operation": OperationType.DIFFERENTIAL})
+
+    def emit_deconvolution_signal(self):
+        self.deconvolution_clicked.emit("deconvolution")
 
 
 class ExperimentSubBar(QWidget):
-    """
-    A QWidget subclass that serves as a sub-bar in the experiment application.
-    It aggregates the smoothing, background subtraction, and action buttons blocks.
-    """
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()

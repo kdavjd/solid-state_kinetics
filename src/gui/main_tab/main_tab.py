@@ -53,6 +53,7 @@ class MainTab(QWidget):
         self.sidebar.console_show_signal.connect(self.toggle_console_visibility)
         self.sub_sidebar.experiment_sub_bar.action_buttons_block.cancel_changes_clicked.connect(self.to_main_window)
         self.sub_sidebar.experiment_sub_bar.action_buttons_block.derivative_clicked.connect(self.to_main_window)
+        self.sub_sidebar.experiment_sub_bar.action_buttons_block.deconvolution_clicked.connect(self.toggle_sub_sidebar)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_added.connect(self.to_main_window)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_removed.connect(self.to_main_window)
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(self.to_main_window)
@@ -97,6 +98,8 @@ class MainTab(QWidget):
                 self.sub_sidebar.update_content("model_based")
             elif content_type in self.sidebar.get_experiment_files_names():
                 self.sub_sidebar.update_content("experiments")
+            elif content_type == "deconvolution":
+                self.sub_sidebar.update_content("deconvolution")
             else:
                 self.sub_sidebar.update_content(content_type)
             self.sub_sidebar.setVisible(True)

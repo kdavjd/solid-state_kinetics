@@ -33,6 +33,7 @@ class SideBar(QWidget):
     chosen_experiment_signal = pyqtSignal(str)
     console_show_signal = pyqtSignal(bool)
     active_file_selected = pyqtSignal(str)
+    active_series_selected = pyqtSignal(str)
     to_main_window_signal = pyqtSignal(dict)
 
     def __init__(self, parent=None):
@@ -66,7 +67,6 @@ class SideBar(QWidget):
         # Initialize calculation section
         self.calculation_root = QStandardItem("calculation")
         self.model.appendRow(self.calculation_root)
-        self.calculation_root.appendRow(QStandardItem("deconvolution"))
         self.calculation_root.appendRow(QStandardItem("Ea"))
         self.calculation_root.appendRow(QStandardItem("A"))
         self.calculation_root.appendRow(QStandardItem("model-based"))
@@ -104,13 +104,19 @@ class SideBar(QWidget):
             is_series (bool): Whether the item is a series.
         """
         if is_series:
+            if self.active_file_item:
+                self.unmark_active_state(self.active_file_item)
+                self.active_file_item = None
             if self.active_series_item:
                 self.unmark_active_state(self.active_series_item)
             self.mark_active_state(item)
             self.active_series_item = item
-            self.active_file_selected.emit(item.text())  # Emitting series name
+            self.active_series_selected.emit(item.text())
             logger.debug(f"Active series: {item.text()}")
         else:
+            if self.active_series_item:
+                self.unmark_active_state(self.active_series_item)
+                self.active_series_item = None
             if self.active_file_item:
                 self.unmark_active_state(self.active_file_item)
             self.mark_active_state(item)
