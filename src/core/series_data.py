@@ -35,7 +35,7 @@ class SeriesData(BaseSlots):
             r["data"] = success
 
         def handle_delete_series(p: dict, r: dict) -> None:
-            name = p.get("name")
+            name = p.get("series_name")
             success = self.delete_series(series_name=name)
             r["data"] = success
 
@@ -191,6 +191,7 @@ class SeriesData(BaseSlots):
             return True
         else:
             logger.error(f"Series with name '{series_name}' not found.")
+            logger.debug(f"{self.series=}")
             return False
 
     def rename_series(self, old_series_name: str, new_series_name: str) -> bool:
