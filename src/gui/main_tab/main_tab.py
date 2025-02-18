@@ -93,13 +93,10 @@ class MainTab(QWidget):
         self.initialize_sizes()
 
     def toggle_sub_sidebar(self, content_type):
+        logger.debug(f"totoggle_sub_sidebar: {content_type=}")
         if content_type:
-            if content_type in self.sidebar.get_series_names():
-                self.sub_sidebar.update_content("model_based")
-            elif content_type in self.sidebar.get_experiment_files_names():
+            if content_type in self.sidebar.get_experiment_files_names():
                 self.sub_sidebar.update_content("experiments")
-            elif content_type == "deconvolution":
-                self.sub_sidebar.update_content("deconvolution")
             else:
                 self.sub_sidebar.update_content(content_type)
             self.sub_sidebar.setVisible(True)

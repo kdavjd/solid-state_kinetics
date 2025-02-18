@@ -28,7 +28,9 @@ class DeconvolutionStrategy(BestResultStrategy):
             self.calculation.mse_history.append((datetime.datetime.now(), best_mse))
             logger.info("A new best MSE has been found.")
 
-            self.calculation.handle_request_cycle("main_window", "plot_mse_line", mse_data=self.calculation.mse_history)
+            self.calculation.handle_request_cycle(
+                "main_window", OperationType.PLOT_MSE_LINE, mse_data=self.calculation.mse_history
+            )
 
             def reaction_param_count(func_type: str) -> int:
                 if func_type == "gauss":
@@ -105,7 +107,9 @@ class ModelBasedCalculationStrategy(BestResultStrategy):
             self.calculation.mse_history.append((datetime.datetime.now(), best_mse))
             logger.info("A new best MSE has been found in model calculation.")
 
-            self.calculation.handle_request_cycle("main_window", "plot_mse_line", mse_data=self.calculation.mse_history)
+            self.calculation.handle_request_cycle(
+                "main_window", OperationType.PLOT_MSE_LINE, mse_data=self.calculation.mse_history
+            )
 
             console.log("\nNew best result found in model calculation:")
             console.log(f"Best MSE: {best_mse:.4f}")

@@ -83,7 +83,6 @@ class CalculationsDataOperations(BaseSlots):
                 if operation == OperationType.DECONVOLUTION:
                     self.deconvolution_signal.emit(answer)
 
-            # Swap target and actor before emitting the response
             params["target"], params["actor"] = params["actor"], params["target"]
             self.signals.response_signal.emit(params)
         else:
