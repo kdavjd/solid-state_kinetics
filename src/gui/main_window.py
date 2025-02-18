@@ -130,10 +130,12 @@ class MainWindow(QMainWindow):
 
         reaction_scheme = series_entry.get("reaction_scheme")
         calculation_settings = series_entry.get("calculation_settings")
+        series_df = series_entry.get("experimental_data")
         if not reaction_scheme:
             logger.warning(f"Couldn't get a scheme for the series '{series_name}'")
             return
 
+        self.main_tab.plot_canvas.plot_data_from_dataframe(series_df)
         self.main_tab.sub_sidebar.model_based.update_scheme_data(reaction_scheme)
         self.main_tab.sub_sidebar.model_based.update_calculation_settings(calculation_settings)
         self.update_model_simulation(series_name)

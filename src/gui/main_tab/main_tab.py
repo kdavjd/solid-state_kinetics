@@ -59,7 +59,7 @@ class MainTab(QWidget):
         self.sub_sidebar.deconvolution_sub_bar.reactions_table.reaction_chosed.connect(self.to_main_window)
         self.sub_sidebar.deconvolution_sub_bar.update_value.connect(self.to_main_window)
         self.sidebar.active_file_selected.connect(self.sub_sidebar.deconvolution_sub_bar.reactions_table.switch_file)
-        self.sidebar.active_file_selected.connect(self.select_series)
+        self.sidebar.active_series_selected.connect(self.select_series)
         self.plot_canvas.update_value.connect(self.update_anchors_slot)
         self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(self.to_main_window)
         self.sub_sidebar.ea_sub_bar.create_series_signal.connect(self.to_main_window)
