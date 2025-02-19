@@ -36,6 +36,7 @@ class OperationType(Enum):
     SCHEME_CHANGE = "scheme_change"
     MODEL_PARAMS_CHANGE = "model_params_change"
     SELECT_SERIES = "select_series"
+    LOAD_DECONVOLUTION_RESULTS = "load_deconvolution_results"
 
 
 MODEL_BASED_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {

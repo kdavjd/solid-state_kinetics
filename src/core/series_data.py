@@ -11,7 +11,7 @@ class SeriesData(BaseSlots):
         self.series = {}
         self.default_name_counter: int = 1
 
-    def process_request(self, params: dict) -> None:
+    def process_request(self, params: dict) -> None:  # noqa: C901
         operation = params.get("operation")
         logger.debug(f"{self.actor_name} processing operation: {operation}")
 
@@ -61,6 +61,27 @@ class SeriesData(BaseSlots):
             success = self.update_series(series_name, new_scheme, new_calculation_settings)
             r["data"] = success
 
+        def handle_load_deconvolution_results(p: dict, r: dict) -> None:
+            series_name = p.get("series_name")
+            deconvolution_results = p.get("deconvolution_results", {})
+
+            if series_name:
+                if series_name not in self.series:
+                    logger.error(f"Series '{series_name}' not found. Cannot store deconvolution results.")
+                    return
+
+                series_entry: dict = self.series[series_name]
+                existing_deconvolution_results: dict = series_entry.get("deconvolution_results", {})
+
+                existing_deconvolution_results.update(deconvolution_results)
+                series_entry["deconvolution_results"] = existing_deconvolution_results
+
+                r["data"] = True
+                logger.debug(f"Deconvolution results for {series_name} updated successfully.")
+            else:
+                logger.error("No series_name provided for loading deconvolution results.")
+                r["data"] = False
+
         operations_map = {
             OperationType.ADD_NEW_SERIES: handle_add_new_series,
             OperationType.DELETE_SERIES: handle_delete_series,
@@ -68,6 +89,7 @@ class SeriesData(BaseSlots):
             OperationType.GET_ALL_SERIES: handle_get_all_series,
             OperationType.GET_SERIES: handle_get_series,
             OperationType.SCHEME_CHANGE: handle_scheme_change,
+            OperationType.LOAD_DECONVOLUTION_RESULTS: handle_load_deconvolution_results,
         }
 
         handler = operations_map.get(operation)

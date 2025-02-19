@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
             OperationType.SCHEME_CHANGE: self._handle_scheme_change,
             OperationType.MODEL_PARAMS_CHANGE: self._handle_model_params_change,
             OperationType.SELECT_SERIES: self._handle_select_series,
+            OperationType.LOAD_DECONVOLUTION_RESULTS: self._handle_load_deconvolution_results,
         }
 
         handler = operation_handlers.get(operation)
@@ -114,6 +115,22 @@ class MainWindow(QMainWindow):
             handler(params)
         else:
             logger.error(f"{self.actor_name} unknown operation: {operation},\n\n {params=}")
+
+    def _handle_load_deconvolution_results(self, params: dict):
+        deconvolution_results = params.get("deconvolution_results", {})
+        for heating_rate, data in deconvolution_results.items():
+            series_name = params.get("series_name")
+            if series_name:
+                is_ok = self.handle_request_cycle(
+                    "series_data",
+                    OperationType.LOAD_DECONVOLUTION_RESULTS,
+                    series_name=series_name,
+                    deconvolution_results={heating_rate: data},
+                )
+                if not is_ok:
+                    logger.error(f"Failed to load deconvolution results for {series_name}.")
+            else:
+                logger.error("No series_name provided for deconvolution results.")
 
     def _handle_select_series(self, params: dict):
         series_name = params.get("series_name")
