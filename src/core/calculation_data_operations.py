@@ -135,7 +135,7 @@ class CalculationsDataOperations(BaseSlots):
             logger.warning(f"No parameters found for {reaction_name} with bound {bound_label}. Skipping plot.")
             return
         x_min, x_max = params[0]
-        x = np.linspace(x_min, x_max, 100)
+        x = np.linspace(x_min, x_max, 250)
         y = cft.calculate_reaction(params)
         curve_name = f"{reaction_name}_{bound_label}"
         logger.debug(f"Emitting plot signal for curve: {curve_name} in file: {file_name}.")
@@ -272,7 +272,7 @@ class CalculationsDataOperations(BaseSlots):
                     y = cft.calculate_reaction(reaction_params.get(bound_label, []))
                     if x is None:
                         x_min, x_max = params[0]
-                        x = np.linspace(x_min, x_max, 100)
+                        x = np.linspace(x_min, x_max, 250)
                     cumulative_y[bound_label] = cumulative_y[bound_label] + y if cumulative_y[bound_label].size else y
 
             # If reaction_name is specified in path_keys, treat it as highlighted

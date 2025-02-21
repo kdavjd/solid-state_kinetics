@@ -87,7 +87,7 @@ class CurveFitting:
     @staticmethod
     def calculate_reaction(reaction_params: tuple):
         x_range, function_type, coeffs = reaction_params
-        x = np.linspace(x_range[0], x_range[1], 100)
+        x = np.linspace(x_range[0], x_range[1], 250)  # TODO range number to dataclass
         result = None
         if function_type == "gauss":
             result = CurveFitting.gaussian(x, *coeffs)

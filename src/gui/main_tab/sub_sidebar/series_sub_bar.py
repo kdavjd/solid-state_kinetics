@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.core.app_settings import OperationType
+from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
 
@@ -128,6 +129,7 @@ class DeconvolutionResultsLoadDialog(QDialog):
 
 class SeriesSubBar(QWidget):
     load_deconvolution_results_signal = pyqtSignal(dict)
+    results_combobox_text_changed_signal = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -156,6 +158,13 @@ class SeriesSubBar(QWidget):
         self.layout.addWidget(self.export_button)
 
         self.load_button_deconvolution_results_button.clicked.connect(self.load_deconvolution_results_dialog)
+        self.results_combobox.currentTextChanged.connect(self.emit_combobox_text)
+
+        self.last_selected_reaction = None
+
+    def emit_combobox_text(self, text):
+        self.last_selected_reaction = text
+        self.results_combobox_text_changed_signal.emit(text)
 
     def load_deconvolution_results_dialog(self):
         dialog = DeconvolutionResultsLoadDialog(self)
@@ -168,7 +177,6 @@ class SeriesSubBar(QWidget):
         for heating_rate, file_path in files_data.items():
             data = self.load_reactions(file_path, str(heating_rate))
             if data:
-                self.results_combobox.addItem(f"Heating Rate: {heating_rate}", data)
                 self.load_deconvolution_results_signal.emit(
                     {
                         "deconvolution_results": {heating_rate: data},
@@ -225,16 +233,78 @@ class SeriesSubBar(QWidget):
         return common_reactions, missing_reactions
 
     def _update_table_with_reactions(self, common_reactions, deconvolution_results: dict):
+        self.results_combobox.blockSignals(True)
+        self.results_combobox.clear()
         self.table.setRowCount(0)
+
+        selected_reaction = self.last_selected_reaction if self.last_selected_reaction in common_reactions else None
 
         for reaction in common_reactions:
             self.results_combobox.addItem(f"{reaction}")
-
             row_position = self.table.rowCount()
             self.table.insertRow(row_position)
             self.table.setItem(row_position, 0, QTableWidgetItem(reaction))
             self.table.setItem(row_position, 1, QTableWidgetItem(""))
             self.table.setItem(row_position, 2, QTableWidgetItem(""))
+
+        if selected_reaction:
+            self.results_combobox.setCurrentText(selected_reaction)
+        else:
+            self.last_selected_reaction = None
+
+        self.results_combobox.blockSignals(False)
+
+    def _get_series_dataframe(
+        self, experimental_data: pd.DataFrame, deconvolution_results: dict, reaction_n="reaction_0"
+    ) -> pd.DataFrame:
+        temperatures = experimental_data["temperature"]
+        fitted_data = {}
+        for key, result in deconvolution_results.items():
+            reaction_data = result.get(reaction_n)
+            if reaction_data:
+                function_type = reaction_data.get("function")
+                coeffs = reaction_data.get("coeffs", {})
+
+                if function_type == "gauss":
+                    fitted_values = cft.calculate_reaction(
+                        (
+                            (np.min(temperatures), np.max(temperatures)),
+                            function_type,
+                            (coeffs.get("h", 0), coeffs.get("z", 0), coeffs.get("w", 0)),
+                        )
+                    )
+                elif function_type == "fraser":
+                    fitted_values = cft.calculate_reaction(
+                        (
+                            (np.min(temperatures), np.max(temperatures)),
+                            function_type,
+                            (coeffs.get("h", 0), coeffs.get("z", 0), coeffs.get("w", 0), coeffs.get("fr", 0)),
+                        )
+                    )
+                elif function_type == "ads":
+                    fitted_values = cft.calculate_reaction(
+                        (
+                            (np.min(temperatures), np.max(temperatures)),
+                            function_type,
+                            (
+                                coeffs.get("h", 0),
+                                coeffs.get("z", 0),
+                                coeffs.get("w", 0),
+                                coeffs.get("ads1", 0),
+                                coeffs.get("ads2", 0),
+                            ),
+                        )
+                    )
+                else:
+                    fitted_values = np.zeros_like(temperatures)
+
+                fitted_data[key] = fitted_values
+
+        # 250 depends on cft.calculate_reaction
+        fitted_data["temperature"] = np.linspace(np.min(temperatures), np.max(temperatures), 250)
+        series_df = pd.DataFrame(fitted_data)
+        logger.info(f"{series_df=}")
+        return series_df
 
     def update_series_ui(self, experimental_data: pd.DataFrame, deconvolution_results: dict):
         experimental_columns = experimental_data.columns.tolist()

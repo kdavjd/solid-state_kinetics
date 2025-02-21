@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
     def handle_request_from_main_tab(self, params: dict):
         operation = params.pop("operation")
 
-        logger.debug(f"{self.actor_name} handle_request_from_main_tab '{operation}'")
+        logger.info(f"{self.actor_name} handle_request_from_main_tab '{operation}' with {params=}")
 
         operation_handlers = {
             OperationType.DIFFERENTIAL: self._handle_differential,
@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
                     logger.error(f"Failed to load deconvolution results for {series_name}.")
             else:
                 logger.error("No series_name provided for deconvolution results.")
+        self._handle_select_series(params)
 
     def _handle_select_series(self, params: dict):
         series_name = params.get("series_name")
@@ -151,11 +152,17 @@ class MainWindow(QMainWindow):
             logger.warning(f"Couldn't get a scheme for the series '{series_name}'")
             return
 
-        self.main_tab.plot_canvas.plot_data_from_dataframe(series_df)
+        if deconvolution_results == {}:
+            self.main_tab.plot_canvas.plot_data_from_dataframe(series_df)
+        else:
+            reaction_n = params.get("reaction_n", "reaction_0")
+            reaction_df = self.main_tab.sub_sidebar.series_sub_bar._get_series_dataframe(
+                series_df, deconvolution_results, reaction_n
+            )
+            self.main_tab.plot_canvas.plot_data_from_dataframe(reaction_df)
         self.main_tab.sub_sidebar.model_based.update_scheme_data(reaction_scheme)
         self.main_tab.sub_sidebar.model_based.update_calculation_settings(calculation_settings)
         self.main_tab.sub_sidebar.series_sub_bar.update_series_ui(series_df, deconvolution_results)
-        self.update_model_simulation(series_name)
 
     def _handle_model_params_change(self, params: dict):
         series_name = params.get("series_name")

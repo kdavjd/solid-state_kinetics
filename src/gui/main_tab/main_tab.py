@@ -75,6 +75,7 @@ class MainTab(QWidget):
         self.sub_sidebar.model_based.calc_buttons.simulation_stopped.connect(self.to_main_window)
         self.sub_sidebar.model_based.model_params_changed.connect(self.to_main_window)
         self.sub_sidebar.series_sub_bar.load_deconvolution_results_signal.connect(self.to_main_window)
+        self.sub_sidebar.series_sub_bar.results_combobox_text_changed_signal.connect(self.select_series_reaction)
 
     def initialize_sizes(self):
         total_width = self.width()
@@ -112,6 +113,16 @@ class MainTab(QWidget):
     def select_series(self, series_name):
         if series_name in self.sidebar.get_series_names():
             self.to_main_window_signal.emit({"operation": OperationType.SELECT_SERIES, "series_name": series_name})
+
+    @pyqtSlot(str)
+    def select_series_reaction(self, reaction_name):
+        series_name = self.sidebar.active_series_item.text() if self.sidebar.active_series_item else "no_series"
+        params = {
+            "operation": OperationType.SELECT_SERIES,
+            "series_name": series_name,
+            "reaction_n": reaction_name,
+        }
+        self.to_main_window_signal.emit(params)
 
     @pyqtSlot(dict)
     def to_main_window(self, params: dict):
