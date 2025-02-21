@@ -1,6 +1,7 @@
 import json
 
 import numpy as np
+import pandas as pd
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -12,12 +13,15 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from src.core.app_settings import OperationType
 from src.core.logger_config import logger
+from src.core.logger_console import LoggerConsole as console
 
 
 class DialogDimensions:
@@ -33,7 +37,7 @@ class DeconvolutionResultsLoadDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.setWindowTitle("Load Deconvolution Results")
+        self.setWindowTitle("load deconvolution results")
         self.setMinimumWidth(DialogDimensions.MIN_WINDOW_WIDTH)
 
         self.layout = QVBoxLayout(self)
@@ -43,7 +47,7 @@ class DeconvolutionResultsLoadDialog(QDialog):
         self.file_inputs = []
         self.file_count = 1
 
-        self.add_button = QPushButton("Add File", self)
+        self.add_button = QPushButton("add file", self)
         self.add_button.clicked.connect(self.add_file_input)
 
         self.layout.addLayout(self.form_layout)
@@ -59,7 +63,7 @@ class DeconvolutionResultsLoadDialog(QDialog):
         self.add_file_input()
 
     def add_file_input(self):
-        file_input = QPushButton(f"Select File {self.file_count}", self)
+        file_input = QPushButton(f"select file {self.file_count}", self)
         heating_rate_input = QLineEdit(self)
         heating_rate_input.setPlaceholderText("heating rate:")
 
@@ -130,12 +134,26 @@ class SeriesSubBar(QWidget):
 
         self.layout = QVBoxLayout(self)
 
-        self.load_button_deconvolution_results_button = QPushButton("Load Deconvolution Results", self)
+        self.load_button_deconvolution_results_button = QPushButton("load deconvolution results", self)
         self.layout.addWidget(self.load_button_deconvolution_results_button)
 
         self.results_combobox = QComboBox(self)
-        self.results_combobox.setPlaceholderText("Select Reaction")
+        self.results_combobox.setPlaceholderText("select reaction")
         self.layout.addWidget(self.results_combobox)
+
+        self.model_free_method_combobox = QComboBox(self)
+        self.model_free_method_combobox.addItems(
+            ["direct-diff", "Coats-Redfern", "Freeman-Carroll", "Kissinger", "Horwitz-Metzger"]
+        )
+        self.layout.addWidget(self.model_free_method_combobox)
+
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(3)  # Adjust based on expected columns
+        self.table.setHorizontalHeaderLabels(["reactions", "Ea", "A"])
+        self.layout.addWidget(self.table)
+
+        self.export_button = QPushButton("Export Results", self)
+        self.layout.addWidget(self.export_button)
 
         self.load_button_deconvolution_results_button.clicked.connect(self.load_deconvolution_results_dialog)
 
@@ -175,3 +193,52 @@ class SeriesSubBar(QWidget):
         except IOError as e:
             logger.error(f"Error loading file {load_file_name}: {e}")
             return {}
+
+    def _check_missing_reactions(self, deconvolution_results: dict, experimental_columns: list):
+        reactions_per_key = {}
+
+        for key in deconvolution_results:
+            key_float = float(key)
+
+            if key_float not in [float(x) for x in experimental_columns]:
+                logger.error(f"Missing corresponding data for key: {key_float} in {experimental_columns=}")
+                console.log(f"Missing corresponding data for key: {key_float} in {experimental_columns=}")
+                continue
+
+            reaction_data = deconvolution_results[key]
+            reaction_keys = list(reaction_data.keys())
+
+            reactions_for_this_key = set()
+            for reaction in reaction_keys:
+                reactions_for_this_key.add(reaction)
+
+            reactions_per_key[key] = reactions_for_this_key
+
+        common_reactions = set.intersection(*reactions_per_key.values()) if reactions_per_key else set()
+        all_reactions = {reaction for reactions_set in reactions_per_key.values() for reaction in reactions_set}
+        missing_reactions = all_reactions - common_reactions
+
+        if missing_reactions:
+            logger.error(f"The following reactions do not appear in all keys: {missing_reactions}")
+            console.log(f"The following reactions do not appear in all keys: {missing_reactions}")
+
+        return common_reactions, missing_reactions
+
+    def _update_table_with_reactions(self, common_reactions, deconvolution_results: dict):
+        self.table.setRowCount(0)
+
+        for reaction in common_reactions:
+            self.results_combobox.addItem(f"{reaction}")
+
+            row_position = self.table.rowCount()
+            self.table.insertRow(row_position)
+            self.table.setItem(row_position, 0, QTableWidgetItem(reaction))
+            self.table.setItem(row_position, 1, QTableWidgetItem(""))
+            self.table.setItem(row_position, 2, QTableWidgetItem(""))
+
+    def update_series_ui(self, experimental_data: pd.DataFrame, deconvolution_results: dict):
+        experimental_columns = experimental_data.columns.tolist()
+        experimental_columns = [col for col in experimental_columns if col != "temperature"]
+
+        common_reactions, _ = self._check_missing_reactions(deconvolution_results, experimental_columns)
+        self._update_table_with_reactions(common_reactions, deconvolution_results)

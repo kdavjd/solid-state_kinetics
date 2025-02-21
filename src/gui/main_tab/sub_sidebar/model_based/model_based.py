@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+import numpy as np
+import pandas as pd
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -23,8 +25,10 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from scipy.integrate import solve_ivp
 
-from src.core.app_settings import NUC_MODELS_LIST, OperationType
+from src.core.app_settings import NUC_MODELS_LIST, NUC_MODELS_TABLE, OperationType
+from src.core.logger_config import logger
 from src.gui.main_tab.sub_sidebar.model_based.models_scheme import ModelsScheme
 
 
@@ -606,6 +610,73 @@ class ModelBasedTab(QWidget):
             self.model_params_changed.emit(update_data)
 
             QMessageBox.information(self, "Settings Saved", "The settings have been updated successfully.")
+
+    def _simulate_reaction_model(self, experimental_data: pd.DataFrame, reaction_scheme: dict):
+        T = experimental_data["temperature"].values
+        T_K = T + 273.15
+
+        beta_columns = [col for col in experimental_data.columns if col.lower() != "temperature"]
+
+        reactions = reaction_scheme.get("reactions", [])
+        components = reaction_scheme.get("components", [])
+
+        species_list = [comp["id"] for comp in components]
+        num_species = len(species_list)
+        num_reactions = len(reactions)
+
+        logA = np.array([reaction.get("log_A", 0) for reaction in reactions])
+        Ea = np.array([reaction.get("Ea", 0) for reaction in reactions])
+        contributions = np.array([reaction.get("contribution", 0) for reaction in reactions])
+        R = 8.314
+
+        simulation_results = {"temperature": T}
+
+        for beta_col in beta_columns:
+            beta_value = float(beta_col)
+
+            def ode_func(T_val, X):
+                dXdt = np.zeros(num_species + num_reactions)
+                conc = X[:num_species]
+                beta_SI = beta_value / 60.0
+                for i, reaction in enumerate(reactions):
+                    src = reaction.get("from")
+                    tgt = reaction.get("to")
+                    if src not in species_list or tgt not in species_list:
+                        continue
+                    src_index = species_list.index(src)
+                    tgt_index = species_list.index(tgt)
+                    e_value = conc[src_index]
+                    reaction_type = reaction.get("reaction_type")
+                    model = NUC_MODELS_TABLE.get(reaction_type)
+                    f_e = model["differential_form"](e_value)
+                    # Arrhenius
+                    k_i = (10 ** logA[i]) * np.exp(-Ea[i] * 1000 / (R * T_val))
+                    k_i /= beta_SI
+                    rate = k_i * f_e
+                    dXdt[src_index] -= rate
+                    dXdt[tgt_index] += rate
+                    dXdt[num_species + i] = rate
+                return dXdt
+
+            X0 = np.zeros(num_species + num_reactions)
+            if num_species > 0:
+                X0[0] = 1.0
+
+            sol = solve_ivp(ode_func, [T_K[0], T_K[-1]], X0, t_eval=T_K, method="RK45")
+            if not sol.success:
+                logger.error(f"ODE failed for β = {beta_value}.")
+                continue
+
+            rates_int = sol.y[num_species : num_species + num_reactions, :]
+            int_sum = np.sum(contributions[:, np.newaxis] * rates_int, axis=0)
+            exp_mass = experimental_data[beta_col].values
+            M0 = exp_mass[0]
+            Mfin = exp_mass[-1]
+
+            model_mass = M0 - (M0 - Mfin) * int_sum
+            simulation_results[beta_col] = model_mass
+
+        return pd.DataFrame(simulation_results)
 
 
 class CalculationSettingsDialog(QDialog):
