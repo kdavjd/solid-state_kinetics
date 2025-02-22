@@ -174,10 +174,7 @@ NUC_MODELS_TABLE = {
 
 
 def clamp_fraction(e, eps=1e-8):
-    if e < eps:
-        e = eps
-    elif e > 1 - eps:
-        e = 1 - eps
+    e = np.clip(e, eps, 1 - eps)
     return e
 
 
