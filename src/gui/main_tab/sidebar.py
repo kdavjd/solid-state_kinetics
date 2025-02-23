@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.core.app_settings import OperationType
+from src.core.app_settings import OperationType, SideBarNames
 from src.core.logger_config import logger
 from src.gui.main_tab.load_file_button import LoadButton
 
@@ -67,9 +67,9 @@ class SideBar(QWidget):
         # Initialize calculation section
         self.calculation_root = QStandardItem("calculation")
         self.model.appendRow(self.calculation_root)
-        self.calculation_root.appendRow(QStandardItem("Ea"))
-        self.calculation_root.appendRow(QStandardItem("A"))
-        self.calculation_root.appendRow(QStandardItem("model-based"))
+        self.calculation_root.appendRow(QStandardItem("model fit"))
+        self.calculation_root.appendRow(QStandardItem("model free"))
+        self.calculation_root.appendRow(QStandardItem("model based"))
 
         # Initialize settings section
         self.settings_root = QStandardItem("settings")
@@ -160,7 +160,7 @@ class SideBar(QWidget):
         elif item == self.delete_series_item:
             self.delete_series()
         elif item.parent() == self.experiments_data_root:
-            self.sub_side_bar_needed.emit("experiments")
+            self.sub_side_bar_needed.emit(SideBarNames.EXPERIMENTS.value)
             self.chosen_experiment_signal.emit(item.text())
             self.mark_as_active(item)
         elif item == self.console_show_state:
@@ -179,7 +179,7 @@ class SideBar(QWidget):
             if item.text() in action_items:
                 pass
             else:
-                self.sub_side_bar_needed.emit("series")
+                self.sub_side_bar_needed.emit(SideBarNames.SERIES.value)
                 self.mark_as_active(item, is_series=True)
                 logger.debug(f"Selected series: {item.text()}")
         else:
@@ -258,7 +258,7 @@ class SideBar(QWidget):
         self.experiments_data_root.insertRow(self.experiments_data_root.rowCount() - 2, new_file_item)
         self.tree_view.expandAll()
         self.mark_as_active(new_file_item)
-        self.sub_side_bar_needed.emit("experiments")
+        self.sub_side_bar_needed.emit(SideBarNames.EXPERIMENTS.value)
         logger.debug(f"New file added and set as active: {new_file_item.text()}")
 
     def delete_active_file(self):

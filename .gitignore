@@ -1,4 +1,5 @@
-docs/
+docs/drafts
+docs/literature
 .vscode/
 .ruff_cache/
 # Byte-compiled / optimized / DLL files

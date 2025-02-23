@@ -173,15 +173,15 @@ NUC_MODELS_TABLE = {
 }
 
 
-def clamp_fraction(e, eps=1e-8):
+def clip_fraction(e, eps=1e-8):
     e = np.clip(e, eps, 1 - eps)
     return e
 
 
-def clamp_fraction_decorator(eps=1e-8):
+def clip_fraction_decorator(eps=1e-8):
     def decorator(func):
         def wrapper(e, *args, **kwargs):
-            e_clamped = clamp_fraction(e, eps=eps)
+            e_clamped = clip_fraction(e, eps=eps)
             return func(e_clamped, *args, **kwargs)
 
         return wrapper
@@ -193,4 +193,15 @@ NUC_MODELS_LIST = sorted(NUC_MODELS_TABLE.keys())
 for key in NUC_MODELS_LIST:
     if key in NUC_MODELS_TABLE:
         df = NUC_MODELS_TABLE[key]["differential_form"]
-        NUC_MODELS_TABLE[key]["differential_form"] = clamp_fraction_decorator()(df)
+        NUC_MODELS_TABLE[key]["differential_form"] = clip_fraction_decorator()(df)
+
+
+MODEL_FIT_METHODS = ["direct-diff", "Coats-Redfern", "Freeman-Carroll", "Kissinger", "Horwitz-Metzger"]
+
+
+class SideBarNames(Enum):
+    MODEL_BASED = "model based"
+    MODEL_FREE = "model free"
+    MODEL_FIT = "model fit"
+    EXPERIMENTS = "experiments"
+    SERIES = "series"

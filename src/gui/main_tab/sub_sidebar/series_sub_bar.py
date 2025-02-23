@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.core.app_settings import OperationType
+from src.core.app_settings import MODEL_FIT_METHODS, OperationType
 from src.core.curve_fitting import CurveFitting as cft
 from src.core.logger_config import logger
 from src.core.logger_console import LoggerConsole as console
@@ -144,9 +144,7 @@ class SeriesSubBar(QWidget):
         self.layout.addWidget(self.results_combobox)
 
         self.model_free_method_combobox = QComboBox(self)
-        self.model_free_method_combobox.addItems(
-            ["direct-diff", "Coats-Redfern", "Freeman-Carroll", "Kissinger", "Horwitz-Metzger"]
-        )
+        self.model_free_method_combobox.addItems(MODEL_FIT_METHODS)
         self.layout.addWidget(self.model_free_method_combobox)
 
         self.table = QTableWidget(self)

@@ -1,7 +1,7 @@
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
-from src.core.app_settings import OperationType
+from src.core.app_settings import OperationType, SideBarNames
 from src.core.logger_config import logger
 from src.gui.console_widget import ConsoleWidget
 from src.gui.main_tab.plot_canvas.plot_canvas import PlotCanvas
@@ -62,7 +62,7 @@ class MainTab(QWidget):
         self.sidebar.active_series_selected.connect(self.select_series)
         self.plot_canvas.update_value.connect(self.update_anchors_slot)
         self.sub_sidebar.deconvolution_sub_bar.calc_buttons.calculation_started.connect(self.to_main_window)
-        self.sub_sidebar.ea_sub_bar.create_series_signal.connect(self.to_main_window)
+        self.sub_sidebar.model_fit_sub_bar.create_series_signal.connect(self.to_main_window)
         self.sub_sidebar.deconvolution_sub_bar.file_transfer_buttons.import_reactions_signal.connect(
             self.to_main_window
         )
@@ -98,7 +98,7 @@ class MainTab(QWidget):
         logger.debug(f"totoggle_sub_sidebar: {content_type=}")
         if content_type:
             if content_type in self.sidebar.get_experiment_files_names():
-                self.sub_sidebar.update_content("experiments")
+                self.sub_sidebar.update_content(SideBarNames.EXPERIMENTS.value)
             else:
                 self.sub_sidebar.update_content(content_type)
             self.sub_sidebar.setVisible(True)
