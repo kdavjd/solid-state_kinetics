@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.core.app_settings import OperationType
+from src.core.app_settings import OperationType, SideBarNames
 from src.core.logger_config import logger
 
 
@@ -153,7 +153,7 @@ class ActionButtonsBlock(QWidget):
         self.derivative_clicked.emit({"operation": OperationType.DIFFERENTIAL})
 
     def emit_deconvolution_signal(self):
-        self.deconvolution_clicked.emit("deconvolution")
+        self.deconvolution_clicked.emit(SideBarNames.DECONVOLUTION.value)
 
 
 class ExperimentSubBar(QWidget):

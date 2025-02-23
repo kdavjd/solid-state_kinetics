@@ -12,11 +12,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from src.core.app_settings import MODEL_FIT_METHODS, NUC_MODELS_LIST
+from src.core.app_settings import MODEL_FIT_METHODS, NUC_MODELS_LIST, OperationType
 
 
 class ModelFitSubBar(QWidget):
-    create_series_signal = pyqtSignal(dict)
+    model_fit_calculation = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -71,26 +71,30 @@ class ModelFitSubBar(QWidget):
         self.setLayout(self.layout)
 
     def on_calculate_clicked(self):
-        # Validate inputs
         try:
             alpha_min = float(self.alpha_min_input.text())
             alpha_max = float(self.alpha_max_input.text())
             valid_proportion = float(self.valid_proportion_input.text())
+            fit_method = self.model_combobox.currentText()
 
-            # Validate alpha_min and alpha_max
             if not (0 <= alpha_min <= 0.999):
                 raise ValueError("alpha_min must be between 0 and 0.999")
             if not (0 <= alpha_max <= 1):
                 raise ValueError("alpha_max must be between 0 and 1")
             if alpha_min > alpha_max:
                 raise ValueError("alpha_min cannot be greater than alpha_max")
-
-            # Validate valid_proportion
             if not (0.001 <= valid_proportion <= 1):
                 raise ValueError("valid proportion must be between 0.001 and 1")
 
-            # If validation passes, you can perform further calculations or processing here
-            self.populate_table()
+            self.model_fit_calculation.emit(
+                {
+                    "fit_method": fit_method,
+                    "alpha_min": alpha_min,
+                    "alpha_max": alpha_max,
+                    "valid_proportion": valid_proportion,
+                    "operation": OperationType.MODEL_FIT_CALCULATION,
+                }
+            )
 
         except ValueError as e:
             QMessageBox.warning(self, "Input Error", str(e))

@@ -1,10 +1,10 @@
-from gui.main_tab.sub_sidebar.model_free.model_fit_sub_bar import ModelFitSubBar
+from gui.main_tab.sub_sidebar.model_fit_sub_bar import ModelFitSubBar
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from src.core.app_settings import SideBarNames
+from src.gui.main_tab.sub_sidebar.deconvolution_sub_bar import DeconvolutionSubBar
+from src.gui.main_tab.sub_sidebar.experiment_sub_bar import ExperimentSubBar
 from src.gui.main_tab.sub_sidebar.model_based.model_based import ModelBasedTab
-from src.gui.main_tab.sub_sidebar.model_free.deconvolution_sub_bar import DeconvolutionSubBar
-from src.gui.main_tab.sub_sidebar.model_free.experiment_sub_bar import ExperimentSubBar
 from src.gui.main_tab.sub_sidebar.series_sub_bar import SeriesSubBar
 
 
@@ -32,7 +32,7 @@ class SubSideHub(QWidget):
             self.layout.removeWidget(self.current_widget)
             self.current_widget.hide()
 
-        if content_type == "deconvolution":
+        if content_type == SideBarNames.DECONVOLUTION.value:
             self.current_widget = self.deconvolution_sub_bar
         elif content_type == SideBarNames.MODEL_FIT.value:
             self.current_widget = self.model_fit_sub_bar

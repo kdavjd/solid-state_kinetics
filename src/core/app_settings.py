@@ -37,6 +37,7 @@ class OperationType(Enum):
     MODEL_PARAMS_CHANGE = "model_params_change"
     SELECT_SERIES = "select_series"
     LOAD_DECONVOLUTION_RESULTS = "load_deconvolution_results"
+    MODEL_FIT_CALCULATION = "model_fit_calculation"
 
 
 MODEL_BASED_DIFFERENTIAL_EVOLUTION_DEFAULT_KWARGS = {
@@ -205,3 +206,4 @@ class SideBarNames(Enum):
     MODEL_FIT = "model fit"
     EXPERIMENTS = "experiments"
     SERIES = "series"
+    DECONVOLUTION = "deconvolution"
